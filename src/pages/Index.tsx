@@ -6,16 +6,47 @@ import { Contact } from "@/components/Contact";
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Hero />
-      <Skills />
-      <Projects />
-      <Contact />
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="text-xl font-bold">BORKISS</div>
+          <div className="flex gap-8">
+            <a href="#work" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Work
+            </a>
+            <a href="#skills" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Skills
+            </a>
+            <a href="#contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Contact
+            </a>
+          </div>
+        </div>
+      </nav>
       
-      <footer className="border-t border-primary/20 py-6">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <p className="text-muted-foreground text-sm font-mono">
-            © 2025 BORKISS.TRADE | <span className="text-primary">SYSTEM_OPERATIONAL</span>
+      <Hero />
+      <div id="skills">
+        <Skills />
+      </div>
+      <div id="work">
+        <Projects />
+      </div>
+      <div id="contact">
+        <Contact />
+      </div>
+      
+      <footer className="border-t border-border py-8">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            © 2025 borkiss.trade — All rights reserved
           </p>
+          <div className="flex gap-6">
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Privacy
+            </a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Terms
+            </a>
+          </div>
         </div>
       </footer>
     </div>

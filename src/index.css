@@ -2,50 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 3%;
-    --foreground: 120 100% 85%;
+    --background: 0 0% 8%;
+    --foreground: 0 0% 95%;
 
-    --card: 0 0% 5%;
-    --card-foreground: 120 100% 85%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 5%;
-    --popover-foreground: 120 100% 85%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 120 100% 50%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 120 100% 45%;
+    --primary-foreground: 0 0% 8%;
 
-    --secondary: 18 100% 60%;
-    --secondary-foreground: 0 0% 0%;
+    --secondary: 18 100% 55%;
+    --secondary-foreground: 0 0% 8%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 120 100% 40%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 60%;
 
-    --accent: 18 100% 60%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 200 100% 50%;
+    --accent-foreground: 0 0% 8%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 120 100% 85%;
+    --destructive-foreground: 0 0% 95%;
 
-    --border: 120 100% 20%;
-    --input: 120 100% 15%;
-    --ring: 120 100% 50%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 120 100% 45%;
 
-    --radius: 0rem;
+    --radius: 0.25rem;
 
-    --sidebar-background: 0 0% 5%;
-    --sidebar-foreground: 120 100% 85%;
-    --sidebar-primary: 120 100% 50%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 10%;
-    --sidebar-accent-foreground: 120 100% 85%;
-    --sidebar-border: 120 100% 20%;
-    --sidebar-ring: 120 100% 50%;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 120 100% 45%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 120 100% 45%;
   }
 }
 
@@ -55,77 +51,36 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground font-mono;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
 
 @layer utilities {
-  .text-matrix {
-    @apply text-primary;
-    text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  .text-orange {
-    @apply text-secondary;
-    text-shadow: 0 0 10px hsl(var(--secondary) / 0.5);
+  .grid-pattern {
+    background-image: 
+      linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 
-  .border-glow {
-    box-shadow: 0 0 10px hsl(var(--primary) / 0.3);
+  .glow-effect {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.1);
   }
 
-  .corner-brackets::before,
-  .corner-brackets::after {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    border: 1px solid hsl(var(--primary));
+  .hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .corner-brackets::before {
-    top: 0;
-    left: 0;
-    border-right: none;
-    border-bottom: none;
-  }
-
-  .corner-brackets::after {
-    bottom: 0;
-    right: 0;
-    border-left: none;
-    border-top: none;
-  }
-
-  @keyframes glitch {
-    0%, 100% { transform: translate(0); }
-    20% { transform: translate(-2px, 2px); }
-    40% { transform: translate(-2px, -2px); }
-    60% { transform: translate(2px, 2px); }
-    80% { transform: translate(2px, -2px); }
-  }
-
-  @keyframes typing {
-    from { width: 0; }
-    to { width: 100%; }
-  }
-
-  @keyframes blink {
-    50% { opacity: 0; }
-  }
-
-  .animate-glitch {
-    animation: glitch 0.3s infinite;
-  }
-
-  .typing-effect {
-    overflow: hidden;
-    white-space: nowrap;
-    animation: typing 3s steps(40, end);
-  }
-
-  .cursor-blink::after {
-    content: '|';
-    animation: blink 1s step-end infinite;
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px hsl(var(--primary) / 0.15);
   }
 }

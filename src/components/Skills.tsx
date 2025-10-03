@@ -1,49 +1,52 @@
-import { CornerBrackets } from "./CornerBrackets";
-
-const skills = {
-  FRONTEND: ["React", "TypeScript", "Next.js", "Tailwind", "Three.js"],
-  BACKEND: ["Node.js", "Python", "PostgreSQL", "Redis", "Docker"],
-  BLOCKCHAIN: ["Solidity", "Ethers.js", "Web3.js", "Smart Contracts"],
-  SECURITY: ["Penetration Testing", "OWASP", "Cryptography", "Network Security"],
-};
+const skills = [
+  { category: "Frontend", items: ["React", "TypeScript", "Next.js", "Tailwind CSS", "Three.js"] },
+  { category: "Backend", items: ["Node.js", "Python", "PostgreSQL", "Redis", "Docker"] },
+  { category: "Blockchain", items: ["Solidity", "Ethers.js", "Web3.js", "Smart Contracts", "IPFS"] },
+  { category: "Security", items: ["Penetration Testing", "OWASP", "Cryptography", "Network Security", "Auditing"] },
+];
 
 export const Skills = () => {
   return (
-    <section className="min-h-screen py-20 px-4">
-      <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold text-primary mb-12 font-mono">
-          <span className="text-secondary">{'> '}</span>TECH_STACK
-        </h2>
+    <section className="py-32 px-4 relative">
+      <div className="absolute inset-0 grid-pattern opacity-20" />
+      
+      <div className="max-w-6xl mx-auto relative">
+        <div className="mb-16">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">Tech Stack</h2>
+          <div className="w-20 h-1 bg-primary" />
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {Object.entries(skills).map(([category, items], idx) => (
-            <CornerBrackets key={category} className="p-6 bg-card border border-border">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-primary pb-2">
-                  <h3 className="text-xl font-bold text-primary font-mono">{category}</h3>
-                  <span className="text-secondary text-sm">LEVEL_{idx + 1}</span>
-                </div>
-                
-                <div className="space-y-2">
-                  {items.map((skill, index) => (
-                    <div key={skill} className="flex items-center space-x-3">
-                      <span className="text-secondary">{'>'}</span>
-                      <span className="text-muted-foreground font-mono">{skill}</span>
-                      <div className="flex-1 flex space-x-1 ml-auto">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`h-2 w-8 ${
-                              i <= index ? 'bg-primary' : 'bg-muted'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {skills.map((skill, idx) => (
+            <div
+              key={skill.category}
+              className="border border-border bg-card p-8 hover-lift"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-semibold">{skill.category}</h3>
+                <span className="text-xs text-muted-foreground px-3 py-1 border border-border">
+                  0{idx + 1}
+                </span>
               </div>
-            </CornerBrackets>
+              
+              <div className="space-y-3">
+                {skill.items.map((item) => (
+                  <div key={item} className="flex items-center justify-between py-2 border-b border-border/50">
+                    <span className="text-foreground">{item}</span>
+                    <div className="flex gap-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-2 h-2 ${
+                            i < 4 ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
