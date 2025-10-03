@@ -39,15 +39,15 @@ interface AnimationConfig {
 // Default configuration - easy to customize
 const DEFAULT_CONFIG: AnimationConfig = {
   pattern: 'star',
-  charSize: 12,
-  density: 800,              // Increased for smooth elegant lines
+  charSize: 16,              // Larger characters for better visibility
+  density: 300,              // Reduced density - more space between letters
   rotationSpeed: 0,          // No rotation - static star
-  pulseSpeed: 0.001,         // Very slow gentle pulse
-  pulseAmplitude: 0.08,      // Subtle breathing effect
-  mouseInfluence: 0.15,      // Minimal mouse interaction
-  scrollInfluence: 0.1,      // Minimal scroll effect
-  opacity: 0.35,             // Good visibility
-  glowIntensity: 10
+  pulseSpeed: 0.0008,        // Very slow gentle pulse
+  pulseAmplitude: 0.05,      // Minimal breathing effect
+  mouseInfluence: 0.1,       // Subtle mouse interaction
+  scrollInfluence: 0.05,     // Minimal scroll effect
+  opacity: 0.9,              // High opacity for clear visibility
+  glowIntensity: 15          // Strong glow for dramatic effect
 };
 
 /**
@@ -301,8 +301,8 @@ export const AnimatedBackground = () => {
       time += 0.016; // ~60fps
       rotation += config.rotationSpeed;
 
-      // Clear canvas with transparent black for trailing effect
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      // Clear canvas with pure black background
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Calculate center point
@@ -347,36 +347,59 @@ export const AnimatedBackground = () => {
           finalY += (dy / distance) * force * 30;
         }
 
-        // Apply scroll influence - pattern shifts based on scroll
-        const scrollOffset = scrollRef.current * config.scrollInfluence * 0.1;
-        finalY += Math.sin(index * 0.1 + scrollOffset) * 10;
+        // Apply minimal scroll influence
+        const scrollOffset = scrollRef.current * config.scrollInfluence * 0.05;
+        finalY += Math.sin(index * 0.05 + scrollOffset) * 3;
 
-        // Calculate grayscale color based on depth
-        // Depth ranges from 0 (dark) to 1 (bright)
-        // Ensure minimum brightness so nothing is completely invisible
-        const minBrightness = 80; // Minimum gray value to ensure visibility
-        const maxBrightness = 255;
-        const baseGray = minBrightness + Math.floor(point.depth * (maxBrightness - minBrightness));
+        /**
+         * ANIMATED GRADIENT SYSTEM
+         * Creates a flowing wave of brightness across the star
+         * Gradient animates from dark gray → light gray → bright white → light gray → dark gray
+         */
         
-        // Add pulsing variation to create more dynamic shading
-        const pulseVariation = (Math.sin(time * config.pulseSpeed * 2 + index * 0.1) + 1) * 0.1;
-        const adjustedGray = Math.floor(Math.min(255, baseGray * (1 + pulseVariation)));
+        // Base depth from pattern (0 to 1)
+        const baseDepth = point.depth;
         
-        // Create grayscale color
-        const grayValue = `rgb(${adjustedGray}, ${adjustedGray}, ${adjustedGray})`;
+        // Create animated gradient wave that flows along the star
+        // Using sine wave that moves over time
+        const gradientWave = Math.sin(time * 0.5 + index * 0.02);
         
-        // Apply color with glow effect for brighter tones
-        ctx.fillStyle = grayValue;
+        // Combine base depth with animated wave
+        // This creates a "breathing" gradient effect
+        const animatedDepth = baseDepth * 0.5 + (gradientWave * 0.5 + 0.5) * 0.5;
         
-        // Add subtle glow only to brighter characters
-        if (adjustedGray > 150) {
-          ctx.shadowColor = grayValue;
-          ctx.shadowBlur = ((adjustedGray - 150) / 105) * config.glowIntensity;
+        // Map depth to grayscale range
+        // Minimum: 40 (dark gray) → Maximum: 255 (bright white)
+        const minGray = 40;   // Dark gray - never completely black for visibility
+        const maxGray = 255;  // Bright white
+        const grayValue = minGray + Math.floor(animatedDepth * (maxGray - minGray));
+        
+        // Add position-based variation for more organic gradient
+        // Creates subtle variations in brightness based on position
+        const positionVariation = Math.sin(index * 0.1 + time * 0.3) * 20;
+        const finalGray = Math.max(minGray, Math.min(maxGray, grayValue + positionVariation));
+        
+        // Create RGB color (grayscale)
+        const color = `rgb(${finalGray}, ${finalGray}, ${finalGray})`;
+        
+        // Apply color
+        ctx.fillStyle = color;
+        
+        /**
+         * GLOW EFFECT
+         * Brighter characters get more glow for dramatic depth
+         * Creates a luminous, ethereal quality
+         */
+        if (finalGray > 120) {
+          ctx.shadowColor = color;
+          // Scale glow intensity based on brightness
+          const glowStrength = ((finalGray - 120) / 135) * config.glowIntensity;
+          ctx.shadowBlur = glowStrength;
         } else {
           ctx.shadowBlur = 0;
         }
 
-        // Draw character with overall opacity
+        // Draw character with configured opacity
         ctx.globalAlpha = config.opacity;
         ctx.fillText(point.char, finalX, finalY);
       });
@@ -409,7 +432,7 @@ export const AnimatedBackground = () => {
       style={{
         zIndex: 0,
         mixBlendMode: 'normal',
-        background: 'transparent'
+        background: '#000000'  // Pure black background
       }}
     />
   );
@@ -418,23 +441,36 @@ export const AnimatedBackground = () => {
 /**
  * CUSTOMIZATION GUIDE:
  * 
- * To change the pattern:
- * - Modify DEFAULT_CONFIG.pattern to: 'star', 'spiral', 'wave', 'grid', or 'circle'
+ * STAR PROPORTIONS:
+ * - verticalRadius: Controls height of top/bottom arms (line 72)
+ * - horizontalRadius: Controls width of left/right arms (line 73)
+ * - innerRadius: Controls tightness of center connection (line 74)
  * 
- * To adjust animation speed:
- * - rotationSpeed: higher = faster rotation
- * - pulseSpeed: higher = faster pulsing
- * - pulseAmplitude: higher = more expansion/contraction
+ * DENSITY & SPACING:
+ * - density: Lower = more space between letters, higher = denser (line 40)
+ * - charSize: Size of each ASCII character (line 39)
  * 
- * To change interactivity:
- * - mouseInfluence: 0 = no effect, 1 = maximum effect
- * - scrollInfluence: 0 = no effect, 1 = maximum effect
+ * ANIMATION:
+ * - pulseSpeed: Speed of breathing effect (line 42)
+ * - pulseAmplitude: Strength of breathing (line 43)
+ * - time * 0.5: Speed of gradient animation wave (line 319)
+ * - index * 0.02: Spacing of gradient wave (line 319)
  * 
- * To adjust visibility:
- * - opacity: lower = more transparent, keeps text readable
- * - glowIntensity: higher = more glow effect
+ * GRADIENT COLORS:
+ * - minGray (40): Darkest shade - adjust for darker/lighter minimum (line 327)
+ * - maxGray (255): Brightest shade - always white
+ * - positionVariation: Organic variation amount (line 333)
  * 
- * To change density:
- * - density: higher = more characters in pattern
- * - charSize: larger = bigger characters
+ * GLOW EFFECT:
+ * - glowIntensity: Overall glow strength (line 47)
+ * - Threshold (120): When glow starts (line 346)
+ * 
+ * INTERACTIVITY:
+ * - mouseInfluence: How much mouse affects pattern (line 44)
+ * - scrollInfluence: How much scroll affects pattern (line 45)
+ * - maxDistance: Range of mouse interaction (line 297)
+ * 
+ * VISIBILITY:
+ * - opacity: Overall transparency of animation (line 46)
+ * - Use lower opacity if text readability is an issue
  */
