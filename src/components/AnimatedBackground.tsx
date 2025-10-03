@@ -1,199 +1,359 @@
 import { useEffect, useRef, useState } from 'react';
 
-const TradingChart = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+// ASCII Art Animation Frames
+const ANIMATIONS = {
+  rotatingCube: [
+    `
+      +------+
+     /|     /|
+    / |    / |
+   +------+  |
+   |  |   |  |
+   |  +---|--+
+   | /    | /
+   |/     |/
+   +------+
+    `,
+    `
+      +------+
+     /      /|
+    /      / |
+   +------+  |
+   |      |  |
+   |      |  +
+   |      | /
+   |      |/
+   +------+
+    `,
+    `
+      ________
+     /       /|
+    /       / |
+   +-------+  |
+   |       |  |
+   |       |  +
+   |       | /
+   +-------+
+    `,
+    `
+    +--------+
+    |       /|
+    |      / |
+    |     /  |
+    |    /   |
+    |   /    |
+    |  /     |
+    | /      |
+    |/       |
+    +--------+
+    `
+  ],
   
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    
-    // Generate trading data
-    const points: { x: number; y: number }[] = [];
-    const numPoints = 100;
-    let price = canvas.height / 2;
-    
-    for (let i = 0; i < numPoints; i++) {
-      price += (Math.random() - 0.5) * 30;
-      price = Math.max(canvas.height * 0.3, Math.min(canvas.height * 0.7, price));
-      points.push({
-        x: (i / numPoints) * canvas.width,
-        y: price
-      });
-    }
-    
-    let offset = 0;
-    
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw grid
-      ctx.strokeStyle = 'rgba(0, 255, 0, 0.05)';
-      ctx.lineWidth = 1;
-      
-      for (let i = 0; i < canvas.width; i += 50) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, canvas.height);
-        ctx.stroke();
-      }
-      
-      for (let i = 0; i < canvas.height; i += 50) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(canvas.width, i);
-        ctx.stroke();
-      }
-      
-      // Draw chart line
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
-      ctx.lineWidth = 2;
-      
-      points.forEach((point, index) => {
-        const x = point.x - offset;
-        if (index === 0) {
-          ctx.moveTo(x, point.y);
-        } else {
-          ctx.lineTo(x, point.y);
-        }
-      });
-      
-      ctx.stroke();
-      
-      // Fill area under chart
-      ctx.lineTo(points[points.length - 1].x - offset, canvas.height);
-      ctx.lineTo(points[0].x - offset, canvas.height);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
-      ctx.fill();
-      
-      offset += 0.5;
-      if (offset > canvas.width / numPoints) {
-        offset = 0;
-        // Add new point
-        const lastPoint = points[points.length - 1];
-        let newPrice = lastPoint.y + (Math.random() - 0.5) * 30;
-        newPrice = Math.max(canvas.height * 0.3, Math.min(canvas.height * 0.7, newPrice));
-        points.shift();
-        points.push({
-          x: lastPoint.x + canvas.width / numPoints,
-          y: newPrice
-        });
-      }
-      
-      requestAnimationFrame(animate);
-    };
-    
-    animate();
-    
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-    };
-  }, []);
+  runningCharacter: [
+    `
+     o
+    /|\\
+    / \\
+    `,
+    `
+     o
+    /|\\
+     |
+    / \\
+    `,
+    `
+     o
+    \\|/
+     |
+    / \\
+    `,
+    `
+     o
+    \\|
+     |\\
+    /  \\
+    `,
+    `
+     o
+     |\\
+    /|
+     / \\
+    `
+  ],
   
-  return <canvas ref={canvasRef} className="absolute inset-0" />;
+  wave: [
+    `
+    ~~~~~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~~~
+    `,
+    `
+    ~~~~~~~~~~~~~~~
+    `
+  ],
+  
+  tradingChart: [
+    `
+    ₿  ↗ $52,340
+    ───────────────
+    │         ╱╲
+    │        ╱  ╲
+    │   ╱╲  ╱    ╲╱
+    │  ╱  ╲╱
+    │ ╱
+    └────────────→
+    `,
+    `
+    ₿  ↗ $52,450
+    ───────────────
+    │          ╱╲
+    │         ╱  ╲
+    │    ╱╲  ╱    ╲
+    │   ╱  ╲╱      ╲
+    │  ╱
+    └────────────→
+    `,
+    `
+    ₿  ↗ $52,680
+    ───────────────
+    │           ╱╲
+    │          ╱  ╲
+    │     ╱╲  ╱    ╲
+    │    ╱  ╲╱
+    │   ╱
+    └────────────→
+    `,
+    `
+    ₿  ↗ $52,820
+    ───────────────
+    │            ╱
+    │           ╱╲
+    │      ╱╲  ╱  ╲
+    │     ╱  ╲╱
+    │    ╱
+    └────────────→
+    `
+  ],
+  
+  candlestick: [
+    `
+    │  │  │  │  
+    ┃  │  ┃  │  
+    ┃  │  ┃  │  
+    ┃  ┃  ┃  ┃  
+    `,
+    `
+    │  │  │  │  
+    │  ┃  │  ┃  
+    │  ┃  │  ┃  
+    ┃  ┃  ┃  ┃  
+    `,
+    `
+    │  │  │  │  
+    │  │  ┃  │  
+    │  ┃  ┃  │  
+    ┃  ┃  ┃  ┃  
+    `,
+    `
+    │  │  │  │  
+    ┃  │  │  ┃  
+    ┃  │  ┃  ┃  
+    ┃  ┃  ┃  ┃  
+    `
+  ]
 };
 
-const ASCIIArt = () => {
-  const [chars, setChars] = useState<Array<{ char: string; x: number; y: number; opacity: number; delay: number }>>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  
+interface ASCIIAnimationProps {
+  animation: keyof typeof ANIMATIONS;
+  fps?: number;
+  scale?: number;
+  color?: string;
+  position: { x: string; y: string };
+}
+
+const ASCIIAnimation = ({ animation, fps = 8, scale = 1, color = '#00ff00', position }: ASCIIAnimationProps) => {
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const frameRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
+  const preRef = useRef<HTMLPreElement>(null);
+
   useEffect(() => {
-    const symbols = ['▲', '▼', '│', '─', '┼', '█', '▒', '░', '$', '%', '↑', '↓', '≈', '∿', '~', '•', '○', '◆', '■'];
-    const newChars: Array<{ char: string; x: number; y: number; opacity: number; delay: number }> = [];
-    
-    const cols = Math.floor(window.innerWidth / 20);
-    const rows = Math.floor(window.innerHeight / 30);
-    
-    for (let i = 0; i < cols * rows * 0.15; i++) {
-      newChars.push({
-        char: symbols[Math.floor(Math.random() * symbols.length)],
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        opacity: 0,
-        delay: Math.random() * 2
-      });
-    }
-    
-    setChars(newChars);
-    
-    // Animate chars in
-    const timeout = setTimeout(() => {
-      setChars(prev => prev.map(char => ({
-        ...char,
-        opacity: Math.random() * 0.3 + 0.1
-      })));
-    }, 100);
-    
-    // Random flicker
-    const interval = setInterval(() => {
-      setChars(prev => prev.map(char => ({
-        ...char,
-        opacity: Math.random() > 0.7 ? Math.random() * 0.4 : char.opacity
-      })));
-    }, 3000);
-    
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
+    if (!isPlaying) return;
+
+    const frames = ANIMATIONS[animation];
+    const frameDuration = 1000 / fps;
+
+    const animate = (timestamp: number) => {
+      if (timestamp - lastTimeRef.current >= frameDuration) {
+        setCurrentFrame((prev) => (prev + 1) % frames.length);
+        lastTimeRef.current = timestamp;
+      }
+      frameRef.current = requestAnimationFrame(animate);
     };
-  }, []);
-  
+
+    frameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, [animation, fps, isPlaying]);
+
+  const frames = ANIMATIONS[animation];
+
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden">
-      {chars.map((char, i) => (
+    <pre
+      ref={preRef}
+      className="font-mono whitespace-pre leading-tight transition-opacity duration-300"
+      style={{
+        position: 'absolute',
+        left: position.x,
+        top: position.y,
+        color: color,
+        fontSize: `${12 * scale}px`,
+        textShadow: `0 0 10px ${color}`,
+        opacity: 0.6,
+        userSelect: 'none',
+        pointerEvents: 'none'
+      }}
+    >
+      {frames[currentFrame]}
+    </pre>
+  );
+};
+
+const FloatingSymbols = () => {
+  const symbols = ['$', '₿', '€', '¥', '£', '↑', '↓', '▲', '▼', '%'];
+  const [particles, setParticles] = useState<Array<{ char: string; x: number; y: number; speed: number; opacity: number }>>([]);
+
+  useEffect(() => {
+    const newParticles = Array.from({ length: 20 }, () => ({
+      char: symbols[Math.floor(Math.random() * symbols.length)],
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      speed: 0.5 + Math.random() * 1.5,
+      opacity: 0.1 + Math.random() * 0.3
+    }));
+    setParticles(newParticles);
+
+    const interval = setInterval(() => {
+      setParticles(prev => 
+        prev.map(p => ({
+          ...p,
+          y: p.y > 100 ? -5 : p.y + p.speed * 0.1
+        }))
+      );
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <>
+      {particles.map((particle, i) => (
         <div
           key={i}
-          className="absolute font-mono text-primary transition-opacity duration-1000"
+          className="absolute font-mono text-primary pointer-events-none"
           style={{
-            left: `${char.x}%`,
-            top: `${char.y}%`,
-            opacity: char.opacity,
-            fontSize: `${Math.random() * 10 + 14}px`,
-            transitionDelay: `${char.delay}s`,
-            textShadow: '0 0 10px rgba(0, 255, 0, 0.5)'
+            left: `${particle.x}%`,
+            top: `${particle.y}%`,
+            opacity: particle.opacity,
+            fontSize: '16px',
+            transition: 'top 0.05s linear'
           }}
         >
-          {char.char}
+          {particle.char}
         </div>
       ))}
-    </div>
+    </>
   );
 };
 
 export const AnimatedBackground = () => {
   const [isVisible, setIsVisible] = useState(false);
-  
+
   useEffect(() => {
-    // Trigger entrance animation
-    const timeout = setTimeout(() => {
-      setIsVisible(true);
-    }, 100);
-    
-    return () => clearTimeout(timeout);
+    // Entrance animation
+    setTimeout(() => setIsVisible(true), 100);
   }, []);
-  
+
   return (
-    <div className={`fixed inset-0 pointer-events-none overflow-hidden transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-      {/* Grid pattern overlay */}
-      <div className="absolute inset-0 grid-pattern opacity-10" />
+    <div 
+      className={`fixed inset-0 pointer-events-none overflow-hidden transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      style={{ zIndex: 0 }}
+    >
+      {/* Grid pattern */}
+      <div className="absolute inset-0 grid-pattern opacity-5" />
+
+      {/* Floating symbols */}
+      <FloatingSymbols />
+
+      {/* ASCII Animations - positioned across the screen */}
+      <ASCIIAnimation
+        animation="tradingChart"
+        fps={4}
+        scale={0.8}
+        color="#00ff00"
+        position={{ x: '5%', y: '15%' }}
+      />
       
-      {/* Trading Chart */}
-      <TradingChart />
+      <ASCIIAnimation
+        animation="rotatingCube"
+        fps={6}
+        scale={0.7}
+        color="#ff8c42"
+        position={{ x: '80%', y: '20%' }}
+      />
       
-      {/* ASCII Art Overlay */}
-      <ASCIIArt />
+      <ASCIIAnimation
+        animation="candlestick"
+        fps={5}
+        scale={1}
+        color="#00ccff"
+        position={{ x: '10%', y: '70%' }}
+      />
+      
+      <ASCIIAnimation
+        animation="wave"
+        fps={10}
+        scale={0.9}
+        color="#00ff00"
+        position={{ x: '70%', y: '75%' }}
+      />
+      
+      <ASCIIAnimation
+        animation="runningCharacter"
+        fps={8}
+        scale={0.8}
+        color="#ff8c42"
+        position={{ x: '45%', y: '60%' }}
+      />
+
+      <ASCIIAnimation
+        animation="rotatingCube"
+        fps={4}
+        scale={0.6}
+        color="#00ccff"
+        position={{ x: '85%', y: '65%' }}
+      />
     </div>
   );
 };
