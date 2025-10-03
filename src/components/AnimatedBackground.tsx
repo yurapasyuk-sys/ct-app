@@ -1,6 +1,6 @@
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, OrbitControls } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 const TradingBox = ({ position, color, speed }: { position: [number, number, number]; color: string; speed: number }) => {
@@ -36,6 +36,59 @@ const AlgorithmicTorus = ({ position, color, speed }: { position: [number, numbe
   );
 };
 
+const ParticleRain = () => {
+  const particlesRef = useRef<THREE.InstancedMesh>(null);
+  
+  const particleData = useMemo(() => {
+    const data = [];
+    const colors = ['#00ff00', '#ff8c42', '#00ccff'];
+    
+    for (let i = 0; i < 150; i++) {
+      data.push({
+        x: (Math.random() - 0.5) * 20,
+        y: Math.random() * 15 + 5,
+        z: (Math.random() - 0.5) * 15,
+        speed: 0.02 + Math.random() * 0.04,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        length: 0.3 + Math.random() * 0.7,
+      });
+    }
+    return data;
+  }, []);
+
+  useFrame(() => {
+    if (!particlesRef.current) return;
+    
+    const dummy = new THREE.Object3D();
+    
+    particleData.forEach((particle, i) => {
+      particle.y -= particle.speed;
+      
+      if (particle.y < -10) {
+        particle.y = 15;
+        particle.x = (Math.random() - 0.5) * 20;
+        particle.z = (Math.random() - 0.5) * 15;
+      }
+      
+      dummy.position.set(particle.x, particle.y, particle.z);
+      dummy.scale.set(0.03, particle.length, 0.03);
+      dummy.rotation.set(0, 0, Math.PI / 2);
+      dummy.updateMatrix();
+      
+      particlesRef.current!.setMatrixAt(i, dummy.matrix);
+    });
+    
+    particlesRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={particlesRef} args={[undefined, undefined, 150]}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshBasicMaterial color="#00ff00" transparent opacity={0.6} />
+    </instancedMesh>
+  );
+};
+
 const Scene = () => {
   const elements = useMemo(() => {
     const items = [];
@@ -59,9 +112,11 @@ const Scene = () => {
 
   return (
     <>
-      <ambientLight intensity={0.3} />
-      <pointLight position={[10, 10, 10]} intensity={0.5} color="#00ff00" />
-      <pointLight position={[-10, -10, -5]} intensity={0.3} color="#ff8c42" />
+      <ambientLight intensity={0.2} />
+      <pointLight position={[10, 10, 10]} intensity={0.4} color="#00ff00" />
+      <pointLight position={[-10, -10, -5]} intensity={0.2} color="#ff8c42" />
+      
+      <ParticleRain />
       
       {elements.map((item) => {
         if (item.type === 0) return <TradingBox key={item.key} position={item.position} color={item.color} speed={item.speed} />;
