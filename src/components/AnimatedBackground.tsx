@@ -40,13 +40,13 @@ interface AnimationConfig {
 const DEFAULT_CONFIG: AnimationConfig = {
   pattern: 'star',
   charSize: 12,
-  density: 300,
+  density: 500,              // Increased for continuous lines
   rotationSpeed: 0.0005,
   pulseSpeed: 0.002,
   pulseAmplitude: 0.15,
   mouseInfluence: 0.3,
   scrollInfluence: 0.2,
-  opacity: 0.25,
+  opacity: 0.3,              // Slightly increased for better visibility
   glowIntensity: 8
 };
 
@@ -66,55 +66,56 @@ const generatePattern = (
 
   switch (type) {
     case 'star':
-      // Five-pointed star pattern with proper geometry
+      // Five-pointed star pattern - simplified and reliable
       const starPoints = 5;
       const outerRadius = size;
-      const innerRadius = size * 0.38; // Golden ratio for aesthetically pleasing star
+      const innerRadius = size * 0.4;
       
-      // Generate points along star outline
-      for (let i = 0; i < density; i++) {
-        const segmentProgress = (i / density) * starPoints;
-        const currentPoint = Math.floor(segmentProgress);
-        const nextPoint = (currentPoint + 1) % starPoints;
-        const progress = segmentProgress - currentPoint;
-        
-        // Alternate between outer and inner points
-        const angle1 = (currentPoint / starPoints) * Math.PI * 2 - Math.PI / 2;
-        const angle2 = ((currentPoint + 0.5) / starPoints) * Math.PI * 2 - Math.PI / 2;
-        const angle3 = (nextPoint / starPoints) * Math.PI * 2 - Math.PI / 2;
-        
-        let x, y, depth;
-        
-        if (progress < 0.5) {
-          // From outer point to inner point
-          const t = progress * 2;
-          const startX = centerX + Math.cos(angle1) * outerRadius;
-          const startY = centerY + Math.sin(angle1) * outerRadius;
-          const endX = centerX + Math.cos(angle2) * innerRadius;
-          const endY = centerY + Math.sin(angle2) * innerRadius;
-          
-          x = startX + (endX - startX) * t;
-          y = startY + (endY - startY) * t;
-          depth = 1 - t * 0.6; // Outer points are brighter
-        } else {
-          // From inner point to next outer point
-          const t = (progress - 0.5) * 2;
-          const startX = centerX + Math.cos(angle2) * innerRadius;
-          const startY = centerY + Math.sin(angle2) * innerRadius;
-          const endX = centerX + Math.cos(angle3) * outerRadius;
-          const endY = centerY + Math.sin(angle3) * outerRadius;
-          
-          x = startX + (endX - startX) * t;
-          y = startY + (endY - startY) * t;
-          depth = 0.4 + t * 0.6; // Gradually brighten towards outer point
-        }
-        
-        points.push({
-          x,
-          y,
-          char: ASCII_CHARS[Math.floor(Math.random() * ASCII_CHARS.length)],
-          depth
+      // Generate all 10 vertices (5 outer + 5 inner)
+      const vertices: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < starPoints * 2; i++) {
+        const angle = (i / (starPoints * 2)) * Math.PI * 2 - Math.PI / 2;
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        vertices.push({
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius
         });
+      }
+      
+      // Draw lines between vertices to form complete star
+      const pointsPerSegment = Math.ceil(density / 10);
+      for (let i = 0; i < 10; i++) {
+        const start = vertices[i];
+        const end = vertices[(i + 1) % 10];
+        
+        // Interpolate points along each segment
+        for (let j = 0; j < pointsPerSegment; j++) {
+          const t = j / pointsPerSegment;
+          const x = start.x + (end.x - start.x) * t;
+          const y = start.y + (end.y - start.y) * t;
+          
+          // Depth based on whether it's outer or inner vertex
+          // Outer points (even indices) are brighter
+          const isOuter = i % 2 === 0;
+          const nextIsOuter = ((i + 1) % 10) % 2 === 0;
+          
+          let depth;
+          if (isOuter && nextIsOuter) {
+            depth = 0.9; // Between two outer points - brightest
+          } else if (!isOuter && !nextIsOuter) {
+            depth = 0.5; // Between two inner points - darker
+          } else {
+            // Transition between outer and inner
+            depth = isOuter ? 0.9 - (t * 0.4) : 0.5 + (t * 0.4);
+          }
+          
+          points.push({
+            x,
+            y,
+            char: ASCII_CHARS[Math.floor(Math.random() * ASCII_CHARS.length)],
+            depth
+          });
+        }
       }
       break;
 
@@ -321,11 +322,13 @@ export const AnimatedBackground = () => {
 
         // Calculate grayscale color based on depth
         // Depth ranges from 0 (dark) to 1 (bright)
-        // Using full range: black → dark gray → gray → light gray → white
-        const baseGray = Math.floor(point.depth * 255);
+        // Ensure minimum brightness so nothing is completely invisible
+        const minBrightness = 80; // Minimum gray value to ensure visibility
+        const maxBrightness = 255;
+        const baseGray = minBrightness + Math.floor(point.depth * (maxBrightness - minBrightness));
         
         // Add pulsing variation to create more dynamic shading
-        const pulseVariation = (Math.sin(time * config.pulseSpeed * 2 + index * 0.1) + 1) * 0.15;
+        const pulseVariation = (Math.sin(time * config.pulseSpeed * 2 + index * 0.1) + 1) * 0.1;
         const adjustedGray = Math.floor(Math.min(255, baseGray * (1 + pulseVariation)));
         
         // Create grayscale color
@@ -335,9 +338,9 @@ export const AnimatedBackground = () => {
         ctx.fillStyle = grayValue;
         
         // Add subtle glow only to brighter characters
-        if (adjustedGray > 128) {
+        if (adjustedGray > 150) {
           ctx.shadowColor = grayValue;
-          ctx.shadowBlur = (adjustedGray / 255) * config.glowIntensity;
+          ctx.shadowBlur = ((adjustedGray - 150) / 105) * config.glowIntensity;
         } else {
           ctx.shadowBlur = 0;
         }
