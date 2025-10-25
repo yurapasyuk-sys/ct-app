@@ -78,6 +78,10 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
             borderColor: 'rgba(255, 255, 255, 0.2)',
             timeVisible: true,
             secondsVisible: false,
+            barSpacing: 3,
+            rightOffset: 0,
+            fixLeftEdge: true,
+            fixRightEdge: false,
           },
           rightPriceScale: {
             borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -139,7 +143,7 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
 
   // Update data when klines change
   useEffect(() => {
-    if (!candlestickSeriesRef.current || !isInitializedRef.current || klines.length === 0) return;
+    if (!candlestickSeriesRef.current || !chartRef.current || !isInitializedRef.current || klines.length === 0) return;
 
     try {
       const candleData: CandlestickData[] = klines.map((k) => ({
@@ -151,6 +155,30 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
       }));
 
       candlestickSeriesRef.current.setData(candleData);
+
+      // Calculate optimal bar spacing based on data points
+      // More data = smaller spacing to fit everything
+      const dataPointCount = candleData.length;
+      const baseSpacing = 3;
+      const dynamicSpacing = Math.max(1, baseSpacing - Math.floor(dataPointCount / 200));
+      
+      // Apply time scale options to show full range
+      chartRef.current.timeScale().applyOptions({
+        barSpacing: dynamicSpacing,
+        rightOffset: 5,
+        fixLeftEdge: false,
+        fixRightEdge: false,
+      });
+
+      // Fit all content in view
+      chartRef.current.timeScale().fitContent();
+
+      console.log('[OhlcChart] Updated candlestick data:', {
+        points: candleData.length,
+        barSpacing: dynamicSpacing,
+        firstTime: new Date((candleData[0]?.time as number) * 1000).toISOString(),
+        lastTime: new Date((candleData[candleData.length - 1]?.time as number) * 1000).toISOString(),
+      });
     } catch (error) {
       console.error('[OhlcChart] Error setting candlestick data:', error);
     }
