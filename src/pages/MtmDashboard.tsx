@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useKlines } from '@/hooks/useKlines';
 import { OhlcChart } from '@/components/ohlc/OhlcChart';
-import { TensionHistogram } from '@/components/ohlc/TensionHistogram';
 import { getRecommendedThreshold } from '@/lib/tension';
 import { Button } from '@/components/ui/button';
 import {
@@ -126,17 +125,23 @@ function Panel({ timeframe, symbol, dataSource }: PanelProps) {
         </div>
       )}
 
-      {/* OHLC Chart */}
-      <div className="mb-2">
-        <OhlcChart klines={klines} height={250} />
+      {/* Combined OHLC Chart with Tension Histogram */}
+      <div className="mb-3">
+        <OhlcChart 
+          klines={klines} 
+          tensionData={tensionData}
+          threshold={threshold}
+          height={350} 
+        />
       </div>
 
-      {/* Tension Histogram */}
-      <div className="mb-2">
-        <div className="text-xs text-muted-foreground mb-1 font-mono">
-          Tension Map (Threshold: {threshold})
-        </div>
-        <TensionHistogram data={tensionData} threshold={threshold} height={80} />
+      {/* Legend */}
+      <div className="mb-2 text-xs text-muted-foreground">
+        <span className="font-mono">
+          Tension Map (Threshold: {threshold}) - 
+          <span className="text-muted-foreground/60"> Gray: normal</span>
+          <span className="text-green-500"> Green: above threshold</span>
+        </span>
       </div>
 
       {/* Stats */}

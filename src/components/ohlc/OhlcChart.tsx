@@ -7,22 +7,28 @@ import {
   createChart,
   ColorType,
   CandlestickSeries,
+  HistogramSeries,
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
+  type HistogramData,
 } from 'lightweight-charts';
 import type { Kline } from '@/lib/binance';
+import type { TensionDataPoint } from '@/lib/tension';
 
 export interface OhlcChartProps {
   klines: Kline[];
+  tensionData?: TensionDataPoint[];
+  threshold?: number;
   height?: number;
   className?: string;
 }
 
-export function OhlcChart({ klines, height = 300, className = '' }: OhlcChartProps) {
+export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, className = '' }: OhlcChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<any>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const histogramSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const isInitializedRef = useRef(false);
 
   // Initialize chart only once when container is ready
@@ -76,9 +82,12 @@ export function OhlcChart({ klines, height = 300, className = '' }: OhlcChartPro
           rightPriceScale: {
             borderColor: 'rgba(255, 255, 255, 0.2)',
           },
+          // Disable user interactions for synchronized scrolling
+          handleScroll: false,
+          handleScale: false,
         });
 
-        // Add candlestick series
+        // Add candlestick series in main pane
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350',
@@ -86,13 +95,30 @@ export function OhlcChart({ klines, height = 300, className = '' }: OhlcChartPro
           borderDownColor: '#ef5350',
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350',
+          priceScaleId: 'right',
         });
 
+        // Add histogram series in separate pane if tensionData is provided
+        let histogramSeries: ISeriesApi<'Histogram'> | null = null;
+        if (tensionData && tensionData.length > 0) {
+          histogramSeries = chart.addSeries(HistogramSeries, {
+            color: 'rgba(128, 128, 128, 0.5)',
+            priceFormat: {
+              type: 'volume',
+            },
+            priceScaleId: 'histogram',
+          }, 1); // paneIndex: 1 = separate pane below
+        }
+
         chartRef.current = chart;
-        seriesRef.current = candlestickSeries;
+        candlestickSeriesRef.current = candlestickSeries;
+        histogramSeriesRef.current = histogramSeries;
         isInitializedRef.current = true;
 
-        console.log('[OhlcChart] Chart initialized successfully');
+        console.log('[OhlcChart] Chart initialized successfully', {
+          hasTensionData: !!tensionData,
+          hasHistogram: !!histogramSeries,
+        });
       } catch (error) {
         console.error('[OhlcChart] Failed to initialize chart:', error);
       }
@@ -110,7 +136,8 @@ export function OhlcChart({ klines, height = 300, className = '' }: OhlcChartPro
           console.error('[OhlcChart] Error removing chart:', error);
         }
         chartRef.current = null;
-        seriesRef.current = null;
+        candlestickSeriesRef.current = null;
+        histogramSeriesRef.current = null;
         isInitializedRef.current = false;
       }
     };
@@ -118,7 +145,7 @@ export function OhlcChart({ klines, height = 300, className = '' }: OhlcChartPro
 
   // Update data when klines change
   useEffect(() => {
-    if (!seriesRef.current || !isInitializedRef.current || klines.length === 0) return;
+    if (!candlestickSeriesRef.current || !isInitializedRef.current || klines.length === 0) return;
 
     try {
       const candleData: CandlestickData[] = klines.map((k) => ({
@@ -129,11 +156,29 @@ export function OhlcChart({ klines, height = 300, className = '' }: OhlcChartPro
         close: k.close,
       }));
 
-      seriesRef.current.setData(candleData);
+      candlestickSeriesRef.current.setData(candleData);
     } catch (error) {
-      console.error('[OhlcChart] Error setting data:', error);
+      console.error('[OhlcChart] Error setting candlestick data:', error);
     }
   }, [klines]);
+
+  // Update histogram data when tensionData changes
+  useEffect(() => {
+    if (!histogramSeriesRef.current || !isInitializedRef.current || !tensionData || tensionData.length === 0) return;
+
+    try {
+      const histogramData: HistogramData[] = tensionData.map((t) => ({
+        time: (t.timestamp / 1000) as any, // Convert to seconds
+        value: t.tensionIndex,
+        color: t.tensionIndex > threshold ? '#26a69a' : 'rgba(128, 128, 128, 0.5)',
+      }));
+
+      histogramSeriesRef.current.setData(histogramData);
+      console.log('[OhlcChart] Updated histogram data:', histogramData.length, 'points');
+    } catch (error) {
+      console.error('[OhlcChart] Error setting histogram data:', error);
+    }
+  }, [tensionData, threshold]);
 
   // Handle resize
   useEffect(() => {
