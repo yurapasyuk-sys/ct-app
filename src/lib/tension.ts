@@ -152,50 +152,69 @@ export function calculateTensionIndicators(
     return (vs + volumeScore[i]) / 2;
   });
 
-  // Build result array
+  // Build result array - include ALL candles with real calculated values
   const result: TensionDataPoint[] = [];
   
-  // First, collect all valid tension points
-  const validPoints: TensionDataPoint[] = [];
   for (let i = 0; i < klines.length; i++) {
-    // Skip if any value is NaN
-    if (
-      !isFinite(relativeVolatility[i]) ||
-      !isFinite(volatilityScore[i]) ||
-      !isFinite(volumeScore[i]) ||
-      !isFinite(tensionIndex[i])
-    ) {
-      continue;
-    }
-
-    validPoints.push({
-      timestamp: timestamps[i],
-      relativeVolatility: relativeVolatility[i],
-      volatilityScore: volatilityScore[i],
-      volumeScore: volumeScore[i],
-      tensionIndex: tensionIndex[i],
-    });
-  }
-
-  // If we have valid points, backfill missing early candles
-  // Use the first valid tension value as estimate for earlier candles
-  if (validPoints.length > 0) {
-    const firstValidIndex = klines.findIndex(k => k.openTime === validPoints[0].timestamp);
-    const firstValidValue = validPoints[0];
+    // For early candles without enough history, use smaller window
+    const effectiveWindow = Math.min(i + 1, period);
     
-    // Backfill missing candles at the start
-    for (let i = 0; i < firstValidIndex; i++) {
+    // Calculate values for this candle using available data
+    let rvValue = relativeVolatility[i];
+    let vsValue = volatilityScore[i];
+    let volScore = volumeScore[i];
+    let tensionIdx = tensionIndex[i];
+    
+    // If values are NaN due to insufficient window, calculate with smaller window
+    if (!isFinite(tensionIdx) && effectiveWindow >= 2) {
+      // Recalculate with smaller window for this specific candle
+      const startIdx = Math.max(0, i - effectiveWindow + 1);
+      const windowPrices = closePrices.slice(startIdx, i + 1);
+      const windowVolumes = volumes.slice(startIdx, i + 1);
+      
+      // Calculate std for this window
+      const mean = windowPrices.reduce((sum, p) => sum + p, 0) / windowPrices.length;
+      const variance = windowPrices.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / windowPrices.length;
+      const std = Math.sqrt(variance);
+      
+      // Relative volatility
+      rvValue = std / closePrices[i];
+      
+      // Volatility score (normalized within available window)
+      const windowRV = windowPrices.map((p, idx) => {
+        const wMean = windowPrices.slice(0, idx + 1).reduce((s, v) => s + v, 0) / (idx + 1);
+        const wVar = windowPrices.slice(0, idx + 1).reduce((s, v) => s + Math.pow(v - wMean, 2), 0) / (idx + 1);
+        return Math.sqrt(wVar) / p;
+      }).filter(v => isFinite(v));
+      
+      const rvMinVal = Math.min(...windowRV);
+      const rvMaxVal = Math.max(...windowRV);
+      vsValue = normalizeScore(rvValue, rvMinVal, rvMaxVal, true);
+      
+      // Volume score (normalized within available window)
+      const volMinVal = Math.min(...windowVolumes);
+      const volMaxVal = Math.max(...windowVolumes);
+      volScore = normalizeScore(volumes[i], volMinVal, volMaxVal, false);
+      
+      // Tension index
+      tensionIdx = (vsValue + volScore) / 2;
+    }
+    
+    // Only add if we have valid finite values
+    if (
+      isFinite(rvValue) &&
+      isFinite(vsValue) &&
+      isFinite(volScore) &&
+      isFinite(tensionIdx)
+    ) {
       result.push({
         timestamp: timestamps[i],
-        relativeVolatility: firstValidValue.relativeVolatility,
-        volatilityScore: firstValidValue.volatilityScore,
-        volumeScore: firstValidValue.volumeScore,
-        tensionIndex: firstValidValue.tensionIndex,
+        relativeVolatility: rvValue,
+        volatilityScore: vsValue,
+        volumeScore: volScore,
+        tensionIndex: tensionIdx,
       });
     }
-    
-    // Add all valid points
-    result.push(...validPoints);
   }
 
   return result;
