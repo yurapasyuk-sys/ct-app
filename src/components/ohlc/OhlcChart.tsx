@@ -1,4 +1,7 @@
 /**
+ * OHLC candlestick chart using lightweight-charts
+ */
+
 import { useEffect, useRef } from 'react';
 import {
   createChart,
@@ -6,16 +9,6 @@ import {
   CandlestickSeries,
   type IChartApi,
   type ISeriesApi,
-  type CandlestickData,
-} from 'lightweight-charts';
-import type { Kline } from '../../lib/binance';candlestick chart using lightweight-charts
- */
-
-import { useEffect, useRef } from 'react';
-import {
-  createChart,
-  ColorType,
-  type IChartApi,
   type CandlestickData,
 } from 'lightweight-charts';
 import type { Kline } from '@/lib/binance';
