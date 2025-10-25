@@ -156,6 +156,12 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
 
       candlestickSeriesRef.current.setData(candleData);
 
+      // Expose data to window for console debugging
+      if (typeof window !== 'undefined') {
+        (window as any).__DEBUG_OHLC_DATA = candleData;
+        (window as any).__DEBUG_KLINES = klines;
+      }
+
       // Calculate optimal bar spacing based on data points
       // More data = smaller spacing to fit everything
       const dataPointCount = candleData.length;
@@ -223,6 +229,68 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
 
       // Set histogram data
       histogramSeriesRef.current.setData(histogramData);
+
+      // Expose data to window for console debugging
+      if (typeof window !== 'undefined') {
+        (window as any).__DEBUG_HISTOGRAM_DATA = histogramData;
+        (window as any).__DEBUG_TENSION_DATA = tensionData;
+        
+        // Add verification helper function
+        (window as any).__VERIFY_ALIGNMENT = () => {
+          const ohlc = (window as any).__DEBUG_OHLC_DATA;
+          const hist = (window as any).__DEBUG_HISTOGRAM_DATA;
+          
+          console.group('📊 Data Alignment Verification');
+          
+          console.log('📈 Dataset Counts:');
+          console.log('  Candles:', ohlc?.length || 0);
+          console.log('  Histogram:', hist?.length || 0);
+          console.log('  Match:', ohlc?.length === hist?.length ? '✅' : '❌');
+          
+          if (ohlc && hist) {
+            console.log('\n⏰ First 5 Timestamps:');
+            console.log('  Candles:', ohlc.slice(0, 5).map((d: any) => new Date(d.time * 1000).toISOString()));
+            console.log('  Histogram:', hist.slice(0, 5).map((d: any) => new Date(d.time * 1000).toISOString()));
+            
+            console.log('\n⏰ Last 5 Timestamps:');
+            console.log('  Candles:', ohlc.slice(-5).map((d: any) => new Date(d.time * 1000).toISOString()));
+            console.log('  Histogram:', hist.slice(-5).map((d: any) => new Date(d.time * 1000).toISOString()));
+            
+            console.log('\n🔍 Time Alignment Check:');
+            const allMatch = ohlc.every((c: any, i: number) => c.time === hist[i]?.time);
+            console.log('  All timestamps match:', allMatch ? '✅' : '❌');
+            
+            if (!allMatch) {
+              console.log('\n❌ Mismatched Indices:');
+              ohlc.forEach((c: any, i: number) => {
+                if (c.time !== hist[i]?.time) {
+                  console.log(`  Index ${i}:`, 
+                    'Candle:', new Date(c.time * 1000).toISOString(),
+                    'Histogram:', hist[i] ? new Date(hist[i].time * 1000).toISOString() : 'MISSING'
+                  );
+                }
+              });
+            }
+            
+            console.log('\n⏱️ Time Difference (first candle):');
+            if (ohlc[0] && hist[0]) {
+              const diff = ohlc[0].time - hist[0].time;
+              console.log('  Seconds difference:', diff);
+              console.log('  Status:', diff === 0 ? '✅ Perfect alignment' : `❌ ${Math.abs(diff)}s offset`);
+            }
+          }
+          
+          console.groupEnd();
+          
+          console.log('\n💡 Tip: Access raw data with:');
+          console.log('  window.__DEBUG_OHLC_DATA');
+          console.log('  window.__DEBUG_HISTOGRAM_DATA');
+          console.log('  window.__DEBUG_TENSION_DATA');
+          console.log('  window.__DEBUG_KLINES');
+        };
+        
+        console.log('🔧 Debug mode enabled. Run window.__VERIFY_ALIGNMENT() to check data alignment.');
+      }
 
       // Fit content to ensure alignment
       chartRef.current.timeScale().fitContent();
