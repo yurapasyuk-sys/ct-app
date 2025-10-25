@@ -154,6 +154,9 @@ export function calculateTensionIndicators(
 
   // Build result array
   const result: TensionDataPoint[] = [];
+  
+  // First, collect all valid tension points
+  const validPoints: TensionDataPoint[] = [];
   for (let i = 0; i < klines.length; i++) {
     // Skip if any value is NaN
     if (
@@ -165,13 +168,34 @@ export function calculateTensionIndicators(
       continue;
     }
 
-    result.push({
+    validPoints.push({
       timestamp: timestamps[i],
       relativeVolatility: relativeVolatility[i],
       volatilityScore: volatilityScore[i],
       volumeScore: volumeScore[i],
       tensionIndex: tensionIndex[i],
     });
+  }
+
+  // If we have valid points, backfill missing early candles
+  // Use the first valid tension value as estimate for earlier candles
+  if (validPoints.length > 0) {
+    const firstValidIndex = klines.findIndex(k => k.openTime === validPoints[0].timestamp);
+    const firstValidValue = validPoints[0];
+    
+    // Backfill missing candles at the start
+    for (let i = 0; i < firstValidIndex; i++) {
+      result.push({
+        timestamp: timestamps[i],
+        relativeVolatility: firstValidValue.relativeVolatility,
+        volatilityScore: firstValidValue.volatilityScore,
+        volumeScore: firstValidValue.volumeScore,
+        tensionIndex: firstValidValue.tensionIndex,
+      });
+    }
+    
+    // Add all valid points
+    result.push(...validPoints);
   }
 
   return result;

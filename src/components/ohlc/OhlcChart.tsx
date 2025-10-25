@@ -205,42 +205,20 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
     }
 
     try {
-      // Build a map of candle openTime -> index for fast lookup
-      const candleTimeMap = new Map<number, number>();
-      klines.forEach((k, idx) => {
-        const timeInSeconds = Math.floor(k.openTime / 1000);
-        candleTimeMap.set(timeInSeconds, idx);
-      });
-
-      // Get the first and last candle times (in seconds)
-      const firstCandleTime = Math.floor(klines[0].openTime / 1000);
-      const lastCandleTime = Math.floor(klines[klines.length - 1].openTime / 1000);
-
-      // Map tension data to candle timestamps
-      // Tension uses closeTime, but we need to align it with the candle's openTime
+      // Create a time-aligned histogram dataset
+      // Both klines and tensionData now use openTime, so they should align 1:1
       const histogramData: HistogramData[] = [];
       
+      // Build histogram from tension data (already aligned with klines)
       for (let i = 0; i < tensionData.length; i++) {
         const tensionPoint = tensionData[i];
-        const tensionTimeSeconds = Math.floor(tensionPoint.timestamp / 1000);
+        const timeSeconds = Math.floor(tensionPoint.timestamp / 1000);
         
-        // Try to find the corresponding candle by matching timestamp
-        // Tension closeTime should align with next candle's openTime
-        let candleTimeSeconds = tensionTimeSeconds;
-        
-        // If not found, try to find the nearest candle openTime
-        if (!candleTimeMap.has(candleTimeSeconds) && i < klines.length) {
-          candleTimeSeconds = Math.floor(klines[i].openTime / 1000);
-        }
-        
-        // Only include if within candle range
-        if (candleTimeSeconds >= firstCandleTime && candleTimeSeconds <= lastCandleTime) {
-          histogramData.push({
-            time: candleTimeSeconds as any,
-            value: tensionPoint.tensionIndex,
-            color: tensionPoint.tensionIndex > threshold ? '#26a69a' : 'rgba(128, 128, 128, 0.5)',
-          });
-        }
+        histogramData.push({
+          time: timeSeconds as any,
+          value: tensionPoint.tensionIndex,
+          color: tensionPoint.tensionIndex > threshold ? '#26a69a' : 'rgba(128, 128, 128, 0.5)',
+        });
       }
 
       // Set histogram data
@@ -249,17 +227,31 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
       // Fit content to ensure alignment
       chartRef.current.timeScale().fitContent();
 
+      // Verification logging
+      const firstCandleTime = Math.floor(klines[0].openTime / 1000);
+      const lastCandleTime = Math.floor(klines[klines.length - 1].openTime / 1000);
+      const missingCount = klines.length - tensionData.length;
+
       console.log('[OhlcChart] Updated histogram data:', {
         candleCount: klines.length,
         tensionCount: tensionData.length,
         histogramBars: histogramData.length,
+        missingCount: missingCount,
+        aligned: missingCount === 0 ? '✓ Perfect alignment' : `⚠ ${missingCount} bars missing`,
         firstCandleTime: new Date(firstCandleTime * 1000).toISOString(),
-        firstTensionTime: tensionData[0] ? new Date(Math.floor(tensionData[0].timestamp / 1000) * 1000).toISOString() : 'N/A',
         firstHistogramTime: histogramData[0] ? new Date((histogramData[0].time as number) * 1000).toISOString() : 'N/A',
         lastCandleTime: new Date(lastCandleTime * 1000).toISOString(),
         lastHistogramTime: histogramData[histogramData.length - 1] ? new Date((histogramData[histogramData.length - 1].time as number) * 1000).toISOString() : 'N/A',
         threshold,
+        timeDiffStart: histogramData[0] ? (histogramData[0].time as number) - firstCandleTime : 'N/A',
       });
+
+      // Log backfill info if applicable
+      if (missingCount < 0) {
+        console.warn('[OhlcChart] More tension data than candles - this should not happen');
+      } else if (missingCount === 0) {
+        console.log('[OhlcChart] ✓ All candles have tension data - perfect 1:1 alignment');
+      }
     } catch (error) {
       console.error('[OhlcChart] Error setting histogram data:', error);
     }
