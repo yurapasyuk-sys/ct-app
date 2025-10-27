@@ -378,9 +378,15 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
     <div
       ref={containerRef}
       className={className}
-      style={{ position: 'relative', width: '100%', height: `${height}px` }}
+      style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: `${height}px`,
+        background: 'transparent',
+        isolation: 'isolate', // Create stacking context
+      }}
     >
-      {/* Tension glow layer - below chart canvas */}
+      {/* Tension glow layer - below chart canvas (z-index: 0) */}
       {chartRef.current && tensionData && tensionData.length > 0 && (
         <TensionGlow
           chartApi={chartRef.current}
@@ -390,6 +396,7 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
           height={height}
         />
       )}
+      {/* Watermark overlay (z-index: 5) */}
       <Watermark visible={!isLoading} />
     </div>
   );
