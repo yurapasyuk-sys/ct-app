@@ -249,7 +249,7 @@ export default function MtmDashboard() {
       {/* Header */}
       <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
@@ -261,31 +261,31 @@ export default function MtmDashboard() {
                 Back
               </Button>
               <div>
-                <h1 className="text-2xl font-bold">Market Tension Map</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl lg:text-2xl font-bold">Market Tension Map</h1>
+                <p className="text-xs lg:text-sm text-muted-foreground">
                   Real-time OHLC analysis with tension indicators
                 </p>
               </div>
             </div>
 
             {/* Controls */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 lg:gap-3">
               {/* RVWAP Toggle */}
-              <div className="flex items-center gap-2 px-3 py-1 rounded-md border border-border">
+              <div className="flex items-center gap-2 px-2 py-1 rounded-md border border-border">
                 <Switch
                   id="rvwap-toggle"
                   checked={showRvwap}
                   onCheckedChange={setShowRvwap}
                 />
-                <Label htmlFor="rvwap-toggle" className="text-sm cursor-pointer">
-                  Show Rolling VWAP
+                <Label htmlFor="rvwap-toggle" className="text-xs lg:text-sm cursor-pointer whitespace-nowrap">
+                  RVWAP
                 </Label>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Symbol:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs lg:text-sm text-muted-foreground">Symbol:</span>
                 <Select value={symbol} onValueChange={setSymbol}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[100px] lg:w-[140px] h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -298,10 +298,10 @@ export default function MtmDashboard() {
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Source:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs lg:text-sm text-muted-foreground">Source:</span>
                 <Select value={dataSource} onValueChange={(v) => setDataSource(v as DataSource)}>
-                  <SelectTrigger className="w-[120px]">
+                  <SelectTrigger className="w-[90px] lg:w-[120px] h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

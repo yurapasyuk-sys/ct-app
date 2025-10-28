@@ -1,5 +1,10 @@
 /**
- * RVWAP Chart Component using lightweight-charts
+ * RVWAP Chart Coexport function RvwapChart({ data, height = 400, className = '' }: RvwapChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const isInitializedRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(true); using lightweight-charts
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -7,7 +12,6 @@ import {
   createChart,
   ColorType,
   LineSeries,
-  AreaSeries,
   type IChartApi,
   type ISeriesApi,
   type LineData,
@@ -25,7 +29,6 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const areaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const isInitializedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -79,27 +82,21 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
           },
         });
 
-        // Add area series for background fill
-        const areaSeries = chart.addSeries(AreaSeries, {
-          topColor: 'rgba(0, 180, 255, 0.1)',
-          bottomColor: 'rgba(0, 180, 255, 0.0)',
-          lineColor: 'rgba(0, 180, 255, 0)',
-        });
-
         // Add line series for RVWAP line
         const lineSeries = chart.addSeries(LineSeries, {
-          color: 'rgba(0, 180, 255, 0.9)',
-          lineWidth: 2,
+          color: '#00b4ff',
+          lineWidth: 3,
           priceLineVisible: true,
           lastValueVisible: true,
+          crosshairMarkerVisible: true,
+          crosshairMarkerRadius: 6,
         });
 
         chartRef.current = chart;
         lineSeriesRef.current = lineSeries;
-        areaSeriesRef.current = areaSeries;
         isInitializedRef.current = true;
 
-        console.log('[RvwapChart] Chart initialized');
+        console.log('[RvwapChart] Chart initialized successfully');
       } catch (error) {
         console.error('[RvwapChart] Failed to initialize:', error);
       }
@@ -112,7 +109,6 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
         chartRef.current.remove();
         chartRef.current = null;
         lineSeriesRef.current = null;
-        areaSeriesRef.current = null;
         isInitializedRef.current = false;
       }
     };
@@ -122,10 +118,9 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
   useEffect(() => {
     console.log('[RvwapChart] render', data.length);
     
-    if (!lineSeriesRef.current || !areaSeriesRef.current || !chartRef.current || data.length === 0) {
+    if (!lineSeriesRef.current || !chartRef.current || data.length === 0) {
       console.log('[RvwapChart] Update skipped:', {
         hasLineSeries: !!lineSeriesRef.current,
-        hasAreaSeries: !!areaSeriesRef.current,
         hasChart: !!chartRef.current,
         dataLength: data.length,
       });
@@ -141,7 +136,6 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
       }));
 
       lineSeriesRef.current.setData(lineData);
-      areaSeriesRef.current.setData(lineData);
 
       // Fit content to show all data
       chartRef.current.timeScale().fitContent();
@@ -186,7 +180,8 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
         position: 'relative',
         width: '100%',
         height: `${height}px`,
-        background: '#141414',
+        background: '#1a1a1a', // Lighter background so chart is visible
+        borderRadius: '8px',
       }}
     >
       <Watermark visible={!isLoading} text="borkiss.trade RVWAP" opacity={0.04} fontSize={48} />
