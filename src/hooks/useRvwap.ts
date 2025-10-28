@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { fetchKlines, type DataSource, type Kline } from '@/lib/binance';
-import { calculateRollingVwap, getWindowSize, getLookbackDays, type RvwapDataPoint } from '@/lib/rvwap';
+import { calculateRollingVwap, getWindowSize, getLookbackDays, smoothRvwapData, type RvwapDataPoint } from '@/lib/rvwap';
 
 interface UseRvwapOptions {
   symbol: string;
@@ -56,6 +56,10 @@ export function useRvwap({
       try {
         console.log('[useRvwap] Fetching data:', { symbol, interval, period, dataSource });
 
+        // Always fetch 1h data for consistent RVWAP calculation
+        const fetchInterval = '1h';
+        console.log('[useRvwap] 🔧 Using 1h base for RVWAP calculation (requested:', interval, ')');
+
         // Calculate lookback days needed
         const lookbackDays = getLookbackDays(period);
         const endTime = Date.now();
@@ -67,10 +71,10 @@ export function useRvwap({
           endTime: new Date(endTime).toISOString(),
         });
         
-        // Fetch klines from Binance
+        // Fetch klines from Binance (always 1h for RVWAP)
         const klines = await fetchKlines({
           symbol,
-          interval,
+          interval: fetchInterval,
           startTime,
           endTime,
           dataSource,
@@ -82,18 +86,23 @@ export function useRvwap({
           throw new Error('No klines data received');
         }
 
-        // Calculate rolling VWAP
-        const windowSize = getWindowSize(period, interval);
+        // Calculate rolling VWAP (always on 1h data)
+        const windowSize = getWindowSize(period, fetchInterval);
         const rvwap = calculateRollingVwap(klines, windowSize);
 
+        // Apply smoothing for cleaner display
+        const smoothingPeriod = interval === '15m' ? 4 : interval === '4h' ? 2 : 3;
+        const smoothedRvwap = smoothRvwapData(rvwap, smoothingPeriod);
+
         console.log('[useRvwap] Calculated RVWAP:', {
-          dataPoints: rvwap.length,
+          dataPoints: smoothedRvwap.length,
           windowSize,
           period,
+          smoothing: smoothingPeriod,
         });
-        console.log('[useRvwap] ✅ points', rvwap.length, { period, interval });
+        console.log('[useRvwap] ✅ points', smoothedRvwap.length, { period, interval });
 
-        setRvwapData(rvwap);
+        setRvwapData(smoothedRvwap);
         setKlines(klines);
         setLastUpdated(new Date());
         setError(null);

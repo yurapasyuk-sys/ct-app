@@ -68,6 +68,35 @@ export function calculateRollingVwap(
 }
 
 /**
+ * Smooth RVWAP data using Simple Moving Average (SMA)
+ * This helps reduce noise and makes the line cleaner across different timeframes
+ */
+export function smoothRvwapData(
+  data: RvwapDataPoint[],
+  smoothingPeriod: number = 3
+): RvwapDataPoint[] {
+  if (data.length === 0 || smoothingPeriod <= 1) return data;
+
+  const smoothed: RvwapDataPoint[] = [];
+
+  for (let i = 0; i < data.length; i++) {
+    // Calculate average over smoothing window
+    const start = Math.max(0, i - smoothingPeriod + 1);
+    const end = i + 1;
+    const window = data.slice(start, end);
+
+    const avgVwap = window.reduce((sum, d) => sum + d.vwap, 0) / window.length;
+
+    smoothed.push({
+      ...data[i],
+      vwap: avgVwap,
+    });
+  }
+
+  return smoothed;
+}
+
+/**
  * Get recommended window size based on period and interval
  */
 export function getWindowSize(period: string, interval: string): number {
