@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,7 +7,6 @@ import { RvwapPanel } from '@/components/rvwap/RvwapPanel';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('rvwap');
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -41,21 +38,12 @@ const Dashboard = () => {
         </header>
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* Tabs Navigation */}
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-1 mb-8">
-              <TabsTrigger value="rvwap" className="text-sm">
-                Rolling VWAP
-              </TabsTrigger>
-              {/* TODO: Add MTM tab when MTMPanel is ready */}
-            </TabsList>
-
-            {/* RVWAP Tab */}
-            <TabsContent value="rvwap" className="mt-0">
-              <RvwapPanel symbol="BTCUSDT" dataSource="spot" />
-            </TabsContent>
-          </Tabs>
+        <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* RVWAP Panel */}
+          <RvwapPanel symbol="BTCUSDT" dataSource="spot" />
+          
+          {/* TODO: Add MTM Panel here when ready */}
+          {/* <MTMPanel symbol="BTCUSDT" /> */}
         </main>
       </div>
     </div>
