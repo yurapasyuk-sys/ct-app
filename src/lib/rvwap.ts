@@ -107,6 +107,7 @@ export function getWindowSize(period: string, interval: string): number {
     '15m': 96,  // 24 * 4
     '1h': 24,
     '4h': 6,
+    '1d': 1,
   };
 
   const candlesPerDayForInterval = candlesPerDay[interval] || 24;
