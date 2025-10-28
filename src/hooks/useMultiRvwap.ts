@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { fetchKlines, type DataSource, type Kline } from '@/lib/binance';
+import { fetchKlines, fetchKlinesMultiBatch, type DataSource, type Kline } from '@/lib/binance';
 import { calculateRollingVwap, getWindowSize, getLookbackDays, smoothRvwapData, type RvwapDataPoint } from '@/lib/rvwap';
 
 export interface MultiRvwapData {
@@ -45,35 +45,48 @@ export function useMultiRvwap(
         const endTime = Date.now();
         const results: Partial<MultiRvwapData> = {};
 
-        // Fetch 30D and 90D using 1h data
-        console.log('[useMultiRvwap] Fetching 1h data for 30D/90D...');
-        const lookbackDays90 = getLookbackDays('90d');
-        const startTime90 = endTime - (lookbackDays90 * 24 * 60 * 60 * 1000);
+        // Fetch 30D using 1h data (single request, 720 candles)
+        console.log('[useMultiRvwap] Fetching 1h data for 30D...');
+        const lookbackDays30 = getLookbackDays('30d');
+        const startTime30 = endTime - (lookbackDays30 * 24 * 60 * 60 * 1000);
         
-        const klines1h = await fetchKlines({
+        const klines30d = await fetchKlines({
           symbol,
           interval: '1h',
-          startTime: startTime90,
+          startTime: startTime30,
           endTime,
           limit: 1000,
           dataSource,
         });
 
-        console.log('[useMultiRvwap] Fetched 1h klines:', klines1h.length);
+        console.log('[useMultiRvwap] Fetched 30D klines:', klines30d.length);
 
         // Calculate 30D RVWAP (720 1h candles)
         const windowSize30d = getWindowSize('30d', '1h');
-        const rvwap30d = calculateRollingVwap(klines1h, windowSize30d);
+        const rvwap30d = calculateRollingVwap(klines30d, windowSize30d);
         results['30d'] = smoothRvwapData(rvwap30d, 3);
         console.log(`[useMultiRvwap] Calculated 30d:`, results['30d'].length, 'points');
 
-        // Calculate 90D RVWAP (2160 1h candles, but limited by fetch)
+        // Fetch 90D using 1h data (multi-batch, 2160 candles = 3 batches)
+        console.log('[useMultiRvwap] Fetching 1h data for 90D (multi-batch)...');
+        const klines90d = await fetchKlinesMultiBatch(
+          {
+            symbol,
+            interval: '1h',
+            dataSource,
+          },
+          2160, // 90 days * 24 hours
+        );
+
+        console.log('[useMultiRvwap] Fetched 90D klines:', klines90d.length);
+
+        // Calculate 90D RVWAP (2160 1h candles)
         const windowSize90d = getWindowSize('90d', '1h');
-        const rvwap90d = calculateRollingVwap(klines1h, windowSize90d);
+        const rvwap90d = calculateRollingVwap(klines90d, windowSize90d);
         results['90d'] = smoothRvwapData(rvwap90d, 3);
         console.log(`[useMultiRvwap] Calculated 90d:`, results['90d'].length, 'points');
 
-        // Fetch 365D using 1d data
+        // Fetch 365D using 1d data (single request, 365 candles)
         console.log('[useMultiRvwap] Fetching 1d data for 365D...');
         const lookbackDays365 = getLookbackDays('365d');
         const startTime365 = endTime - (lookbackDays365 * 24 * 60 * 60 * 1000);
@@ -96,7 +109,7 @@ export function useMultiRvwap(
         console.log(`[useMultiRvwap] Calculated 365d:`, results['365d'].length, 'points');
 
         setRvwapData(results as MultiRvwapData);
-        setKlines(klines1h); // Use 1h klines for candlesticks
+        setKlines(klines90d); // Use 90d klines (most data) for candlesticks
         setLastUpdated(new Date());
         setError(null);
       } catch (err: any) {

@@ -177,99 +177,58 @@ export function calculateStartTime(daysBack: number): number {
 }
 
 /**
- * Fetch klines in batches to overcome 1000-limit per request
- * Useful for long periods like 365 days
+ * Fetch klines in multiple batches to overcome 1000-limit
+ * Fetches in reverse chronological order (most recent first)
  */
-export async function fetchKlinesBatch(
+export async function fetchKlinesMultiBatch(
   params: FetchKlinesParams,
+  totalCandles: number,
   signal?: AbortSignal
 ): Promise<Kline[]> {
-  const { symbol, interval, startTime, endTime, dataSource = 'spot' } = params;
-
-  if (!startTime || !endTime) {
-    throw new Error('startTime and endTime are required for batch fetching');
-  }
+  const { symbol, interval, dataSource = 'spot' } = params;
+  
+  const batchSize = 1000;
+  const batchesNeeded = Math.ceil(totalCandles / batchSize);
+  
+  console.log(`[fetchKlinesMultiBatch] Fetching ${totalCandles} candles in ${batchesNeeded} batches`);
 
   const allKlines: Kline[] = [];
-  let currentStartTime = startTime;
-  const batchLimit = 1000;
+  let endTime = Date.now();
 
-  // Calculate time per candle based on interval
-  const intervalMs = getIntervalMs(interval);
-  if (!intervalMs) {
-    throw new Error(`Unsupported interval: ${interval}`);
-  }
+  for (let i = 0; i < batchesNeeded; i++) {
+    console.log(`[fetchKlinesMultiBatch] Batch ${i + 1}/${batchesNeeded}`);
 
-  console.log('[fetchKlinesBatch] Starting batch fetch:', {
-    symbol,
-    interval,
-    startTime: new Date(startTime).toISOString(),
-    endTime: new Date(endTime).toISOString(),
-    expectedCandles: Math.floor((endTime - startTime) / intervalMs),
-  });
-
-  let batchCount = 0;
-  while (currentStartTime < endTime) {
-    batchCount++;
-    
-    // Fetch batch
     const batch = await fetchKlines(
       {
         symbol,
         interval,
-        startTime: currentStartTime,
         endTime,
-        limit: batchLimit,
+        limit: batchSize,
         dataSource,
       },
       signal
     );
 
-    console.log(`[fetchKlinesBatch] Batch ${batchCount}: fetched ${batch.length} candles`);
-
     if (batch.length === 0) {
-      break; // No more data
-    }
-
-    allKlines.push(...batch);
-
-    // Move to next batch (start from last candle's close time + 1ms)
-    const lastCandle = batch[batch.length - 1];
-    currentStartTime = lastCandle.closeTime + 1;
-
-    // If we got less than the limit, we've reached the end
-    if (batch.length < batchLimit) {
+      console.warn(`[fetchKlinesMultiBatch] Batch ${i + 1} returned 0 candles, stopping`);
       break;
     }
 
-    // Small delay to avoid rate limits
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Add to beginning of array (since we're fetching backwards)
+    allKlines.unshift(...batch);
+
+    // Set next endTime to first candle's openTime - 1ms
+    endTime = batch[0].openTime - 1;
+
+    console.log(`[fetchKlinesMultiBatch] Batch ${i + 1} fetched ${batch.length} candles, total: ${allKlines.length}`);
+
+    // Small delay to avoid rate limits (except for last batch)
+    if (i < batchesNeeded - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
   }
 
-  console.log('[fetchKlinesBatch] Total fetched:', allKlines.length, 'candles');
-
+  console.log(`[fetchKlinesMultiBatch] Total fetched: ${allKlines.length} candles`);
   return allKlines;
 }
 
-/**
- * Get interval duration in milliseconds
- */
-function getIntervalMs(interval: string): number | null {
-  const unit = interval.slice(-1);
-  const value = parseInt(interval.slice(0, -1));
-
-  if (isNaN(value)) return null;
-
-  switch (unit) {
-    case 'm':
-      return value * 60 * 1000;
-    case 'h':
-      return value * 60 * 60 * 1000;
-    case 'd':
-      return value * 24 * 60 * 60 * 1000;
-    case 'w':
-      return value * 7 * 24 * 60 * 60 * 1000;
-    default:
-      return null;
-  }
-}
