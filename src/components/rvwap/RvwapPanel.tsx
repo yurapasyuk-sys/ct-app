@@ -2,10 +2,11 @@
  * RVWAP Panel with controls and chart
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RvwapChart } from './RvwapChart';
 import { useRvwap } from '@/hooks/useRvwap';
 import { Card } from '@/components/ui/card';
+import { SnapshotButton } from '@/components/SnapshotButton';
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ const TIMEFRAMES = [
 export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
   const [period, setPeriod] = useState('90d');
   const [timeframe, setTimeframe] = useState('1h');
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { rvwapData, klines, isLoading, error, lastUpdated } = useRvwap({
     symbol,
@@ -62,14 +64,24 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
   const statusColor = error ? 'bg-red-500' : isLoading ? 'bg-amber-500' : 'bg-green-500';
 
   return (
-    <Card 
-      className="p-4 bg-card border border-border w-full relative" 
-      data-testid="rvwap-root"
-    >
-      {/* Visible Debug Badge */}
-      <div className="absolute top-4 right-4 z-50 px-3 py-1 bg-emerald-500/20 border-2 border-emerald-500 rounded-md text-emerald-400 text-xs font-bold shadow-lg">
-        RVWAP ACTIVE
-      </div>
+    <div ref={containerRef} className="relative">
+      <Card 
+        className="p-4 bg-card border border-border w-full relative" 
+        data-testid="rvwap-root"
+      >
+        {/* Snapshot Button */}
+        <div className="absolute top-2 right-2 z-50" data-snapshot-hide>
+          <SnapshotButton
+            containerRef={containerRef}
+            symbol={symbol}
+            timeframe={`RVWAP_${period}`}
+          />
+        </div>
+
+        {/* Visible Debug Badge */}
+        <div className="absolute top-4 right-14 z-40 px-3 py-1 bg-emerald-500/20 border-2 border-emerald-500 rounded-md text-emerald-400 text-xs font-bold shadow-lg">
+          RVWAP ACTIVE
+        </div>
       
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
@@ -131,20 +143,20 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
         </div>
       )}
 
-      {/* Loading state */}
-      {isLoading && rvwapData.length === 0 && (
-        <div className="flex items-center justify-center h-[400px] text-muted-foreground">
-          <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="text-sm">Loading RVWAP data...</span>
-          </div>
+      {/* Chart */}
+      {!isLoading && rvwapData.length > 0 && (
+        <div className="mb-3" style={{ minHeight: '400px' }}>
+          <RvwapChart data={rvwapData} klines={klines} height={400} />
         </div>
       )}
 
-      {/* Chart */}
-      {!isLoading && rvwapData.length > 0 && (
-        <div className="mb-3">
-          <RvwapChart data={rvwapData} klines={klines} height={400} />
+      {/* Loading placeholder to prevent layout shift */}
+      {isLoading && (
+        <div className="mb-3 flex items-center justify-center bg-[#1a1a1a] rounded-lg" style={{ minHeight: '400px', height: '400px' }}>
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="text-sm text-muted-foreground">Loading RVWAP data...</span>
+          </div>
         </div>
       )}
       
@@ -180,5 +192,6 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
         </div>
       )}
     </Card>
+    </div>
   );
 }
