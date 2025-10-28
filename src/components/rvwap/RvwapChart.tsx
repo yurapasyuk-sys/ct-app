@@ -84,16 +84,16 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
             borderColor: 'rgba(255, 255, 255, 0.2)',
             timeVisible: true,
             secondsVisible: false,
-            barSpacing: 3,
-            rightOffset: 0,
-            fixLeftEdge: true,
+            barSpacing: 6,
+            rightOffset: 12,
+            fixLeftEdge: false,
             fixRightEdge: false,
           },
           rightPriceScale: {
             borderColor: 'rgba(255, 255, 255, 0.2)',
           },
-          handleScroll: false,
-          handleScale: false,
+          handleScroll: true,
+          handleScale: true,
         });
 
         console.log('[RvwapChart] 📊 Chart object created:', {
