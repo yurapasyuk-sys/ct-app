@@ -1,10 +1,5 @@
 /**
- * RVWAP Chart Coexport function RvwapChart({ data, height = 400, className = '' }: RvwapChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const isInitializedRef = useRef(false);
-  const [isLoading, setIsLoading] = useState(true); using lightweight-charts
+ * RVWAP Chart Component using lightweight-charts
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -76,10 +71,22 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
             borderColor: 'rgba(255, 255, 255, 0.2)',
             timeVisible: true,
             secondsVisible: false,
+            barSpacing: 3,
+            rightOffset: 0,
+            fixLeftEdge: true,
+            fixRightEdge: false,
           },
           rightPriceScale: {
             borderColor: 'rgba(255, 255, 255, 0.2)',
           },
+          handleScroll: false,
+          handleScale: false,
+        });
+
+        console.log('[RvwapChart] 📊 Chart object created:', {
+          width: rect.width,
+          height,
+          hasChart: !!chart,
         });
 
         // Add line series for RVWAP line
@@ -92,13 +99,19 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
           crosshairMarkerRadius: 6,
         });
 
+        console.log('[RvwapChart] 📈 LineSeries added:', {
+          hasLineSeries: !!lineSeries,
+          color: '#00b4ff',
+          lineWidth: 3,
+        });
+
         chartRef.current = chart;
         lineSeriesRef.current = lineSeries;
         isInitializedRef.current = true;
 
-        console.log('[RvwapChart] Chart initialized successfully');
+        console.log('[RvwapChart] ✅ Chart initialized successfully');
       } catch (error) {
-        console.error('[RvwapChart] Failed to initialize:', error);
+        console.error('[RvwapChart] ❌ Failed to initialize:', error);
       }
     };
 
@@ -116,10 +129,15 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
 
   // Update data
   useEffect(() => {
-    console.log('[RvwapChart] render', data.length);
+    console.log('[RvwapChart] 🔄 Update effect triggered:', {
+      dataLength: data.length,
+      hasLineSeries: !!lineSeriesRef.current,
+      hasChart: !!chartRef.current,
+      isInitialized: isInitializedRef.current,
+    });
     
     if (!lineSeriesRef.current || !chartRef.current || data.length === 0) {
-      console.log('[RvwapChart] Update skipped:', {
+      console.log('[RvwapChart] ⚠️ Update skipped:', {
         hasLineSeries: !!lineSeriesRef.current,
         hasChart: !!chartRef.current,
         dataLength: data.length,
@@ -135,12 +153,23 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
         value: d.vwap,
       }));
 
+      console.log('[RvwapChart] 📝 Calling setData with:', {
+        points: lineData.length,
+        firstPoint: lineData[0],
+        lastPoint: lineData[lineData.length - 1],
+        sample: lineData.slice(0, 3),
+      });
+
       lineSeriesRef.current.setData(lineData);
+
+      console.log('[RvwapChart] ✅ setData completed');
 
       // Fit content to show all data
       chartRef.current.timeScale().fitContent();
 
-      console.log('[RvwapChart] Updated data:', {
+      console.log('[RvwapChart] ✅ fitContent completed');
+
+      console.log('[RvwapChart] 📊 Updated data:', {
         points: lineData.length,
         firstTime: new Date(data[0].timestamp).toISOString(),
         lastTime: new Date(data[data.length - 1].timestamp).toISOString(),
@@ -150,7 +179,7 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
 
       setTimeout(() => setIsLoading(false), 300);
     } catch (error) {
-      console.error('[RvwapChart] Error setting data:', error);
+      console.error('[RvwapChart] ❌ Error setting data:', error);
       setIsLoading(false);
     }
   }, [data]);
