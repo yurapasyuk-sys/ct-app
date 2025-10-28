@@ -89,6 +89,7 @@ export function useRvwap({
           windowSize,
           period,
         });
+        console.log('[useRvwap] ✅ points', rvwap.length, { period, interval });
 
         setRvwapData(rvwap);
         setLastUpdated(new Date());

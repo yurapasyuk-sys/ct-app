@@ -120,6 +120,8 @@ export function RvwapChart({ data, height = 400, className = '' }: RvwapChartPro
 
   // Update data
   useEffect(() => {
+    console.log('[RvwapChart] render', data.length);
+    
     if (!lineSeriesRef.current || !areaSeriesRef.current || !chartRef.current || data.length === 0) {
       console.log('[RvwapChart] Update skipped:', {
         hasLineSeries: !!lineSeriesRef.current,

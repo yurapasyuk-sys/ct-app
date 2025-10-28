@@ -225,6 +225,25 @@ export default function MtmDashboard() {
     localStorage.setItem('mtm_showRvwap', String(showRvwap));
   }, [showRvwap]);
 
+  // URL override effect and mount verification
+  useEffect(() => {
+    const forced = new URLSearchParams(window.location.search).get('forceRvwap');
+    if (forced === '1') setShowRvwap(true);
+    if (forced === '0') setShowRvwap(false);
+
+    // Verify panel mounts when expected
+    setTimeout(() => {
+      const el = document.querySelector('[data-testid="rvwap-root"]');
+      if (!el && showRvwap) {
+        console.error('[RVWAP] ❌ Panel expected but not mounted on /dashboard/mtm');
+        console.error('[RVWAP] showRvwap:', showRvwap);
+        console.error('[RVWAP] Check conditional render logic');
+      } else if (el && showRvwap) {
+        console.log('[RVWAP] ✅ Panel successfully mounted on /dashboard/mtm');
+      }
+    }, 1000);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -310,8 +329,9 @@ export default function MtmDashboard() {
           {/* RVWAP Panel - Conditionally Rendered */}
           {showRvwap && (
             <div
-              className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+              className="mt-6 border-2 border-emerald-600/40 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500"
               style={{ animationFillMode: 'backwards' }}
+              data-testid="rvwap-wrapper"
             >
               <RvwapPanel symbol={symbol} dataSource={dataSource} />
             </div>

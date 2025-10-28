@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/react";
 import Index from "./pages/Index";
 import MtmDashboard from "./pages/MtmDashboard";
 import TestDashboard from "./pages/TestDashboard";
+import RvwapOnly from "./pages/RvwapOnly";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/dashboard/mtm" element={<MtmDashboard />} />
             <Route path="/dashboard/test" element={<TestDashboard />} />
+            <Route path="/dashboard/rvwap" element={<RvwapOnly />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -61,7 +61,15 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
   const statusColor = error ? 'bg-red-500' : isLoading ? 'bg-amber-500' : 'bg-green-500';
 
   return (
-    <Card className="p-4 bg-card border border-border w-full">
+    <Card 
+      className="p-4 bg-card border border-border w-full relative" 
+      data-testid="rvwap-root"
+    >
+      {/* Visible Debug Badge */}
+      <div className="absolute top-4 right-4 z-50 px-3 py-1 bg-emerald-500/20 border-2 border-emerald-500 rounded-md text-emerald-400 text-xs font-bold shadow-lg">
+        RVWAP ACTIVE
+      </div>
+      
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
