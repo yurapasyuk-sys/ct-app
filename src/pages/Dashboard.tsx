@@ -54,10 +54,10 @@ const Dashboard = () => {
 
   const handleLoadingComplete = () => {
     setShowLoading(false);
-    // Fade in content after loading completes (smoother with longer delay)
+    // Small delay before starting content fade-in
     setTimeout(() => {
       setContentOpacity(1);
-    }, 100);
+    }, 50);
   };
 
   // Mobile blocker
@@ -92,18 +92,16 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background relative">
       {/* Loading Overlay - shows on first visit only */}
       {showLoading && (
-        <LoadingOverlay 
-          onComplete={handleLoadingComplete}
-          duration={3300} // 2.5s animation + 0.8s fade-out
-        />
+        <LoadingOverlay onComplete={handleLoadingComplete} />
       )}
 
       {/* Liquid Ether Background - lowest z-index, dimmed during loading */}
       <div 
-        className="fixed inset-0 z-0 transition-opacity duration-300"
+        className="fixed inset-0 z-0 transition-all duration-500"
         style={{ 
-          opacity: showLoading ? 0.3 : 1,
-          filter: showLoading ? 'blur(4px)' : 'blur(0px)'
+          opacity: showLoading ? 0.2 : 1,
+          filter: showLoading ? 'blur(8px)' : 'blur(0px)',
+          transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
         }}
       >
         <LiquidEther
@@ -134,11 +132,11 @@ const Dashboard = () => {
 
       {/* Content - fades in after loading */}
       <div 
-        className="relative z-10 min-h-screen transition-opacity duration-1000"
+        className="relative z-10 min-h-screen transition-opacity duration-[1200ms]"
         style={{ 
           pointerEvents: 'auto',
           opacity: contentOpacity,
-          transitionTimingFunction: 'cubic-bezier(0.25, 0.1, 0.25, 1)'
+          transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
         }}
       >
         {/* Header */}

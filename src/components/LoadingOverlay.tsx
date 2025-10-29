@@ -3,39 +3,39 @@ import ASCIIText from './ASCIIText';
 
 interface LoadingOverlayProps {
   onComplete?: () => void;
-  duration?: number; // in milliseconds, default 3300ms (2.5s animation + 0.8s fade)
 }
 
-export default function LoadingOverlay({ onComplete, duration = 3300 }: LoadingOverlayProps) {
+export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
   const [isVisible, setIsVisible] = useState(true);
-  const [opacity, setOpacity] = useState(1);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   
   // Check for reduced motion preference
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   
-  // Adjust duration for reduced motion (quick fade only)
-  const actualDuration = prefersReducedMotion ? 400 : duration;
-  const fadeOutDuration = 800; // 800ms fade out for smoother transition
+  // Timing configuration
+  const animationDuration = prefersReducedMotion ? 800 : 2500; // 2.5s ASCII animation
+  const fadeOutDuration = 800; // 800ms fade out
+  const totalDuration = animationDuration + fadeOutDuration;
 
   useEffect(() => {
-    // Start fade out before completion
+    // Start fade out after animation completes
     const fadeOutTimer = setTimeout(() => {
-      setOpacity(0);
-    }, actualDuration - fadeOutDuration);
+      setIsFadingOut(true);
+    }, animationDuration);
 
-    // Complete and unmount
+    // Complete and unmount after fade out
     const completeTimer = setTimeout(() => {
       setIsVisible(false);
       if (onComplete) {
         onComplete();
       }
-    }, actualDuration);
+    }, totalDuration);
 
     return () => {
       clearTimeout(fadeOutTimer);
       clearTimeout(completeTimer);
     };
-  }, [actualDuration, fadeOutDuration, onComplete]);
+  }, [animationDuration, totalDuration, onComplete]);
 
   if (!isVisible) return null;
 
@@ -43,33 +43,33 @@ export default function LoadingOverlay({ onComplete, duration = 3300 }: LoadingO
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black transition-opacity"
       style={{
-        opacity,
+        opacity: isFadingOut ? 0 : 1,
         transitionDuration: `${fadeOutDuration}ms`,
-        transitionTimingFunction: 'cubic-bezier(0.25, 0.1, 0.25, 1)'
+        transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
       }}
     >
       {/* ASCII Animation */}
       <div className="relative w-full h-full">
         <ASCIIText
-          text={prefersReducedMotion ? 'Fetching_data' : 'Fetching_data...'}
-          asciiFontSize={8}
-          textFontSize={120}
+          text="Fetching_data..."
+          asciiFontSize={10}
+          textFontSize={180}
           textColor="#A855F7"
-          planeBaseHeight={6}
+          planeBaseHeight={8}
           enableWaves={!prefersReducedMotion}
         />
       </div>
 
-      {/* Subtle loading indicator (optional) */}
+      {/* Subtle loading indicator */}
       {!prefersReducedMotion && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
-          <div className="flex gap-2">
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
+          <div className="flex gap-3">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="w-2 h-2 rounded-full bg-primary/60"
+                className="w-2.5 h-2.5 rounded-full bg-primary/70"
                 style={{
-                  animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`
+                  animation: `pulse 1.5s ease-in-out ${i * 0.3}s infinite`
                 }}
               />
             ))}
