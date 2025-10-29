@@ -1,4 +1,5 @@
 import LiquidEther from '@/components/LiquidEther';
+import LoadingOverlay from '@/components/LoadingOverlay';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -11,6 +12,22 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [showLoading, setShowLoading] = useState(true);
+  const [contentOpacity, setContentOpacity] = useState(0);
+
+  useEffect(() => {
+    // Check if this is first visit (use sessionStorage for per-session tracking)
+    const hasVisited = sessionStorage.getItem('dashboardVisited');
+    
+    if (hasVisited) {
+      // Skip loading animation on subsequent visits in same session
+      setShowLoading(false);
+      setContentOpacity(1);
+    } else {
+      // Mark as visited for this session
+      sessionStorage.setItem('dashboardVisited', 'true');
+    }
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -34,6 +51,14 @@ const Dashboard = () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
+
+  const handleLoadingComplete = () => {
+    setShowLoading(false);
+    // Fade in content after loading completes
+    setTimeout(() => {
+      setContentOpacity(1);
+    }, 50);
+  };
 
   // Mobile blocker
   if (isMobile) {
@@ -65,8 +90,22 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Liquid Ether Background - lowest z-index */}
-      <div className="fixed inset-0 z-0">
+      {/* Loading Overlay - shows on first visit only */}
+      {showLoading && (
+        <LoadingOverlay 
+          onComplete={handleLoadingComplete}
+          duration={2400} // 2.4 seconds
+        />
+      )}
+
+      {/* Liquid Ether Background - lowest z-index, dimmed during loading */}
+      <div 
+        className="fixed inset-0 z-0 transition-opacity duration-300"
+        style={{ 
+          opacity: showLoading ? 0.3 : 1,
+          filter: showLoading ? 'blur(4px)' : 'blur(0px)'
+        }}
+      >
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
           mouseForce={prefersReducedMotion ? 15 : 30}
@@ -93,8 +132,15 @@ const Dashboard = () => {
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen" style={{ pointerEvents: 'auto' }}>
+      {/* Content - fades in after loading */}
+      <div 
+        className="relative z-10 min-h-screen transition-opacity duration-600"
+        style={{ 
+          pointerEvents: 'auto',
+          opacity: contentOpacity,
+          transitionTimingFunction: 'cubic-bezier(0.25, 0.1, 0.25, 1)'
+        }}
+      >
         {/* Header */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-4 py-4">
