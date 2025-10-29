@@ -12,22 +12,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [showLoading, setShowLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(true); // Always show on mount
   const [contentOpacity, setContentOpacity] = useState(0);
 
-  useEffect(() => {
-    // Check if this is first visit (use sessionStorage for per-session tracking)
-    const hasVisited = sessionStorage.getItem('dashboardVisited');
-    
-    if (hasVisited) {
-      // Skip loading animation on subsequent visits in same session
-      setShowLoading(false);
-      setContentOpacity(1);
-    } else {
-      // Mark as visited for this session
-      sessionStorage.setItem('dashboardVisited', 'true');
-    }
-  }, []);
+  // Remove sessionStorage check - always show animation
+  // Animation will play every time user navigates to dashboard
 
   useEffect(() => {
     const checkMobile = () => {
@@ -53,8 +42,10 @@ const Dashboard = () => {
   }, []);
 
   const handleLoadingComplete = () => {
+    console.log('📍 Dashboard: анимация завершена, показываем контент');
     setShowLoading(false);
-    // Small delay before starting content fade-in
+    
+    // Small delay before starting content fade-in for smooth transition
     setTimeout(() => {
       setContentOpacity(1);
     }, 50);
@@ -90,7 +81,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Loading Overlay - shows on first visit only */}
+      {/* Loading Overlay - shows every time dashboard is loaded */}
       {showLoading && (
         <LoadingOverlay onComplete={handleLoadingComplete} />
       )}

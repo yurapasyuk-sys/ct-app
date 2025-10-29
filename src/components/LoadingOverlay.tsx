@@ -13,18 +13,22 @@ export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   
   // Timing configuration
-  const animationDuration = prefersReducedMotion ? 800 : 2500; // 2.5s ASCII animation
-  const fadeOutDuration = 800; // 800ms fade out
+  const animationDuration = prefersReducedMotion ? 800 : 3200; // 3.2s ASCII animation
+  const fadeOutDuration = 800; // 0.8s fade out
   const totalDuration = animationDuration + fadeOutDuration;
 
   useEffect(() => {
+    console.log('🎬 Loading animation started - будет показываться', animationDuration, 'ms');
+    
     // Start fade out after animation completes
     const fadeOutTimer = setTimeout(() => {
+      console.log('⬇️ Starting fade-out');
       setIsFadingOut(true);
     }, animationDuration);
 
     // Complete and unmount after fade out
     const completeTimer = setTimeout(() => {
+      console.log('✅ Loading animation complete');
       setIsVisible(false);
       if (onComplete) {
         onComplete();
@@ -52,10 +56,10 @@ export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
       <div className="relative w-full h-full">
         <ASCIIText
           text="Fetching_data..."
-          asciiFontSize={10}
-          textFontSize={180}
+          asciiFontSize={9}
+          textFontSize={130}
           textColor="#A855F7"
-          planeBaseHeight={8}
+          planeBaseHeight={7}
           enableWaves={!prefersReducedMotion}
         />
       </div>
