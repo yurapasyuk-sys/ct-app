@@ -22,13 +22,23 @@ export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
     // Small screens (< 768px): smaller text
     // Medium screens (768-1024px): medium text
     // Large screens (> 1024px): full text
-    if (minDimension < 500) return 80;  // Very small mobile
-    if (minDimension < 768) return 100; // Mobile
+    if (minDimension < 500) return 90;   // Very small mobile (было 80)
+    if (minDimension < 768) return 110;  // Mobile (было 100)
     if (minDimension < 1024) return 120; // Tablet
     return 130; // Desktop
   };
   
+  // Adaptive plane base height - bigger on small screens for visibility
+  const getAdaptivePlaneHeight = () => {
+    const minDimension = Math.min(window.innerWidth, window.innerHeight);
+    
+    if (minDimension < 500) return 9;  // Больше для маленьких экранов
+    if (minDimension < 768) return 8;  // Средний размер
+    return 7; // Стандартный для десктопа
+  };
+  
   const adaptiveTextSize = getAdaptiveTextSize();
+  const adaptivePlaneHeight = getAdaptivePlaneHeight();
   
   // Timing configuration
   const animationDuration = prefersReducedMotion ? 800 : 3200; // 3.2s ASCII animation
@@ -80,7 +90,7 @@ export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
           asciiFontSize={9}
           textFontSize={adaptiveTextSize}
           textColor="#A855F7"
-          planeBaseHeight={7}
+          planeBaseHeight={adaptivePlaneHeight}
           enableWaves={!prefersReducedMotion}
         />
       </div>

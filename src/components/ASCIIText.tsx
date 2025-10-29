@@ -359,6 +359,16 @@ class CanvAscii {
       planeH = this.planeBaseHeight * padding;
       planeW = planeH * textAspect;
     }
+    
+    console.log('🎨 ASCII setMesh:', {
+      viewport: `${this.width}x${this.height}`,
+      textAspect: textAspect.toFixed(2),
+      viewportAspect: viewportAspect.toFixed(2),
+      padding: padding.toFixed(2),
+      planeBaseHeight: this.planeBaseHeight,
+      planeSize: `${planeW.toFixed(2)}x${planeH.toFixed(2)}`,
+      textFontSize: this.textFontSize
+    });
 
     this.geometry = new THREE.PlaneGeometry(planeW, planeH, 36, 36);
     this.material = new THREE.ShaderMaterial({
@@ -380,11 +390,12 @@ class CanvAscii {
   getAdaptivePadding(): number {
     const minDimension = Math.min(this.width, this.height);
     
-    // Smaller screens need more padding to prevent text clipping
-    if (minDimension < 400) return 0.70; // 70% for very small screens
-    if (minDimension < 600) return 0.75; // 75% for small screens
-    if (minDimension < 768) return 0.80; // 80% for mobile
-    return 0.85; // 85% for tablets and desktop
+    // INVERTED LOGIC: Smaller screens need LARGER values to keep text visible
+    // The padding multiplier should be HIGHER on small screens
+    if (minDimension < 400) return 0.95; // 95% - максимальное использование экрана
+    if (minDimension < 600) return 0.90; // 90% - больше места для текста
+    if (minDimension < 768) return 0.88; // 88% - мобильные
+    return 0.85; // 85% - десктоп (больше отступы)
   }
 
   setRenderer() {
