@@ -1,7 +1,7 @@
 export const Hero = () => {
   return (
     <section className="min-h-screen flex items-center justify-center relative overflow-hidden px-4">
-      <div className="absolute inset-0 grid-pattern opacity-40" />
+      {/* Grid pattern removed - using Liquid Ether background instead */}
       
       <div className="relative max-w-5xl w-full">
         <div className="mb-8">

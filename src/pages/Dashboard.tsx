@@ -69,8 +69,8 @@ const Dashboard = () => {
       <div className="fixed inset-0 z-0">
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
-          mouseForce={prefersReducedMotion ? 10 : 20}
-          cursorSize={100}
+          mouseForce={prefersReducedMotion ? 15 : 30}
+          cursorSize={150}
           isViscous={false}
           viscous={30}
           iterationsViscous={prefersReducedMotion ? 16 : 32}
@@ -78,8 +78,8 @@ const Dashboard = () => {
           resolution={prefersReducedMotion ? 0.3 : 0.5}
           isBounce={false}
           autoDemo={true}
-          autoSpeed={prefersReducedMotion ? 0.3 : 0.5}
-          autoIntensity={2.2}
+          autoSpeed={prefersReducedMotion ? 0.4 : 0.7}
+          autoIntensity={3.0}
           takeoverDuration={0.25}
           autoResumeDelay={3000}
           autoRampDuration={0.6}

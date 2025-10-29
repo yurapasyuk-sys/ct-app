@@ -20,7 +20,7 @@ export const Philosophy = () => {
 
   return (
     <section className="py-32 px-4 relative">
-      <div className="absolute inset-0 grid-pattern opacity-20" />
+      {/* Grid pattern removed - using Liquid Ether background instead */}
       
       <div className="max-w-4xl mx-auto relative">
         <div className="mb-16">
