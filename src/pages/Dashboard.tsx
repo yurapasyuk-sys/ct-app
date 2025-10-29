@@ -65,8 +65,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Liquid Ether Background - lowest z-index, no pointer events */}
-      <div className="fixed inset-0 z-0" style={{ pointerEvents: 'none' }}>
+      {/* Liquid Ether Background - lowest z-index */}
+      <div className="fixed inset-0 z-0">
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
           mouseForce={prefersReducedMotion ? 10 : 20}
@@ -94,7 +94,7 @@ const Dashboard = () => {
       />
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen">
+      <div className="relative z-10 min-h-screen" style={{ pointerEvents: 'auto' }}>
         {/* Header */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-4 py-4">

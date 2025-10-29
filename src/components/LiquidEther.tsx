@@ -86,6 +86,8 @@ export default function LiquidEther({
 
   useEffect(() => {
     if (!mountRef.current) return;
+    
+    console.log('🎨 LiquidEther: Component mounted, initializing WebGL...');
 
     function makePaletteTexture(stops: string[]): THREE.DataTexture {
       let arr: string[];
@@ -135,6 +137,11 @@ export default function LiquidEther({
         this.container = container;
         this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         this.resize();
+        console.log('🎨 LiquidEther: Common initialized', { 
+          width: this.width, 
+          height: this.height,
+          pixelRatio: this.pixelRatio 
+        });
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         // Always transparent
         this.renderer.autoClear = false;
@@ -1078,6 +1085,11 @@ export default function LiquidEther({
       autoRampDuration
     });
     webglRef.current = webgl;
+    
+    console.log('🎨 LiquidEther: WebGL Manager created', { 
+      hasRenderer: !!webgl.output,
+      containerSize: { width: container.offsetWidth, height: container.offsetHeight }
+    });
 
     const applyOptionsFromProps = () => {
       if (!webglRef.current) return;
