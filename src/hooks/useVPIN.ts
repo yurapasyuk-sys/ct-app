@@ -59,8 +59,12 @@ async function fetchBinanceTrades(symbol: string, hours: number): Promise<AggTra
       limit: '2000',
     });
 
-    const proxyUrl = `/api/binance-proxy?${params}`;
-    console.log(`[useVPIN] Fetching from proxy...`);
+    // Use production API in dev mode (Vite doesn't support serverless functions locally)
+    const isDev = import.meta.env.DEV;
+    const baseUrl = isDev ? 'https://borkiss-site.vercel.app' : '';
+    const proxyUrl = `${baseUrl}/api/binance-proxy?${params}`;
+    
+    console.log(`[useVPIN] Fetching from ${isDev ? 'production' : 'local'} proxy...`);
 
     const response = await fetch(proxyUrl);
     
@@ -91,7 +95,11 @@ async function calculateVPIN(
   timeframe: string,
   hours: number
 ): Promise<VPINData> {
-  const response = await fetch('/api/vpin-calculate', {
+  // Use production API in dev mode
+  const isDev = import.meta.env.DEV;
+  const baseUrl = isDev ? 'https://borkiss-site.vercel.app' : '';
+  
+  const response = await fetch(`${baseUrl}/api/vpin-calculate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
