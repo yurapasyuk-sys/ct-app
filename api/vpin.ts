@@ -3,8 +3,53 @@
  * Vercel Serverless Function
  */
 
-import { Redis } from '@upstash/redis';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+// ==================== REDIS HELPER ====================
+
+async function redisGet(key: string): Promise<any> {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  
+  if (!url || !token) {
+    console.log('[Redis] Missing credentials');
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${url}/get/${key}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    const data = await response.json() as { result: string | null };
+    return data.result ? JSON.parse(data.result) : null;
+  } catch (error) {
+    console.error('[Redis] Get error:', error);
+    return null;
+  }
+}
+
+async function redisSet(key: string, value: any, expirySeconds: number): Promise<void> {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  
+  if (!url || !token) {
+    console.log('[Redis] Missing credentials, skipping cache');
+    return;
+  }
+
+  try {
+    await fetch(`${url}/setex/${key}/${expirySeconds}/${encodeURIComponent(JSON.stringify(value))}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    console.error('[Redis] Set error:', error);
+  }
+}
 
 // ==================== TYPES ====================
 
@@ -239,12 +284,6 @@ export default async function handler(
   }
 
   try {
-    // Initialize Redis client inside handler
-    const redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL || '',
-      token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-    });
-
     const { symbol = 'BTCUSDT', tf = 'm5', hours = '24' } = req.query;
     const hoursNum = parseInt(hours as string);
     const cacheKey = `vpin:${symbol}:${tf}:${hoursNum}h`;
@@ -253,7 +292,7 @@ export default async function handler(
 
     // 1. Check Redis cache
     console.log(`[VPIN API] Checking cache: ${cacheKey}`);
-    const cached = await redis.get(cacheKey);
+    const cached = await redisGet(cacheKey);
 
     if (cached) {
       console.log(`[VPIN API] ✅ Cache HIT: ${cacheKey}`);
@@ -293,7 +332,7 @@ export default async function handler(
     console.log(`[VPIN API] Result: ${vpin.buckets.length} buckets, avg VPIN: ${vpin.stats.avgVPIN}`);
 
     // 4. Cache for 1 hour (3600 seconds)
-    await redis.setex(cacheKey, 3600, JSON.stringify(vpin));
+    await redisSet(cacheKey, vpin, 3600);
     console.log(`[VPIN API] ✅ Cached result for 1 hour`);
 
     // 5. Return response
