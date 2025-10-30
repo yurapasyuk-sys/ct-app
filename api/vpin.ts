@@ -216,12 +216,6 @@ function calculateVPIN(
 
 // ==================== API HANDLER ====================
 
-// Initialize Redis client
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -245,6 +239,12 @@ export default async function handler(
   }
 
   try {
+    // Initialize Redis client inside handler
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL || '',
+      token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+    });
+
     const { symbol = 'BTCUSDT', tf = 'm5', hours = '24' } = req.query;
     const hoursNum = parseInt(hours as string);
     const cacheKey = `vpin:${symbol}:${tf}:${hoursNum}h`;
@@ -305,10 +305,16 @@ export default async function handler(
     return res.status(200).json(vpin);
   } catch (error) {
     console.error('[VPIN API] Error:', error);
+    console.error('[VPIN API] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('[VPIN API] Env check:', {
+      hasRedisUrl: !!process.env.UPSTASH_REDIS_REST_URL,
+      hasRedisToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
     
     return res.status(500).json({
       error: 'Failed to calculate VPIN',
       message: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined,
     });
   }
 }
