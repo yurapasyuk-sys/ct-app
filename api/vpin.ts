@@ -94,7 +94,7 @@ async function fetchAggTrades(
   symbol: string,
   hours: number = 24
 ): Promise<AggTrade[]> {
-  // Use CORS proxy to bypass geo-blocking (Binance blocks US IPs from Vercel)
+  // Try multiple proxy services to bypass geo-blocking
   const baseUrl = 'https://api.binance.com/api/v3/aggTrades';
   const endTime = Date.now();
   const startTime = endTime - hours * 60 * 60 * 1000;
@@ -105,6 +105,12 @@ async function fetchAggTrades(
   let fromId: number | null = null;
   let iterationCount = 0;
   const maxIterations = 150;
+
+  // List of proxy services to try
+  const proxies = [
+    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
 
   try {
     while (iterationCount < maxIterations) {
@@ -121,18 +127,34 @@ async function fetchAggTrades(
         params.append('fromId', fromId.toString());
       }
 
-      // Use CORS proxy to bypass Binance geo-blocking
       const binanceUrl = `${baseUrl}?${params}`;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(binanceUrl)}`;
-
-      const response = await fetch(proxyUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-        },
-      });
       
-      if (!response.ok) {
-        throw new Error(`Binance API error: ${response.status} ${response.statusText}`);
+      // Try each proxy until one works
+      let response: Response | null = null;
+      let lastError: Error | null = null;
+      
+      for (const proxy of proxies) {
+        try {
+          const proxyUrl = proxy(binanceUrl);
+          response = await fetch(proxyUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0',
+            },
+          });
+          
+          if (response.ok) {
+            break; // Success with this proxy
+          }
+        } catch (err) {
+          lastError = err as Error;
+          continue; // Try next proxy
+        }
+      }
+      
+      if (!response || !response.ok) {
+        throw new Error(
+          `All proxies failed. Last error: ${lastError?.message || 'Unknown'}, Status: ${response?.status || 'N/A'}`
+        );
       }
       
       const trades = await response.json() as AggTrade[];
