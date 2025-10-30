@@ -79,51 +79,9 @@ export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
         willChange: 'opacity',
         transform: 'translateZ(0)',
         backfaceVisibility: 'hidden',
-        background: 'radial-gradient(circle at center, #0a0015 0%, #000000 100%)'
+        background: '#000000'
       }}
     >
-      {/* Animated background glow */}
-      {!prefersReducedMotion && (
-        <>
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: 'radial-gradient(circle at 50% 50%, rgba(157, 0, 255, 0.3) 0%, transparent 50%)',
-              animation: 'pulse-glow 4s ease-in-out infinite',
-              filter: 'blur(80px)'
-            }}
-          />
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: 'radial-gradient(circle at 30% 40%, rgba(255, 0, 128, 0.2) 0%, transparent 40%)',
-              animation: 'pulse-glow 5s ease-in-out infinite reverse',
-              filter: 'blur(60px)'
-            }}
-          />
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: 'radial-gradient(circle at 70% 60%, rgba(0, 191, 255, 0.2) 0%, transparent 40%)',
-              animation: 'pulse-glow 6s ease-in-out infinite',
-              filter: 'blur(70px)'
-            }}
-          />
-        </>
-      )}
-      
-      <style>{`
-        @keyframes pulse-glow {
-          0%, 100% {
-            opacity: 0.3;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.6;
-            transform: scale(1.1);
-          }
-        }
-      `}</style>
 
       {/* ASCII Animation */}
       <div className="relative w-full h-full z-10">
