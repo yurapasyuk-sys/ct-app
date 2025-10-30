@@ -127,7 +127,7 @@ interface MTMPanelProps {
   dataSource?: DataSource;
 }
 
-export function MTMPanel({ symbol, dataSource = 'spot' }: MTMPanelProps) {
+export function MTMPanel({ symbol, dataSource = 'futures' }: MTMPanelProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-4">

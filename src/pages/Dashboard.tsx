@@ -155,7 +155,7 @@ const Dashboard = () => {
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
           {/* MTM Panel */}
-          <MTMPanel symbol="BTCUSDT" dataSource="spot" />
+          <MTMPanel symbol="BTCUSDT" dataSource="futures" />
           
           {/* RVWAP Panel */}
           <RvwapPanel symbol="BTCUSDT" dataSource="spot" />

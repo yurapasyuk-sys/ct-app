@@ -416,7 +416,7 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
         borderRadius: '8px',
       }}
     >
-      <Watermark visible={!isLoading} text="borkiss.trade RVWAP" opacity={0.04} fontSize={48} />
+      <Watermark visible={!isLoading} text="borkiss.trade" opacity={0.04} fontSize={48} />
     </div>
   );
 }
