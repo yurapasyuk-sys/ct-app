@@ -28,9 +28,16 @@ interface OEBTCData {
 }
 
 const fetcher = async (url: string): Promise<OEBTCData> => {
-  const response = await fetch(url);
+  // Use production API in dev mode
+  const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  const baseUrl = isDev ? 'https://borkiss-site.vercel.app' : '';
+  const fullUrl = `${baseUrl}${url}`;
+  
+  console.log('[OEBTCIndicator] Fetching from:', fullUrl);
+  
+  const response = await fetch(fullUrl);
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({ message: response.statusText }));
     throw new Error(error.message || 'Failed to fetch OE-BTC');
   }
   return response.json();
