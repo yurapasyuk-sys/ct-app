@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 // Import panels
 import { RvwapPanel } from '@/components/rvwap/RvwapPanel';
 import { MTMPanel } from '@/components/mtm/MTMPanel';
+import { OEBTCIndicator } from '@/components/OEBTCIndicator';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -154,6 +155,9 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* OE-BTC Indicator */}
+          <OEBTCIndicator />
+          
           {/* MTM Panel */}
           <MTMPanel symbol="BTCUSDT" dataSource="futures" />
           
