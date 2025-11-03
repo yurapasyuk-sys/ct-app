@@ -1,25 +1,35 @@
 # OE-BTC Widget Enhancements
 
-## ⚠️ Important: Demo Mode
+## ✅ Update: Real Data Implementation
 
-**Current Status:** The historical chart and correlation matrix are using **simulated/mock data** for demonstration purposes.
+**Status:** Historical chart and correlation matrix now use **REAL DATA** from API endpoints!
 
-### What's Mock:
-- 📈 **Historical Chart:** Random walk algorithm generates 30 days of fake OE-BTC values
-- 🔗 **Correlation Matrix:** Hardcoded example correlations (not calculated from real data)
+### What's Real Now:
+- 📈 **Historical Chart:** Fetches real calculated OE-BTC values from `/api/oe-btc-history?days=30`
+  - Historical prices from Finnhub (SPY, NQ, GLD, DXY)
+  - BTC price history from CryptoCompare
+  - Calculates OE-BTC for each historical day using same formula
+  
+- 🔗 **Correlation Matrix:** Fetches real correlations from `/api/oe-btc-correlations`
+  - Pearson correlation coefficient from 30-day rolling window
+  - Correlations: OE-BTC vs SPY/NQ/GLD/DXY/BTC, plus cross-correlations
 
-### Why Mock Data:
-- Real historical data requires API endpoint implementation
-- Real correlations require 30+ days of stored market data
-- Database storage for daily OE-BTC snapshots not yet implemented
+### Macro Indicator Update:
+- ❌ **Removed:** JNK (Junk Bonds), EEM (Emerging Markets)
+- ✅ **Added:** NQ (Nasdaq 100 Futures)
+- **Current macro indicators:** SPY, NQ (US100), GLD, DXY (4 indicators)
 
-### What's Real:
+### Fallback Behavior:
+- Both components use SWR for data fetching
+- Automatic fallback to mock data if API unavailable
+- Clear visual indicators showing data source (● Live / ⚠️ Fallback)
+- Hourly refresh with 30-minute deduplication
+
+### What's Still Real:
 - ✅ **Current OE-BTC value:** Real-time calculation from `/api/oe-btc`
 - ✅ **Component breakdown:** Real macro/ETF/BTC values
 - ✅ **Custom weights:** Real calculation with user-defined weights
 - ✅ **Alerts:** Real localStorage persistence (triggers on real values)
-
-**Amber warning labels** clearly mark demo features on the UI.
 
 ## 📊 Overview
 
@@ -52,10 +62,12 @@ interface HistoricalDataPoint {
 }
 ```
 
-**⚠️ Current Status:** Using **mock/demo data**. The component generates simulated historical values using a random walk algorithm. Real implementation requires:
-- API endpoint: `/api/oe-btc/history?days=30`
-- Database storage of historical OE-BTC calculations
-- Historical BTC price data from Binance/CoinGecko
+**⚠️ Current Status:** Now uses **REAL DATA** from API! The component fetches historical OE-BTC values calculated from:
+- Historical prices from Finnhub (SPY, NQ, GLD, DXY) - 30 days
+- BTC price history from CryptoCompare
+- Same OE-BTC formula applied to each historical day
+- API endpoint: `/api/oe-btc-history?days=30`
+- Falls back to mock data if API unavailable (with clear indicator)
 
 ### 2. Alert Configuration Tab 🔔
 **Component:** `OEBTCAlertConfig.tsx`
@@ -106,26 +118,26 @@ interface Alert {
 
 **Tracked Markets:**
 - SPY (S&P 500)
-- JNK (High Yield Bonds)
-- EEM (Emerging Markets)
+- NQ (Nasdaq 100)
 - GLD (Gold)
 - DXY (US Dollar Index)
-- ETF Flows
-- BTC Price
-- SPY-BTC Cross
-- ETF-BTC Cross
+- BTC (Bitcoin Price)
+- SPY-BTC Cross Correlation
+- NQ-BTC Cross Correlation
 
-**⚠️ Current Status:** Using **mock/demo data**. Real correlation calculation requires:
-- Historical data storage for all tracked markets (30+ days)
-- Pearson correlation coefficient calculation
-- Rolling 30-day window
-- API endpoint: `/api/oe-btc/correlations`
+**✅ Current Status:** Now uses **REAL DATA** from API! 
+- API endpoint: `/api/oe-btc-correlations`
+- Pearson correlation coefficient calculated from 30-day rolling window
+- Real historical prices fetched from Finnhub and CryptoCompare
+- Updates hourly, cached for 30 minutes
+- Falls back to mock data if API unavailable
 
-**Mock Correlations (for demo):**
+**Correlation Calculation:**
 ```typescript
-{ pair: 'OE-BTC vs SPY', correlation: 0.72 }
-{ pair: 'OE-BTC vs GLD', correlation: -0.34 }
-// ... etc
+// Fetches 30 days of historical prices for each market
+// Calculates 30 days of historical OE-BTC values
+// Applies Pearson correlation formula:
+r = Σ[(x - x̄)(y - ȳ)] / √[Σ(x - x̄)² × Σ(y - ȳ)²]
 ```
 
 ### 4. Custom Weights Tab ⚙️
@@ -208,22 +220,21 @@ src/components/
 
 ## 📝 TODO / Future Improvements
 
-### High Priority (Required for Production)
-- [ ] **Create `/api/oe-btc/history?days=30` endpoint** 
-  - Store historical OE-BTC calculations in database (daily snapshots)
-  - Include historical BTC price for overlay
-  - Return array of `{ timestamp, oe_btc, btc_price }` objects
+### High Priority
+- [ ] **Add caching/database for historical data**
+  - Currently calculates historical OE-BTC on each request (slow)
+  - Store daily snapshots in database (Vercel KV or PostgreSQL)
+  - Pre-calculate and cache correlations daily
   
-- [ ] **Implement real correlation calculation**
-  - Fetch 30 days of historical data for all markets
-  - Calculate Pearson correlation coefficient
-  - Create `/api/oe-btc/correlations` endpoint
-  - Update on daily basis (cron job)
+- [ ] **Optimize API performance**
+  - Parallel fetching already implemented
+  - Add server-side caching (Redis/Vercel KV)
+  - Reduce API calls to Finnhub (rate limits)
 
-- [ ] **Replace mock data generators**
-  - Remove `generateMockData()` from OEBTCHistoricalChart
-  - Remove hardcoded correlations from OEBTCCorrelationMatrix
-  - Add proper loading states while fetching real data
+- [ ] **Alert notification system**
+  - Browser notifications when alerts trigger
+  - Email notifications (optional)
+  - Webhook support for trading bots
 
 ### Medium Priority
 - [ ] Alert notification system (browser notifications / email)
@@ -293,18 +304,24 @@ src/components/
 - Responsive design verified
 - No TypeScript errors
 - Consistent UI/UX across all tabs
-- Mock data generators for demo purposes
+- **REAL DATA implementation:**
+  - ✅ Historical chart fetches from `/api/oe-btc-history`
+  - ✅ Correlation matrix fetches from `/api/oe-btc-correlations`
+  - ✅ Pearson correlation calculation from 30-day window
+  - ✅ Macro indicators updated (SPY, NQ, GLD, DXY)
+  - ✅ Automatic fallback to mock data with status indicators
+  - ✅ SWR caching with hourly refresh
 
-⚠️ **Demo Mode (Mock Data):**
-- Historical chart uses simulated random walk data
-- Correlation matrix shows hardcoded example values
-- Amber warning labels clearly indicate demo status
-- Full functionality works, but data is not real
+⚠️ **Performance Notes:**
+- Historical data calculation takes ~5-10 seconds (fetches 30 days × 5 markets)
+- Correlations calculation takes ~8-12 seconds (calculates OE-BTC + correlations)
+- Both cached for 30 minutes client-side
+- Consider server-side caching for production
 
 ⏳ **Pending for Production:**
-- Real historical data integration (needs API endpoint + DB storage)
-- Real correlation calculation (needs 30-day data for all markets)
-- Alert notification system (needs service worker)
+- Database storage for historical snapshots (reduce API load)
+- Server-side caching (Redis/Vercel KV)
+- Alert notification system (service worker)
 
 ## 📖 References
 
