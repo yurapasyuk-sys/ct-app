@@ -20,8 +20,7 @@ interface OEBTCData {
   timestamp: string;
   components: {
     spy_above_sma: boolean;
-    jnk_above_sma: boolean;
-    eem_above_sma: boolean;
+    nq_above_sma: boolean;
     gld_above_sma: boolean;
     dxy_above_sma: boolean;
     etf_flow_usd: number;
@@ -396,13 +395,9 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
                         <span>{data.components.spy_above_sma ? '✓' : '✗'}</span>
                         <span>SPY above SMA</span>
                       </div>
-                      <div className={`flex items-center gap-2 ${data.components.jnk_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                        <span>{data.components.jnk_above_sma ? '✓' : '✗'}</span>
-                        <span>JNK above SMA</span>
-                      </div>
-                      <div className={`flex items-center gap-2 ${data.components.eem_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                        <span>{data.components.eem_above_sma ? '✓' : '✗'}</span>
-                        <span>EEM above SMA</span>
+                      <div className={`flex items-center gap-2 ${data.components.nq_above_sma ? 'text-green-400' : 'text-red-400'}`}>
+                        <span>{data.components.nq_above_sma ? '✓' : '✗'}</span>
+                        <span>NQ (US100) above SMA</span>
                       </div>
                       <div className={`flex items-center gap-2 ${data.components.gld_above_sma ? 'text-green-400' : 'text-red-400'}`}>
                         <span>{data.components.gld_above_sma ? '✓' : '✗'}</span>

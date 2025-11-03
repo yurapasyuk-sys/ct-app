@@ -19,8 +19,7 @@ interface BTCData {
 const BACKUP_DATA = {
   macro: {
     spy: { symbol: 'SPY', price: 575.0, sma: 560.0 },
-    jnk: { symbol: 'JNK', price: 98.5, sma: 99.0 },
-    eem: { symbol: 'EEM', price: 38.2, sma: 37.5 },
+    nq: { symbol: 'NQ=F', price: 20500.0, sma: 20000.0 }, // Nasdaq 100 Futures
     gld: { symbol: 'GLD', price: 195.5, sma: 192.0 },
     dxy: { symbol: 'DXY', price: 105.2, sma: 104.5 },
   },
@@ -40,7 +39,7 @@ async function fetchMacroData() {
       return BACKUP_DATA.macro;
     }
 
-    const symbols = ['SPY', 'JNK', 'EEM', 'GLD', 'DXY'];
+    const symbols = ['SPY', 'NQ=F', 'GLD', 'DXY'];
     const results: Record<string, any> = {};
     const backupKeys: Record<string, any> = BACKUP_DATA.macro;
 
@@ -51,18 +50,21 @@ async function fetchMacroData() {
         );
         const data = await resp.json();
 
+        const key = symbol === 'NQ=F' ? 'nq' : symbol.toLowerCase();
+
         if (data.c) {
-          results[symbol.toLowerCase()] = {
+          results[key] = {
             symbol,
             price: data.c,
             sma: data.c * (0.97 + Math.random() * 0.06),
           };
         } else {
-          results[symbol.toLowerCase()] = backupKeys[symbol.toLowerCase()];
+          results[key] = backupKeys[key];
         }
       } catch (err) {
         console.warn(`Failed to fetch ${symbol}:`, err);
-        results[symbol.toLowerCase()] = backupKeys[symbol.toLowerCase()];
+        const key = symbol === 'NQ=F' ? 'nq' : symbol.toLowerCase();
+        results[key] = backupKeys[key];
       }
     }
 
@@ -143,22 +145,20 @@ async function fetchETFFlows() {
 
 function calculateMacroRiskOn(macroData: any) {
   const spy = macroData.spy.price > macroData.spy.sma;
-  const jnk = macroData.jnk.price > macroData.jnk.sma;
-  const eem = macroData.eem.price > macroData.eem.sma;
+  const nq = macroData.nq.price > macroData.nq.sma;
   const gld = macroData.gld.price < macroData.gld.sma; // Inverted
   const dxy = macroData.dxy.price < macroData.dxy.sma; // Inverted
 
-  const count = [spy, jnk, eem, gld, dxy].filter(Boolean).length;
+  const count = [spy, nq, gld, dxy].filter(Boolean).length;
   
-  // More aggressive normalization: -1 to +1
-  const value = Math.max(-1, Math.min(1, (count - 2.5) / 2.5));
+  // Normalize to [-1, +1]: 0 bullish = -1, 4 bullish = +1
+  const value = Math.max(-1, Math.min(1, (count - 2) / 2));
 
   return {
     value,
     components: {
       spy_above_sma: spy,
-      jnk_above_sma: jnk,
-      eem_above_sma: eem,
+      nq_above_sma: nq,
       gld_above_sma: gld,
       dxy_above_sma: dxy,
     },

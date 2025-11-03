@@ -1,35 +1,64 @@
 /**
  * OE-BTC Correlation Matrix Component
- * Shows correlations between OE-BTC components and other markets
+ * Displays correlations between OE-BTC and various markets
  */
 
+import useSWR from 'swr';
 import { Card } from '@/components/ui/card';
-import { Grid3x3 } from 'lucide-react';
+import { Grid3x3, AlertCircle } from 'lucide-react';
 
-interface CorrelationData {
+interface CorrelationPair {
   pair: string;
-  correlation: number;
   label: string;
+  correlation: number;
 }
 
-interface OEBTCCorrelationMatrixProps {
-  data?: CorrelationData[];
+interface CorrelationsAPIResponse {
+  success: boolean;
+  days: number;
+  timestamp: string;
+  correlations: CorrelationPair[];
 }
 
-// Mock correlation data (in real app, calculate from historical data)
-const DEFAULT_CORRELATIONS: CorrelationData[] = [
+// Fetcher for SWR
+const fetcher = async (url: string): Promise<CorrelationsAPIResponse> => {
+  const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  const baseUrl = isDev ? 'https://borkiss-site.vercel.app' : '';
+  const fullUrl = `${baseUrl}${url}`;
+  
+  const response = await fetch(fullUrl);
+  if (!response.ok) {
+    throw new Error('Failed to fetch correlations');
+  }
+  return response.json();
+};
+
+// Mock data as fallback
+const MOCK_CORRELATIONS: CorrelationPair[] = [
   { pair: 'OE-BTC vs SPY', correlation: 0.72, label: 'S&P 500' },
-  { pair: 'OE-BTC vs JNK', correlation: 0.68, label: 'Junk Bonds' },
-  { pair: 'OE-BTC vs EEM', correlation: 0.61, label: 'Emerging Markets' },
+  { pair: 'OE-BTC vs NQ', correlation: 0.68, label: 'Nasdaq 100' },
   { pair: 'OE-BTC vs GLD', correlation: -0.34, label: 'Gold' },
   { pair: 'OE-BTC vs DXY', correlation: -0.41, label: 'Dollar Index' },
-  { pair: 'OE-BTC vs ETF Flows', correlation: 0.58, label: 'ETF Inflows' },
-  { pair: 'OE-BTC vs BTC Price', correlation: 0.51, label: 'Bitcoin' },
+  { pair: 'OE-BTC vs BTC', correlation: 0.51, label: 'Bitcoin' },
   { pair: 'SPY vs BTC', correlation: 0.45, label: 'SPY-BTC' },
-  { pair: 'ETF Flows vs BTC', correlation: 0.82, label: 'ETF-BTC' },
+  { pair: 'NQ vs BTC', correlation: 0.52, label: 'NQ-BTC' },
 ];
 
-export function OEBTCCorrelationMatrix({ data = DEFAULT_CORRELATIONS }: OEBTCCorrelationMatrixProps) {
+export function OEBTCCorrelationMatrix() {
+  // Fetch real correlation data from API
+  const { data: apiResponse, error, isLoading } = useSWR<CorrelationsAPIResponse>(
+    '/api/oe-btc-correlations',
+    fetcher,
+    {
+      refreshInterval: 3600000, // Refresh every hour
+      revalidateOnFocus: false,
+      dedupingInterval: 1800000, // Dedupe for 30 minutes
+    }
+  );
+
+  // Use API data or fallback to mock
+  const correlations = apiResponse?.correlations || MOCK_CORRELATIONS;
+
   // Get color based on correlation strength
   const getCorrelationColor = (corr: number) => {
     const abs = Math.abs(corr);
@@ -50,14 +79,29 @@ export function OEBTCCorrelationMatrix({ data = DEFAULT_CORRELATIONS }: OEBTCCor
   return (
     <Card className="p-4 bg-card/40 border border-border/50">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <Grid3x3 className="w-4 h-4 text-blue-400" />
-        <h4 className="text-sm font-semibold">Correlation Matrix</h4>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Grid3x3 className="w-4 h-4 text-blue-400" />
+          <h4 className="text-sm font-semibold">Correlation Matrix</h4>
+          {/* Status indicator */}
+          {isLoading && (
+            <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+          )}
+          {error && !isLoading && (
+            <div className="flex items-center gap-1 text-xs text-amber-400">
+              <AlertCircle className="w-3 h-3" />
+              <span>Fallback mode</span>
+            </div>
+          )}
+          {!error && !isLoading && apiResponse && (
+            <span className="text-xs text-emerald-400">● Live</span>
+          )}
+        </div>
       </div>
 
       {/* Correlation grid */}
       <div className="space-y-2">
-        {data.map((item, idx) => (
+        {correlations.map((item, idx) => (
           <div
             key={idx}
             className="flex items-center gap-3 p-2 hover:bg-muted/20 rounded transition-colors"
@@ -123,10 +167,17 @@ export function OEBTCCorrelationMatrix({ data = DEFAULT_CORRELATIONS }: OEBTCCor
         </div>
       </div>
 
-      {/* Info */}
-      <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
-        <strong>⚠️ Demo Data:</strong> Showing simulated correlations. Real correlation calculation requires historical market data and proper statistical analysis (30-day rolling window with Pearson coefficient).
-      </div>
+      {/* Status messages */}
+      {(error || !apiResponse) && (
+        <div className="mt-4 p-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
+          <strong>⚠️ Fallback Data:</strong> API unavailable, showing simulated correlations. Real implementation calculates from 30-day historical data.
+        </div>
+      )}
+      {apiResponse && !error && (
+        <div className="mt-4 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-emerald-400">
+          <strong>✓ Real Data:</strong> Calculated from {apiResponse.days}-day rolling window using Pearson correlation coefficient.
+        </div>
+      )}
     </Card>
   );
 }

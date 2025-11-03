@@ -4,9 +4,10 @@
  */
 
 import { useMemo, useState } from 'react';
+import useSWR from 'swr';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/ui/card';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, AlertCircle } from 'lucide-react';
 
 interface HistoricalDataPoint {
   timestamp: number;
@@ -20,7 +21,27 @@ interface OEBTCHistoricalChartProps {
   showBTCOverlay?: boolean;
 }
 
-// Generate mock historical data for demo
+interface HistoricalAPIResponse {
+  success: boolean;
+  days: number;
+  count: number;
+  data: HistoricalDataPoint[];
+}
+
+// Fetcher for SWR
+const fetcher = async (url: string): Promise<HistoricalAPIResponse> => {
+  const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  const baseUrl = isDev ? 'https://borkiss-site.vercel.app' : '';
+  const fullUrl = `${baseUrl}${url}`;
+  
+  const response = await fetch(fullUrl);
+  if (!response.ok) {
+    throw new Error('Failed to fetch historical data');
+  }
+  return response.json();
+};
+
+// Generate mock historical data for demo (fallback)
 function generateMockData(days: number): HistoricalDataPoint[] {
   const data: HistoricalDataPoint[] = [];
   const now = Date.now();
@@ -56,12 +77,28 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
   const [timeframe, setTimeframe] = useState<7 | 14 | 30>(14);
   const [overlayEnabled, setOverlayEnabled] = useState(showBTCOverlay);
   
-  // Use provided data or generate mock data
+  // Fetch real historical data from API
+  const { data: apiResponse, error, isLoading } = useSWR<HistoricalAPIResponse>(
+    `/api/oe-btc-history?days=30`,
+    fetcher,
+    {
+      refreshInterval: 3600000, // Refresh every hour
+      revalidateOnFocus: false,
+      dedupingInterval: 1800000, // Dedupe for 30 minutes
+    }
+  );
+  
+  // Use provided data, API data, or generate mock data as fallback
   const data = useMemo(() => {
-    return providedData && providedData.length > 0 
-      ? providedData 
-      : generateMockData(30);
-  }, [providedData]);
+    if (providedData && providedData.length > 0) {
+      return providedData;
+    }
+    if (apiResponse?.data && apiResponse.data.length > 0) {
+      return apiResponse.data;
+    }
+    // Fallback to mock data if API fails
+    return generateMockData(30);
+  }, [providedData, apiResponse]);
 
   // Filter data by selected timeframe
   const filteredData = useMemo(() => {
@@ -126,6 +163,19 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-blue-400" />
           <h4 className="text-sm font-semibold">Historical Trend</h4>
+          {/* Status indicator */}
+          {isLoading && (
+            <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+          )}
+          {error && !isLoading && (
+            <div className="flex items-center gap-1 text-xs text-amber-400">
+              <AlertCircle className="w-3 h-3" />
+              <span>Fallback mode</span>
+            </div>
+          )}
+          {!error && !isLoading && apiResponse && (
+            <span className="text-xs text-emerald-400">● Live</span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -220,9 +270,16 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
       </div>
 
       {/* Demo data warning */}
-      <div className="mt-4 p-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
-        <strong>⚠️ Demo Data:</strong> Showing simulated historical data. Real historical OE-BTC data requires API endpoint implementation.
-      </div>
+      {(error || !apiResponse) && (
+        <div className="mt-4 p-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
+          <strong>⚠️ Fallback Data:</strong> API unavailable, showing simulated data. Real implementation fetches historical OE-BTC from `/api/oe-btc-history`.
+        </div>
+      )}
+      {apiResponse && !error && (
+        <div className="mt-4 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-emerald-400">
+          <strong>✓ Real Data:</strong> Showing {apiResponse.count} days of calculated historical OE-BTC values from macro indicators and BTC price data.
+        </div>
+      )}
     </Card>
   );
 }
