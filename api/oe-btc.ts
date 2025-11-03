@@ -131,7 +131,34 @@ function calculateEMA(prices: number[], period: number): number {
 
 async function fetchETFFlows() {
   try {
-    console.log('[OE-BTC] Fetching ETF flows...');
+    console.log('[OE-BTC] Fetching ETF flows from SoSoValue...');
+    
+    // Try to fetch from our ETF flows API (which scrapes SoSoValue)
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+    
+    const resp = await fetch(`${baseUrl}/api/etf-flows`, {
+      signal: AbortSignal.timeout(8000), // 8 second timeout
+    }).catch(() => null);
+
+    if (resp && resp.ok) {
+      const data = await resp.json();
+      if (data.success && data.data) {
+        console.log('[OE-BTC] ✅ ETF flows from', data.data.source, ':', {
+          dailyFlow: `$${(data.data.dailyFlow / 1e6).toFixed(2)}M`,
+          value: data.data.value.toFixed(3),
+        });
+        
+        return {
+          dailyFlow: data.data.dailyFlow,
+          ma5Flow: data.data.dailyFlow * 0.95, // Approximate MA5
+        };
+      }
+    }
+
+    // Fallback to synthetic data
+    console.log('[OE-BTC] Using synthetic ETF flow data');
     const dailyFlow = 250000000 + Math.random() * 500000000;
     const ma5Flow = dailyFlow * (0.9 + Math.random() * 0.2);
     return { dailyFlow, ma5Flow };
