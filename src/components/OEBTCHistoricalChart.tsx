@@ -82,9 +82,9 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
     `/api/oe-btc-history?days=30`,
     fetcher,
     {
-      refreshInterval: 3600000, // Refresh every hour
+      refreshInterval: 300000, // Refresh every 5 minutes (same as Overview)
       revalidateOnFocus: false,
-      dedupingInterval: 1800000, // Dedupe for 30 minutes
+      dedupingInterval: 60000, // Dedupe for 1 minute
     }
   );
   
@@ -277,10 +277,7 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
       )}
       {apiResponse && !error && (
         <div className="mt-4 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-emerald-400">
-          <strong>✓ Real Data:</strong> Showing {apiResponse.count} days of calculated historical OE-BTC values.
-          <div className="mt-1 text-emerald-400/70">
-            <strong>Note:</strong> ETF flow approximated using BTC price momentum + volume correlation. Macro and BTC components use real historical data.
-          </div>
+          <strong>✓ Real Data:</strong> Showing {apiResponse.count} days of calculated historical OE-BTC values using simplified formula (Macro 60% + BTC 40%).
         </div>
       )}
     </Card>

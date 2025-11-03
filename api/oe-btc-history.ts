@@ -204,6 +204,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const historicalData = await calculateHistoricalOEBTC(days);
 
+    // Add current real-time OE-BTC value
+    try {
+      const currentResponse = await fetch('https://borkiss-site.vercel.app/api/oe-btc', {
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => null);
+
+      if (currentResponse && currentResponse.ok) {
+        const currentData = await currentResponse.json();
+        if (currentData.oe_btc !== undefined) {
+          // Add current value as today's point
+          const now = Date.now();
+          historicalData.push({
+            timestamp: now,
+            date: new Date(now).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            oe_btc: parseFloat(currentData.oe_btc.toFixed(3)),
+            btc_price: Math.round(currentData.components.btc_price),
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[OE-BTC History] Could not fetch current value:', err);
+    }
+
     return res.status(200).json({
       success: true,
       days,
