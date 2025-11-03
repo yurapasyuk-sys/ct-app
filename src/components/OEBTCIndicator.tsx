@@ -6,7 +6,11 @@
 import { useMemo, useEffect, useState, memo } from 'react';
 import useSWR from 'swr';
 import { Card } from '@/components/ui/card';
-import { Activity, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Info, Gauge, TrendingUp as ChartIcon, Bell, Grid3x3, Sliders } from 'lucide-react';
+import { OEBTCHistoricalChart } from './OEBTCHistoricalChart';
+import { OEBTCAlertConfig } from './OEBTCAlertConfig';
+import { OEBTCCorrelationMatrix } from './OEBTCCorrelationMatrix';
+import { OEBTCWeightConfigurator } from './OEBTCWeightConfigurator';
 
 interface OEBTCData {
   oe_btc: number;
@@ -236,6 +240,8 @@ const GaugeChart = memo(function GaugeChart({ value, isLoading }: { value: numbe
  * Main OE-BTC Indicator Component
  */
 export const OEBTCIndicator = memo(function OEBTCIndicator() {
+  const [activeTab, setActiveTab] = useState<'gauge' | 'history' | 'alerts' | 'correlations' | 'customize'>('gauge');
+  
   const { data, error, isLoading } = useSWR<OEBTCData>(
     '/api/oe-btc',
     fetcher,
@@ -245,6 +251,14 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
       dedupingInterval: 60000,
     }
   );
+
+  const tabs = [
+    { id: 'gauge' as const, label: 'Overview', icon: Gauge },
+    { id: 'history' as const, label: 'History', icon: ChartIcon },
+    { id: 'alerts' as const, label: 'Alerts', icon: Bell },
+    { id: 'correlations' as const, label: 'Correlations', icon: Grid3x3 },
+    { id: 'customize' as const, label: 'Customize', icon: Sliders },
+  ];
 
   const statusColor = useMemo(() => {
     if (error) return 'bg-red-600';
@@ -278,7 +292,7 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 rounded-full blur-3xl -z-10" />
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <Activity className="h-6 w-6 text-blue-400" />
@@ -299,6 +313,27 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    : 'bg-background/40 text-muted-foreground hover:bg-background/60 border border-border/30'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Error state */}
@@ -324,144 +359,173 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
           </div>
         )}
 
-        {/* Main content */}
+        {/* Tab content */}
         {data && !error && (
           <>
-            {/* Gauge */}
-            <div className="mb-8">
-              <GaugeChart value={data.oe_btc} isLoading={isLoading} />
-            </div>
+            {/* Gauge Tab */}
+            {activeTab === 'gauge' && (
+              <>
+                {/* Gauge */}
+                <div className="mb-8">
+                  <GaugeChart value={data.oe_btc} isLoading={isLoading} />
+                </div>
 
-            {/* Component breakdown grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-              {/* Macro Risk-On */}
-              <div className="space-y-4 p-4 bg-background/40 rounded-lg border border-border/50 backdrop-blur-sm">
-                <h4 className="font-bold text-lg flex items-center gap-2">
-                  {data.ro_macro > 0 ? (
-                    <TrendingUp className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <TrendingDown className="w-5 h-5 text-red-400" />
-                  )}
-                  Macro Risk-On
-                </h4>
-                
-                <MiniBar
-                  title="Value"
-                  value={data.ro_macro}
-                  icon={data.ro_macro > 0 ? TrendingUp : TrendingDown}
-                  tooltip={`Macro risk-on component: ${data.ro_macro.toFixed(2)}`}
-                />
+                {/* Component breakdown grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                  {/* Macro Risk-On */}
+                  <div className="space-y-4 p-4 bg-background/40 rounded-lg border border-border/50 backdrop-blur-sm">
+                    <h4 className="font-bold text-lg flex items-center gap-2">
+                      {data.ro_macro > 0 ? (
+                        <TrendingUp className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-red-400" />
+                      )}
+                      Macro Risk-On
+                    </h4>
+                    
+                    <MiniBar
+                      title="Value"
+                      value={data.ro_macro}
+                      icon={data.ro_macro > 0 ? TrendingUp : TrendingDown}
+                      tooltip={`Macro risk-on component: ${data.ro_macro.toFixed(2)}`}
+                    />
 
-                {/* Asset checklist */}
-                <div className="text-xs space-y-2 pt-2 border-t border-border/30">
-                  <div className={`flex items-center gap-2 ${data.components.spy_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                    <span>{data.components.spy_above_sma ? '✓' : '✗'}</span>
-                    <span>SPY above SMA</span>
+                    {/* Asset checklist */}
+                    <div className="text-xs space-y-2 pt-2 border-t border-border/30">
+                      <div className={`flex items-center gap-2 ${data.components.spy_above_sma ? 'text-green-400' : 'text-red-400'}`}>
+                        <span>{data.components.spy_above_sma ? '✓' : '✗'}</span>
+                        <span>SPY above SMA</span>
+                      </div>
+                      <div className={`flex items-center gap-2 ${data.components.jnk_above_sma ? 'text-green-400' : 'text-red-400'}`}>
+                        <span>{data.components.jnk_above_sma ? '✓' : '✗'}</span>
+                        <span>JNK above SMA</span>
+                      </div>
+                      <div className={`flex items-center gap-2 ${data.components.eem_above_sma ? 'text-green-400' : 'text-red-400'}`}>
+                        <span>{data.components.eem_above_sma ? '✓' : '✗'}</span>
+                        <span>EEM above SMA</span>
+                      </div>
+                      <div className={`flex items-center gap-2 ${data.components.gld_above_sma ? 'text-green-400' : 'text-red-400'}`}>
+                        <span>{data.components.gld_above_sma ? '✓' : '✗'}</span>
+                        <span>GLD below SMA ↓</span>
+                      </div>
+                      <div className={`flex items-center gap-2 ${data.components.dxy_above_sma ? 'text-green-400' : 'text-red-400'}`}>
+                        <span>{data.components.dxy_above_sma ? '✓' : '✗'}</span>
+                        <span>DXY below SMA ↓</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className={`flex items-center gap-2 ${data.components.jnk_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                    <span>{data.components.jnk_above_sma ? '✓' : '✗'}</span>
-                    <span>JNK above SMA</span>
+
+                  {/* ETF Flow */}
+                  <div className="space-y-4 p-4 bg-background/40 rounded-lg border border-border/50 backdrop-blur-sm">
+                    <h4 className="font-bold text-lg flex items-center gap-2">
+                      {data.etf_flow > 0 ? (
+                        <TrendingUp className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-red-400" />
+                      )}
+                      ETF Flow
+                    </h4>
+
+                    <MiniBar
+                      title="Value"
+                      value={data.etf_flow}
+                      icon={data.etf_flow > 0 ? TrendingUp : TrendingDown}
+                      tooltip={`ETF flow component: ${data.etf_flow.toFixed(2)}`}
+                    />
+
+                    <div className="text-xs space-y-2 pt-2 border-t border-border/30 text-muted-foreground">
+                      <div>
+                        <span className="font-semibold">Daily Flow:</span><br />
+                        <span className="text-base font-bold text-foreground">
+                          ${(data.components.etf_flow_usd / 1e9).toFixed(2)}B
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground/70 pt-2">
+                        Net inflow from BTC ETFs. Positive = accumulation.
+                      </p>
+                    </div>
                   </div>
-                  <div className={`flex items-center gap-2 ${data.components.eem_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                    <span>{data.components.eem_above_sma ? '✓' : '✗'}</span>
-                    <span>EEM above SMA</span>
-                  </div>
-                  <div className={`flex items-center gap-2 ${data.components.gld_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                    <span>{data.components.gld_above_sma ? '✓' : '✗'}</span>
-                    <span>GLD below SMA ↓</span>
-                  </div>
-                  <div className={`flex items-center gap-2 ${data.components.dxy_above_sma ? 'text-green-400' : 'text-red-400'}`}>
-                    <span>{data.components.dxy_above_sma ? '✓' : '✗'}</span>
-                    <span>DXY below SMA ↓</span>
+
+                  {/* BTC Momentum */}
+                  <div className="space-y-4 p-4 bg-background/40 rounded-lg border border-border/50 backdrop-blur-sm">
+                    <h4 className="font-bold text-lg flex items-center gap-2">
+                      {data.btc_momentum > 0 ? (
+                        <TrendingUp className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-red-400" />
+                      )}
+                      BTC Momentum
+                    </h4>
+
+                    <MiniBar
+                      title="Value"
+                      value={data.btc_momentum}
+                      icon={data.btc_momentum > 0 ? TrendingUp : TrendingDown}
+                      tooltip={`BTC vs EMA200: ${data.btc_momentum > 0 ? 'bullish' : 'bearish'} (${data.components.btc_deviation_pct.toFixed(2)}%)`}
+                    />
+
+                    <div className="text-xs space-y-2 pt-2 border-t border-border/30 text-muted-foreground">
+                      <div>
+                        <span className="font-semibold">Price:</span><br />
+                        <span className="text-base font-bold text-foreground">
+                          ${data.components.btc_price.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">EMA200:</span><br />
+                        <span className="text-base font-bold text-foreground">
+                          ${data.components.btc_ema200.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Deviation:</span><br />
+                        <span className={`text-base font-bold ${
+                          data.components.btc_deviation_pct > 0 ? 'text-green-400' :
+                          data.components.btc_deviation_pct < 0 ? 'text-red-400' : 'text-yellow-400'
+                        }`}>
+                          {data.components.btc_deviation_pct > 0 ? '+' : ''}{data.components.btc_deviation_pct.toFixed(2)}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* ETF Flow */}
-              <div className="space-y-4 p-4 bg-background/40 rounded-lg border border-border/50 backdrop-blur-sm">
-                <h4 className="font-bold text-lg flex items-center gap-2">
-                  {data.etf_flow > 0 ? (
-                    <TrendingUp className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <TrendingDown className="w-5 h-5 text-red-400" />
-                  )}
-                  ETF Flow
-                </h4>
-
-                <MiniBar
-                  title="Value"
-                  value={data.etf_flow}
-                  icon={data.etf_flow > 0 ? TrendingUp : TrendingDown}
-                  tooltip={`ETF flow component: ${data.etf_flow.toFixed(2)}`}
-                />
-
-                <div className="text-xs space-y-2 pt-2 border-t border-border/30 text-muted-foreground">
-                  <div>
-                    <span className="font-semibold">Daily Flow:</span><br />
-                    <span className="text-base font-bold text-foreground">
-                      ${(data.components.etf_flow_usd / 1e9).toFixed(2)}B
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground/70 pt-2">
-                    Net inflow from BTC ETFs. Positive = accumulation.
+                {/* Formula */}
+                <div className="text-xs text-muted-foreground bg-background/60 rounded-lg p-4 border border-border/30 font-mono">
+                  <p className="font-semibold mb-2 text-foreground">Formula:</p>
+                  <p className="leading-relaxed">
+                    OE-BTC = <span className="text-green-400">0.40 × Macro</span> + <span className="text-blue-400">0.35 × ETF</span> + <span className="text-cyan-400">0.25 × BTC</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-2">
+                    Clamped to [-1, 1]. Positive = Risk-On, Negative = Risk-Off
                   </p>
                 </div>
-              </div>
+              </>
+            )}
 
-              {/* BTC Momentum */}
-              <div className="space-y-4 p-4 bg-background/40 rounded-lg border border-border/50 backdrop-blur-sm">
-                <h4 className="font-bold text-lg flex items-center gap-2">
-                  {data.btc_momentum > 0 ? (
-                    <TrendingUp className="w-5 h-5 text-green-400" />
-                  ) : (
-                    <TrendingDown className="w-5 h-5 text-red-400" />
-                  )}
-                  BTC Momentum
-                </h4>
+            {/* History Tab */}
+            {activeTab === 'history' && (
+              <OEBTCHistoricalChart data={[]} />
+            )}
 
-                <MiniBar
-                  title="Value"
-                  value={data.btc_momentum}
-                  icon={data.btc_momentum > 0 ? TrendingUp : TrendingDown}
-                  tooltip={`BTC vs EMA200: ${data.btc_momentum > 0 ? 'bullish' : 'bearish'} (${data.components.btc_deviation_pct.toFixed(2)}%)`}
-                />
+            {/* Alerts Tab */}
+            {activeTab === 'alerts' && (
+              <OEBTCAlertConfig currentValue={data.oe_btc} />
+            )}
 
-                <div className="text-xs space-y-2 pt-2 border-t border-border/30 text-muted-foreground">
-                  <div>
-                    <span className="font-semibold">Price:</span><br />
-                    <span className="text-base font-bold text-foreground">
-                      ${data.components.btc_price.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-semibold">EMA200:</span><br />
-                    <span className="text-base font-bold text-foreground">
-                      ${data.components.btc_ema200.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Deviation:</span><br />
-                    <span className={`text-base font-bold ${
-                      data.components.btc_deviation_pct > 0 ? 'text-green-400' :
-                      data.components.btc_deviation_pct < 0 ? 'text-red-400' : 'text-yellow-400'
-                    }`}>
-                      {data.components.btc_deviation_pct > 0 ? '+' : ''}{data.components.btc_deviation_pct.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Correlations Tab */}
+            {activeTab === 'correlations' && (
+              <OEBTCCorrelationMatrix />
+            )}
 
-            {/* Formula */}
-            <div className="text-xs text-muted-foreground bg-background/60 rounded-lg p-4 border border-border/30 font-mono">
-              <p className="font-semibold mb-2 text-foreground">Formula:</p>
-              <p className="leading-relaxed">
-                OE-BTC = <span className="text-green-400">0.40 × Macro</span> + <span className="text-blue-400">0.35 × ETF</span> + <span className="text-cyan-400">0.25 × BTC</span>
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-2">
-                Clamped to [-1, 1]. Positive = Risk-On, Negative = Risk-Off
-              </p>
-            </div>
+            {/* Customize Tab */}
+            {activeTab === 'customize' && (
+              <OEBTCWeightConfigurator
+                roMacro={data.ro_macro}
+                etfFlow={data.etf_flow}
+                btcMomentum={data.btc_momentum}
+              />
+            )}
           </>
         )}
       </Card>
