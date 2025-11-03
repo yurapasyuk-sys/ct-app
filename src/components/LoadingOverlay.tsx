@@ -69,14 +69,14 @@ export default function LoadingOverlay({ onComplete }: LoadingOverlayProps) {
       {/* Simple, lightweight loading animation */}
       <div className="flex flex-col items-center gap-6">
         {/* Loading text */}
-        <div className="text-4xl font-bold text-purple-400 tracking-wider animate-pulse">
-          BORKISS<span className="text-purple-500">.TRADE</span>
+        <div className="text-4xl font-bold text-blue-400 tracking-wider animate-pulse">
+          BORKISS<span className="text-cyan-400">.TRADE</span>
         </div>
 
         {/* Progress bar */}
         <div className="w-64 h-1 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-100 ease-out"
+            className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-100 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>

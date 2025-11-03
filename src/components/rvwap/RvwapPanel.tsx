@@ -48,7 +48,7 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          <TrendingUp className="h-5 w-5 text-emerald-500" />
+          <TrendingUp className="h-5 w-5 text-blue-400" />
           <h3 className="text-lg font-semibold">
             Rolling VWAP
           </h3>
@@ -91,15 +91,15 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
           {/* Legend */}
           <div className="mb-3 flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-emerald-500"></div>
+              <div className="w-8 h-0.5 bg-blue-500"></div>
               <span className="text-muted-foreground">30D RVWAP</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-cyan-500"></div>
+              <div className="w-8 h-0.5 bg-cyan-400"></div>
               <span className="text-muted-foreground">90D RVWAP</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-0.5 bg-purple-500"></div>
+              <div className="w-8 h-0.5 bg-sky-500"></div>
               <span className="text-muted-foreground">365D RVWAP</span>
             </div>
           </div>
@@ -133,15 +133,15 @@ export function RvwapPanel({ symbol, dataSource }: RvwapPanelProps) {
         <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
           <div className="font-mono">
             <span className="text-muted-foreground">30D Points:</span>{' '}
-            <span className="text-emerald-500 font-semibold">{rvwapData['30d'].length}</span>
+            <span className="text-blue-400 font-semibold">{rvwapData['30d'].length}</span>
           </div>
           <div className="font-mono">
             <span className="text-muted-foreground">90D Points:</span>{' '}
-            <span className="text-cyan-500 font-semibold">{rvwapData['90d'].length}</span>
+            <span className="text-cyan-400 font-semibold">{rvwapData['90d'].length}</span>
           </div>
           <div className="font-mono">
             <span className="text-muted-foreground">365D Points:</span>{' '}
-            <span className="text-purple-500 font-semibold">{rvwapData['365d'].length}</span>
+            <span className="text-sky-400 font-semibold">{rvwapData['365d'].length}</span>
           </div>
           {rvwapData['90d'].length > 0 && (
             <div className="font-mono">

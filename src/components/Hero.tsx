@@ -145,20 +145,20 @@ const StatsCounter = () => {
   return (
     <div id="stats-counter" className="grid grid-cols-3 gap-4 md:gap-8 my-12 px-4 md:px-0">
       <div className="text-center">
-        <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
           {yearsTrading}+
         </div>
         <div className="text-sm md:text-base text-muted-foreground mt-2">Years Trading</div>
-        <div className="text-xs text-primary/60 mt-1">(since age 15)</div>
+        <div className="text-xs text-blue-400/60 mt-1">(since age 15)</div>
       </div>
       <div className="text-center">
-        <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
           {studentsHelped}+
         </div>
         <div className="text-sm md:text-base text-muted-foreground mt-2">Students Mentored</div>
       </div>
       <div className="text-center">
-        <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
           {indicatorsMade}+
         </div>
         <div className="text-sm md:text-base text-muted-foreground mt-2">Custom Indicators</div>

@@ -23,7 +23,7 @@ const quote = {
   highlights: [
     { text: "trading not as a profession but as a gamble", color: "text-blue-400" },
     { text: "trader should become as respected as 'engineer' or 'surgeon'", color: "text-cyan-400" },
-    { text: "hard work not a lottery", color: "text-purple-400" }
+    { text: "hard work not a lottery", color: "text-cyan-400" }
   ]
 };
 

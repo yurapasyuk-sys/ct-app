@@ -118,7 +118,7 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
         if (multiData) {
           // Multi-period mode: 3 lines
           const line30d = chart.addSeries(LineSeries, {
-            color: '#10b981', // emerald-500
+            color: '#3B82F6', // blue-500
             lineWidth: 2,
             priceLineVisible: false,
             lastValueVisible: true,
@@ -128,7 +128,7 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
           });
 
           const line90d = chart.addSeries(LineSeries, {
-            color: '#06b6d4', // cyan-500
+            color: '#22D3EE', // cyan-400
             lineWidth: 2,
             priceLineVisible: false,
             lastValueVisible: true,
@@ -138,7 +138,7 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
           });
 
           const line365d = chart.addSeries(LineSeries, {
-            color: '#a855f7', // purple-500
+            color: '#0EA5E9', // sky-500
             lineWidth: 2,
             priceLineVisible: false,
             lastValueVisible: true,
@@ -155,7 +155,7 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
         } else {
           // Single period mode (legacy)
           const lineSeries = chart.addSeries(LineSeries, {
-            color: '#00b4ff',
+            color: '#22D3EE',
             lineWidth: 2,
             priceLineVisible: true,
             lastValueVisible: true,

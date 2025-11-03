@@ -106,7 +106,7 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
 
         // Always add histogram series in separate pane (will be populated when data arrives)
         const histogramSeries = chart.addSeries(HistogramSeries, {
-          color: 'rgba(128, 128, 128, 0.5)',
+          color: 'rgba(59, 130, 246, 0.3)',
           priceFormat: {
             type: 'volume',
           },
@@ -231,7 +231,7 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
         histogramData.push({
           time: timeSeconds as any,
           value: tensionPoint.tensionIndex,
-          color: tensionPoint.tensionIndex > threshold ? '#26a69a' : 'rgba(128, 128, 128, 0.5)',
+          color: tensionPoint.tensionIndex > threshold ? '#22D3EE' : 'rgba(59, 130, 246, 0.3)',
         });
       }
 

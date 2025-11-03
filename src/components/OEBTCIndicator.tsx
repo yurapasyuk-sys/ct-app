@@ -275,13 +275,13 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
     <div className="relative">
       <Card className="p-8 bg-gradient-to-br from-card to-card/80 border border-border/50 backdrop-blur-sm w-full overflow-hidden">
         {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-500/5 to-blue-500/5 rounded-full blur-3xl -z-10" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 rounded-full blur-3xl -z-10" />
 
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="p-2 bg-purple-500/10 rounded-lg">
-              <Activity className="h-6 w-6 text-purple-500" />
+            <div className="p-2 bg-blue-500/10 rounded-lg">
+              <Activity className="h-6 w-6 text-blue-400" />
             </div>
             <div>
               <h3 className="text-2xl font-bold">OE-BTC</h3>
@@ -456,7 +456,7 @@ export const OEBTCIndicator = memo(function OEBTCIndicator() {
             <div className="text-xs text-muted-foreground bg-background/60 rounded-lg p-4 border border-border/30 font-mono">
               <p className="font-semibold mb-2 text-foreground">Formula:</p>
               <p className="leading-relaxed">
-                OE-BTC = <span className="text-green-400">0.40 × Macro</span> + <span className="text-blue-400">0.35 × ETF</span> + <span className="text-purple-400">0.25 × BTC</span>
+                OE-BTC = <span className="text-green-400">0.40 × Macro</span> + <span className="text-blue-400">0.35 × ETF</span> + <span className="text-cyan-400">0.25 × BTC</span>
               </p>
               <p className="text-xs text-muted-foreground/70 mt-2">
                 Clamped to [-1, 1]. Positive = Risk-On, Negative = Risk-Off

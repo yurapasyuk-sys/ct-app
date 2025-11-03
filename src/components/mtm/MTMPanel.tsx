@@ -132,7 +132,7 @@ export function MTMPanel({ symbol, dataSource = 'futures' }: MTMPanelProps) {
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
             <span className="text-white text-sm font-bold">📊</span>
           </div>
           <div>

@@ -43,7 +43,7 @@ export function VPINPanel({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <Activity className="h-5 w-5 text-purple-500" />
+            <Activity className="h-5 w-5 text-cyan-400" />
             <div>
               <h3 className="text-xl font-semibold">VPIN</h3>
               <p className="text-xs text-muted-foreground">
@@ -83,7 +83,7 @@ export function VPINPanel({
         {isLoading && (
           <div className="mb-4 flex items-center justify-center bg-[#1a1a1a] rounded-lg" style={{ minHeight: '400px', height: '400px' }}>
             <div className="flex flex-col items-center gap-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
               <span className="text-sm text-muted-foreground">Fetching trades from Binance...</span>
               <span className="text-xs text-muted-foreground/60">This may take 10-20 seconds</span>
             </div>
@@ -101,7 +101,7 @@ export function VPINPanel({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="bg-[#1a1a1a] rounded-lg p-3">
                 <div className="text-xs text-muted-foreground mb-1">Current VPIN</div>
-                <div className="text-lg font-bold text-purple-500">
+                <div className="text-lg font-bold text-cyan-400">
                   {data.currentVPIN.toFixed(4)}
                 </div>
               </div>

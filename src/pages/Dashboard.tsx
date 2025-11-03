@@ -112,7 +112,7 @@ const Dashboard = () => {
       >
         <Suspense fallback={<div className="w-full h-full bg-black" />}>
           <LiquidEther
-            colors={['#5227FF', '#FF9FFC', '#B19EEF']}
+            colors={['#3B82F6', '#22D3EE', '#0EA5E9']}
             mouseForce={prefersReducedMotion ? 8 : 15}
             cursorSize={80}
             isViscous={false}

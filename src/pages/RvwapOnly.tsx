@@ -35,7 +35,7 @@ export default function RvwapOnly() {
                 </p>
               </div>
             </div>
-            <div className="px-3 py-1 bg-emerald-500/20 border border-emerald-500 rounded text-emerald-400 text-xs font-mono">
+            <div className="px-3 py-1 bg-blue-500/20 border border-blue-500 rounded text-blue-400 text-xs font-mono">
               TEST ROUTE
             </div>
           </div>

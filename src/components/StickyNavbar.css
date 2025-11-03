@@ -319,7 +319,7 @@
   font-size: 1.125rem;
   font-weight: 700;
   color: white;
-  background: linear-gradient(135deg, #5227ff, #ff9ffc);
+  background: linear-gradient(135deg, #3B82F6, #22D3EE);
   border: none;
   border-radius: 0.75rem;
   cursor: pointer;
@@ -336,7 +336,7 @@
 .mobile-cta-button .glow-effect {
   position: absolute;
   inset: -2px;
-  background: linear-gradient(135deg, rgba(82, 39, 255, 0.6), rgba(255, 159, 252, 0.6));
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(34, 211, 238, 0.6));
   border-radius: 0.75rem;
   z-index: -1;
   opacity: 0;

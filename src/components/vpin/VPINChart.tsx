@@ -66,7 +66,7 @@ export function VPINChart({ data, height = 400 }: VPINChartProps) {
         </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-semibold text-purple-500">VPIN:</span>
+            <span className="text-sm font-semibold text-cyan-400">VPIN:</span>
             <span className="text-sm font-mono">{data.vpin.toFixed(4)}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
@@ -132,10 +132,10 @@ export function VPINChart({ data, height = 400 }: VPINChartProps) {
           <Line
             type="monotone"
             dataKey="vpin"
-            stroke="#a855f7"
+            stroke="#22D3EE"
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4, fill: '#a855f7' }}
+            activeDot={{ r: 4, fill: '#22D3EE' }}
           />
         </LineChart>
       </ResponsiveContainer>
