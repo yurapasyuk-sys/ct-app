@@ -15,7 +15,7 @@ interface HistoricalDataPoint {
 /**
  * Fetch historical BTC prices from CryptoCompare
  */
-async function fetchHistoricalBTC(days: number): Promise<{ timestamp: number; price: number }[]> {
+async function fetchHistoricalBTC(days: number): Promise<{ timestamp: number; price: number; volume: number }[]> {
   try {
     const now = Math.floor(Date.now() / 1000);
     const resp = await fetch(
@@ -27,6 +27,7 @@ async function fetchHistoricalBTC(days: number): Promise<{ timestamp: number; pr
       return data.Data.Data.map((bar: any) => ({
         timestamp: bar.time * 1000,
         price: bar.close,
+        volume: bar.volumeto || 0, // USD volume
       }));
     }
 
@@ -135,19 +136,32 @@ async function calculateHistoricalOEBTC(days: number): Promise<HistoricalDataPoi
 
       // BTC momentum (using same threshold as current API: 5%)
       const btcPrice = btcPoint.price;
+      const btcVolume = btcPoint.volume;
       const btcDeviation = ((btcPrice - btcEMA200) / btcEMA200) * 100;
       const btc_momentum = Math.max(-1, Math.min(1, btcDeviation / 5));
 
-      // ETF flow approximation: Use BTC price momentum as proxy
-      // Calculate 1-day return and normalize similar to ETF flow
+      // ETF flow approximation: Improved model using price + volume
+      // ETF buyers tend to correlate with: price increase + high volume
       let etf_flow = 0;
       if (i > 0) {
-        const prevPrice = btcHistory[btcHistory.length - days + i - 1].price;
+        const prevPoint = btcHistory[btcHistory.length - days + i - 1];
+        const prevPrice = prevPoint.price;
+        const prevVolume = prevPoint.volume;
+        
+        // Price momentum component
         const priceChange = btcPrice - prevPrice;
         const returnPct = (priceChange / prevPrice) * 100;
-        // Use tanh normalization similar to ETF flow calculation
-        // Normalize by typical daily volatility (~3%)
-        etf_flow = Math.tanh(returnPct / 3);
+        
+        // Volume component (relative to average)
+        const volumeRatio = prevVolume > 0 ? btcVolume / prevVolume : 1;
+        const volumeSignal = Math.log(volumeRatio) / Math.log(2); // Log scale: 2x volume = +1
+        
+        // Combined signal: price momentum weighted by volume
+        // Higher volume amplifies the signal
+        const combinedSignal = returnPct * (1 + Math.min(volumeSignal, 1) * 0.5);
+        
+        // Normalize using tanh (similar to real ETF flow calculation)
+        etf_flow = Math.tanh(combinedSignal / 3);
       }
 
       // Calculate OE-BTC

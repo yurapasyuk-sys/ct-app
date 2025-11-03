@@ -279,7 +279,7 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
         <div className="mt-4 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-emerald-400">
           <strong>✓ Real Data:</strong> Showing {apiResponse.count} days of calculated historical OE-BTC values.
           <div className="mt-1 text-emerald-400/70">
-            <strong>Note:</strong> Historical ETF flow is approximated using BTC price momentum (no historical ETF data available). Macro and BTC components use real historical data.
+            <strong>Note:</strong> ETF flow approximated using BTC price momentum + volume correlation. Macro and BTC components use real historical data.
           </div>
         </div>
       )}
