@@ -74,17 +74,28 @@ function generateMockData(days: number): HistoricalDataPoint[] {
 }
 
 export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = false }: OEBTCHistoricalChartProps) {
-  const [timeframe, setTimeframe] = useState<7 | 14 | 30>(14);
+  const [timeframe, setTimeframe] = useState<7 | 14 | 30 | 90 | 365>(365); // Changed default to 1 year
   const [overlayEnabled, setOverlayEnabled] = useState(showBTCOverlay);
   
   // Fetch real historical data from API
   const { data: apiResponse, error, isLoading } = useSWR<HistoricalAPIResponse>(
-    `/api/oe-btc-history?days=30`,
+    `/api/oe-btc-history?days=${timeframe}`,
     fetcher,
     {
-      refreshInterval: 300000, // Refresh every 5 minutes (same as Overview)
+      refreshInterval: 300000, // Refresh every 5 minutes
       revalidateOnFocus: false,
       dedupingInterval: 60000, // Dedupe for 1 minute
+    }
+  );
+  
+  // Fetch BTC OHLC data for background
+  const { data: ohlcResponse } = useSWR(
+    `/api/btc-ohlc?days=${timeframe}`,
+    fetcher,
+    {
+      refreshInterval: 3600000, // Refresh every hour (prices don't change often)
+      revalidateOnFocus: false,
+      dedupingInterval: 300000, // Dedupe for 5 minutes
     }
   );
   
@@ -181,10 +192,10 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
         <div className="flex items-center gap-3">
           {/* Timeframe selector */}
           <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1">
-            {[7, 14, 30].map((days) => (
+            {[7, 14, 30, 90, 365].map((days) => (
               <button
                 key={days}
-                onClick={() => setTimeframe(days as 7 | 14 | 30)}
+                onClick={() => setTimeframe(days as 7 | 14 | 30 | 90 | 365)}
                 className={`
                   px-3 py-1 text-xs font-medium rounded transition-all
                   ${timeframe === days 
@@ -193,7 +204,7 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
                   }
                 `}
               >
-                {days}D
+                {days === 365 ? '1Y' : `${days}D`}
               </button>
             ))}
           </div>
