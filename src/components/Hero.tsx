@@ -137,9 +137,9 @@ const StatsCounter = () => {
       animate();
     };
 
-    animateTo(15, setYearsTrading);
-    animateTo(500, setStudentsHelped);
-    animateTo(50, setIndicatorsMade);
+    animateTo(3, setYearsTrading);
+    animateTo(200, setStudentsHelped);
+    animateTo(15, setIndicatorsMade);
   }, [isVisible]);
 
   return (
@@ -149,6 +149,7 @@ const StatsCounter = () => {
           {yearsTrading}+
         </div>
         <div className="text-sm md:text-base text-muted-foreground mt-2">Years Trading</div>
+        <div className="text-xs text-primary/60 mt-1">(since age 15)</div>
       </div>
       <div className="text-center">
         <div className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">
