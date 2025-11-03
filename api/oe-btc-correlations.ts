@@ -100,22 +100,16 @@ function calculateCorrelation(x: number[], y: number[]): number {
 /**
  * Calculate OE-BTC historical values (simplified)
  */
-async function calculateHistoricalOEBTC(days: number): Promise<number[]> {
+function calculateHistoricalOEBTC(btc: number[], spy: number[], nq: number[], gld: number[], dxy: number[]): number[] {
   try {
-    const [btc, spy, nq, gld, dxy] = await Promise.all([
-      fetchHistoricalBTC(days),
-      fetchHistoricalPrices('SPY', days),
-      fetchHistoricalPrices('NQ=F', days),
-      fetchHistoricalPrices('GLD', days),
-      fetchHistoricalPrices('DXY', days),
-    ]);
-
     if (!btc.length) return [];
 
     const n = Math.min(btc.length, spy.length, nq.length, gld.length, dxy.length);
+    if (n < 5) return [];
+    
     const oebtc: number[] = [];
 
-    // Calculate EMA200 for BTC
+    // Calculate EMA200 for BTC (use all available data)
     const calculateEMA = (prices: number[], period: number): number => {
       if (prices.length < period) {
         return prices.reduce((a, b) => a + b, 0) / prices.length;
@@ -129,14 +123,15 @@ async function calculateHistoricalOEBTC(days: number): Promise<number[]> {
       return ema;
     };
 
-    const btcEMA200 = calculateEMA(btc, 200);
+    const btcEMA200 = calculateEMA(btc, Math.min(200, btc.length));
 
     for (let i = 0; i < n; i++) {
-      // Simplified macro calculation (bullish count)
-      const spySMA = spy.slice(Math.max(0, i - 49), i + 1).reduce((a, b) => a + b, 0) / Math.min(i + 1, 50);
-      const nqSMA = nq.slice(Math.max(0, i - 49), i + 1).reduce((a, b) => a + b, 0) / Math.min(i + 1, 50);
-      const gldSMA = gld.slice(Math.max(0, i - 49), i + 1).reduce((a, b) => a + b, 0) / Math.min(i + 1, 50);
-      const dxySMA = dxy.slice(Math.max(0, i - 49), i + 1).reduce((a, b) => a + b, 0) / Math.min(i + 1, 50);
+      // Simplified macro calculation (bullish count) with SMA-50
+      const smaWindow = Math.min(50, i + 1);
+      const spySMA = spy.slice(Math.max(0, i - smaWindow + 1), i + 1).reduce((a, b) => a + b, 0) / smaWindow;
+      const nqSMA = nq.slice(Math.max(0, i - smaWindow + 1), i + 1).reduce((a, b) => a + b, 0) / smaWindow;
+      const gldSMA = gld.slice(Math.max(0, i - smaWindow + 1), i + 1).reduce((a, b) => a + b, 0) / smaWindow;
+      const dxySMA = dxy.slice(Math.max(0, i - smaWindow + 1), i + 1).reduce((a, b) => a + b, 0) / smaWindow;
 
       const spyBullish = spy[i] > spySMA;
       const nqBullish = nq[i] > nqSMA;
@@ -185,19 +180,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const days = 30; // Fixed 30-day window
 
-    console.log('[Correlations] Calculating correlations...');
+    console.log('[Correlations] Starting calculation...');
+    const startTime = Date.now();
 
-    // Fetch all data
-    const [oebtc, spy, nq, gld, dxy, btc] = await Promise.all([
-      calculateHistoricalOEBTC(days),
-      fetchHistoricalPrices('SPY', days),
-      fetchHistoricalPrices('NQ=F', days),
-      fetchHistoricalPrices('GLD', days),
-      fetchHistoricalPrices('DXY', days),
-      fetchHistoricalBTC(days),
+    // Fetch all data in parallel
+    const [spy, nq, gld, dxy, btc] = await Promise.all([
+      fetchHistoricalPrices('SPY', days).catch(() => []),
+      fetchHistoricalPrices('NQ=F', days).catch(() => []),
+      fetchHistoricalPrices('GLD', days).catch(() => []),
+      fetchHistoricalPrices('DXY', days).catch(() => []),
+      fetchHistoricalBTC(days).catch(() => []),
     ]);
 
-    if (!oebtc.length) {
+    console.log(`[Correlations] Data fetched in ${Date.now() - startTime}ms`);
+    console.log(`[Correlations] Data lengths: SPY=${spy.length}, NQ=${nq.length}, BTC=${btc.length}`);
+
+    // Calculate OE-BTC from fetched data
+    const oebtc = calculateHistoricalOEBTC(btc, spy, nq, gld, dxy);
+    
+    console.log(`[Correlations] OE-BTC calculated: ${oebtc.length} points`);
+
+    if (!oebtc.length || oebtc.length < 5) {
+      console.error('[Correlations] Insufficient OE-BTC data');
       throw new Error('Failed to calculate OE-BTC historical data');
     }
 
@@ -206,51 +210,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       {
         pair: 'OE-BTC vs SPY',
         label: 'S&P 500',
-        correlation: parseFloat(calculateCorrelation(oebtc, spy).toFixed(3)),
+        correlation: spy.length >= 5 ? parseFloat(calculateCorrelation(oebtc, spy).toFixed(3)) : 0,
       },
       {
         pair: 'OE-BTC vs NQ',
         label: 'Nasdaq 100',
-        correlation: parseFloat(calculateCorrelation(oebtc, nq).toFixed(3)),
+        correlation: nq.length >= 5 ? parseFloat(calculateCorrelation(oebtc, nq).toFixed(3)) : 0,
       },
       {
         pair: 'OE-BTC vs GLD',
         label: 'Gold',
-        correlation: parseFloat(calculateCorrelation(oebtc, gld).toFixed(3)),
+        correlation: gld.length >= 5 ? parseFloat(calculateCorrelation(oebtc, gld).toFixed(3)) : 0,
       },
       {
         pair: 'OE-BTC vs DXY',
         label: 'US Dollar Index',
-        correlation: parseFloat(calculateCorrelation(oebtc, dxy).toFixed(3)),
+        correlation: dxy.length >= 5 ? parseFloat(calculateCorrelation(oebtc, dxy).toFixed(3)) : 0,
       },
       {
         pair: 'OE-BTC vs BTC',
         label: 'Bitcoin Price',
-        correlation: parseFloat(calculateCorrelation(oebtc, btc).toFixed(3)),
+        correlation: btc.length >= 5 ? parseFloat(calculateCorrelation(oebtc, btc).toFixed(3)) : 0,
       },
       {
         pair: 'SPY vs BTC',
-        label: 'SPY-BTC Cross',
-        correlation: parseFloat(calculateCorrelation(spy, btc).toFixed(3)),
+        label: 'SPY-BTC',
+        correlation: spy.length >= 5 && btc.length >= 5 ? parseFloat(calculateCorrelation(spy, btc).toFixed(3)) : 0,
       },
       {
         pair: 'NQ vs BTC',
-        label: 'NQ-BTC Cross',
-        correlation: parseFloat(calculateCorrelation(nq, btc).toFixed(3)),
+        label: 'NQ-BTC',
+        correlation: nq.length >= 5 && btc.length >= 5 ? parseFloat(calculateCorrelation(nq, btc).toFixed(3)) : 0,
       },
     ];
+
+    console.log(`[Correlations] Calculation completed in ${Date.now() - startTime}ms`);
 
     return res.status(200).json({
       success: true,
       days,
       timestamp: new Date().toISOString(),
       correlations,
+      calculationTime: Date.now() - startTime,
     });
   } catch (error: any) {
     console.error('[Correlations] Error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 }
