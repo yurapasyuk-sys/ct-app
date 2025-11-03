@@ -73,9 +73,6 @@ export const Hero = () => {
           {/* Stats Counter */}
           <StatsCounter />
 
-          {/* OE-BTC Status Widget */}
-          <OEBTCStatusWidget />
-
           <p className="text-lg text-foreground/80 max-w-2xl leading-relaxed">
             Philosophy over prediction. Experience over emotion. Models that acknowledge uncertainty rather than promise certainty.
           </p>
@@ -162,50 +159,6 @@ const StatsCounter = () => {
           {indicatorsMade}+
         </div>
         <div className="text-sm md:text-base text-muted-foreground mt-2">Custom Indicators</div>
-      </div>
-    </div>
-  );
-};
-
-// OE-BTC Status Widget Component
-const OEBTCStatusWidget = () => {
-  const [riskStatus, setRiskStatus] = useState<'Risk-On' | 'Risk-Off'>('Risk-On');
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const response = await fetch('/api/oe-btc');
-        const data = await response.json();
-        setRiskStatus(data.riskStatus || 'Risk-On');
-      } catch (error) {
-        console.error('Failed to fetch OE-BTC status:', error);
-        setRiskStatus('Risk-On');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const isRiskOn = riskStatus === 'Risk-On';
-  const bgColor = isRiskOn ? 'bg-green-500/20' : 'bg-red-500/20';
-  const borderColor = isRiskOn ? 'border-green-500/50' : 'border-red-500/50';
-  const dotColor = isRiskOn ? 'bg-green-500' : 'bg-red-500';
-  const textColor = isRiskOn ? 'text-green-400' : 'text-red-400';
-
-  return (
-    <div className={`inline-flex items-center gap-3 px-4 py-3 rounded-lg border ${bgColor} ${borderColor} mb-6 backdrop-blur-sm`}>
-      <div className={`w-3 h-3 rounded-full ${dotColor} ${isLoading ? 'opacity-50' : 'animate-pulse'}`}></div>
-      <div>
-        <div className="text-xs font-medium text-muted-foreground">OE-BTC Status</div>
-        <div className={`text-sm font-bold ${textColor}`}>
-          {isLoading ? 'Loading...' : riskStatus}
-        </div>
       </div>
     </div>
   );
