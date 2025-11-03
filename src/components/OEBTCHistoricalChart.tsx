@@ -278,6 +278,9 @@ export function OEBTCHistoricalChart({ data: providedData, showBTCOverlay = fals
       {apiResponse && !error && (
         <div className="mt-4 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-emerald-400">
           <strong>✓ Real Data:</strong> Showing {apiResponse.count} days of calculated historical OE-BTC values from macro indicators and BTC price data.
+          <div className="mt-1 text-emerald-400/70">
+            <strong>Note:</strong> Historical ETF flow is approximated from BTC price movements, while current values use real-time ETF data. This may cause differences between historical and current OE-BTC values.
+          </div>
         </div>
       )}
     </Card>
