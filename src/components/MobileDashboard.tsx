@@ -18,11 +18,10 @@ const MobileDashboard = () => {
   
   const signals = useDashboardSignals('BTCUSDT');
 
-  const indicators = ['overview', 'oe-btc', 'mtm', 'rvwap'] as const;
+  const indicators = ['overview', 'mtm', 'rvwap'] as const;
   type IndicatorType = typeof indicators[number];
   const indicatorLabels: Record<IndicatorType, string> = {
     'overview': 'Overview',
-    'oe-btc': 'OE-BTC',
     'mtm': 'MTM',
     'rvwap': 'RVWAP'
   };
@@ -133,7 +132,6 @@ const MobileDashboard = () => {
         {/* Indicator content */}
         <main className="flex-1 px-4 py-6 space-y-4">
           {currentIndicator === 'overview' && <OverviewMetrics signals={signals} />}
-          {currentIndicator === 'oe-btc' && <OEBTCMetrics />}
           {currentIndicator === 'mtm' && <MTMMetrics />}
           {currentIndicator === 'rvwap' && <RVWAPMetrics />}
         </main>
@@ -302,20 +300,6 @@ const OverviewMetrics = ({ signals }: any) => (
       unit="%"
       status={signals.rvwapStatus}
     />
-  </>
-);
-
-// OE-BTC Metrics (Placeholder)
-const OEBTCMetrics = () => (
-  <>
-    <MetricCard
-      label="Current Value"
-      value="Loading..."
-      status="neutral"
-    />
-    <div className="bg-card/50 border border-border rounded-lg p-4 text-center text-muted-foreground text-sm">
-      Full OE-BTC dashboard available on desktop
-    </div>
   </>
 );
 

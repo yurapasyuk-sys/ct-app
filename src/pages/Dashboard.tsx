@@ -6,7 +6,6 @@ import LoadingOverlay from '@/components/LoadingOverlay'; // Not lazy - loads im
 // Lazy load heavy components
 const RvwapPanel = lazy(() => import('@/components/rvwap/RvwapPanel').then(module => ({ default: module.RvwapPanel })));
 const MTMPanel = lazy(() => import('@/components/mtm/MTMPanel').then(module => ({ default: module.MTMPanel })));
-const OEBTCIndicator = lazy(() => import('@/components/OEBTCIndicator').then(module => ({ default: module.OEBTCIndicator })));
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -132,11 +131,6 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-          {/* OE-BTC Indicator */}
-          <Suspense fallback={<div className="h-64 bg-card/50 animate-pulse rounded-lg" />}>
-            <OEBTCIndicator />
-          </Suspense>
-
           {/* MTM Panel */}
           <Suspense fallback={<div className="h-96 bg-card/50 animate-pulse rounded-lg" />}>
             <MTMPanel symbol="BTCUSDT" dataSource="futures" />
