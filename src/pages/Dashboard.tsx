@@ -1,55 +1,48 @@
-import { ArrowLeft, LayoutDashboard } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Sidebar } from '@/components/Sidebar';
 import { UnifiedChartPanel } from '@/components/charts/UnifiedChartPanel';
+import { MarketPulseAlerts } from '@/components/MarketPulseAlerts';
+import { VwapZScorePanel } from '@/components/charts/VwapZScorePanel';
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
+      <Sidebar />
+      
+      <main className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Header */}
+        <header className="h-14 border-b border-border/40 bg-background/95 backdrop-blur flex items-center px-6 justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <h1 className="font-semibold text-lg tracking-tight">Market Overview</h1>
+          </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
-              title="Back to Home"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            
-            <div className="h-6 w-px bg-border mx-2" />
-            
-            <div className="flex items-center gap-2">
-              <LayoutDashboard className="w-5 h-5 text-primary" />
-              <span className="font-semibold tracking-tight">Research Terminal</span>
+             <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono bg-secondary/50 px-3 py-1 rounded-full border border-border/40">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              SYSTEM ONLINE
             </div>
           </div>
+        </header>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground font-mono bg-secondary/50 px-3 py-1 rounded-full border border-border">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              DATA STREAM: ACTIVE
+        {/* Dashboard Grid */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-4 grid-rows-[500px_400px] gap-4 h-full min-h-[900px]">
+            
+            {/* Main Chart Area (Top Left - 3 cols) */}
+            <div className="lg:col-span-3 row-span-1">
+              <UnifiedChartPanel />
             </div>
+
+            {/* Alerts Panel (Top Right - 1 col) */}
+            <div className="lg:col-span-1 row-span-1">
+              <MarketPulseAlerts />
+            </div>
+
+            {/* VWAP Z-Score Mod (Bottom - Full Width) */}
+            <div className="lg:col-span-4 row-span-1">
+              <VwapZScorePanel />
+            </div>
+
           </div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-6 mb-8">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">
-                Market Analysis
-              </h1>
-              <p className="text-muted-foreground max-w-2xl">
-                Advanced technical analysis combining Market Tension Map and Rolling VWAP indicators.
-              </p>
-            </div>
-          </div>
-
-          <UnifiedChartPanel />
       </main>
     </div>
   );

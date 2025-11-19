@@ -12,12 +12,13 @@ export interface ChartDataPoint {
 
 export interface Overlay {
   id: string;
-  type: 'line' | 'histogram' | 'area' | 'pulse';
+  type: 'line' | 'histogram' | 'area' | 'pulse' | 'oscillator';
   dataKey: string;
   color: string;
   width?: number;
   opacity?: number;
   threshold?: number; // For histogram coloring
+  domain?: [number, number]; // Custom domain for oscillator/panel
 }
 
 interface QuantChartProps {
@@ -62,7 +63,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       return { visibleData: [], minPrice: 0, maxPrice: 0, priceRange: 0, scaleY: 0, startIndex: 0, hasBottomPanel: false, mainChartHeight: 0, indicatorHeight: 0 };
     }
 
-    const hasBottomPanel = overlays.some(o => o.type === 'pulse');
+    const hasBottomPanel = overlays.some(o => o.type === 'pulse' || o.type === 'oscillator');
     const mainChartHeight = hasBottomPanel ? dimensions.height * 0.75 : dimensions.height;
     const indicatorHeight = hasBottomPanel ? dimensions.height * 0.25 : 0;
 
@@ -542,6 +543,72 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         ctx.fillRect(x - candleWidth / 2, y, candleWidth, barHeight);
         ctx.globalAlpha = 1.0;
       });
+    });
+
+    // Draw Oscillator (Z-Score etc)
+    overlays.filter(o => o.type === 'oscillator').forEach(overlay => {
+      const panelTop = mainChartHeight;
+      const panelHeight = indicatorHeight;
+      const panelBottom = dimensions.height - padding.bottom;
+      
+      const domain = overlay.domain || [-3, 3];
+      const minVal = domain[0];
+      const maxVal = domain[1];
+      const range = maxVal - minVal;
+      const scale = (panelHeight - padding.bottom) / range;
+
+      const getOscY = (val: number) => {
+        // Clamp value?
+        // val = Math.max(minVal, Math.min(maxVal, val));
+        return dimensions.height - padding.bottom - (val - minVal) * scale;
+      };
+
+      // Draw Zero Line
+      if (showGrid) {
+        const y0 = getOscY(0);
+        ctx.beginPath();
+        ctx.setLineDash([2, 2]);
+        ctx.moveTo(0, y0);
+        ctx.lineTo(dimensions.width - padding.right, y0);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Threshold lines (-2, 2)
+        [-2, 2].forEach(t => {
+            if (t > minVal && t < maxVal) {
+                const yt = getOscY(t);
+                ctx.beginPath();
+                ctx.setLineDash([1, 1]);
+                ctx.moveTo(0, yt);
+                ctx.lineTo(dimensions.width - padding.right, yt);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.stroke();
+            }
+        });
+      }
+
+      // Draw Line
+      ctx.beginPath();
+      ctx.strokeStyle = overlay.color;
+      ctx.lineWidth = overlay.width || 2;
+      
+      let started = false;
+      visibleData.forEach((d, i) => {
+        const val = d[overlay.dataKey];
+        if (typeof val !== 'number') return;
+        
+        const x = getX(i + xShift);
+        const y = getOscY(val);
+        
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
     });
 
   }, [dimensions, visibleData, minPrice, maxPrice, overlays, showGrid]);
