@@ -81,7 +81,7 @@ const SinglePanel = memo(function SinglePanel({ timeframe, symbol, dataSource }:
       </div>
 
       {/* Chart Area */}
-      <div className="flex-grow min-h-[300px] relative bg-secondary/5 rounded-lg border border-border/50 overflow-hidden">
+      <div className="flex-grow min-h-[400px] relative bg-secondary/5 rounded-lg border border-border/50 overflow-hidden">
         {error ? (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-destructive p-4 text-center">
             Error: {error}
@@ -91,7 +91,7 @@ const SinglePanel = memo(function SinglePanel({ timeframe, symbol, dataSource }:
             klines={klines}
             tensionData={tensionData}
             threshold={recommendedThreshold}
-            height={300}
+            height={400}
             className="w-full h-full"
           />
         )}
@@ -139,7 +139,7 @@ export function MTMPanel({ symbol, dataSource = 'futures' }: MTMPanelProps) {
       </div>
 
       {/* Grid Layout for Timeframes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {TIMEFRAMES.map((tf) => (
           <SinglePanel key={tf.id} timeframe={tf} symbol={symbol} dataSource={dataSource} />
         ))}

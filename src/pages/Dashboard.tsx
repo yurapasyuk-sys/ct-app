@@ -15,7 +15,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/')}
@@ -43,7 +43,7 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="mtm" className="space-y-8" onValueChange={setActiveTab}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-6">
             <div>
