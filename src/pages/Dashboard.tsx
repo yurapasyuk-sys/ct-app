@@ -70,23 +70,15 @@ const Dashboard = () => {
           </div>
 
           <TabsContent value="mtm" className="space-y-6 animate-in fade-in-50 duration-500 slide-in-from-bottom-2">
-            <div className="grid grid-cols-1 gap-6">
-              <Suspense fallback={<div className="h-[600px] bg-secondary/20 animate-pulse rounded-xl border border-border" />}>
-                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                  <MTMPanel symbol="BTCUSDT" dataSource="futures" />
-                </div>
-              </Suspense>
-            </div>
+            <Suspense fallback={<div className="h-[600px] bg-secondary/20 animate-pulse rounded-xl border border-border" />}>
+              <MTMPanel symbol="BTCUSDT" dataSource="futures" />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="rvwap" className="space-y-6 animate-in fade-in-50 duration-500 slide-in-from-bottom-2">
-            <div className="grid grid-cols-1 gap-6">
-              <Suspense fallback={<div className="h-[600px] bg-secondary/20 animate-pulse rounded-xl border border-border" />}>
-                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                  <RvwapPanel symbol="BTCUSDT" dataSource="spot" />
-                </div>
-              </Suspense>
-            </div>
+            <Suspense fallback={<div className="h-[600px] bg-secondary/20 animate-pulse rounded-xl border border-border" />}>
+              <RvwapPanel symbol="BTCUSDT" dataSource="spot" />
+            </Suspense>
           </TabsContent>
         </Tabs>
       </main>

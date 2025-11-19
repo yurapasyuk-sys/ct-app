@@ -13,7 +13,7 @@ const queryClient = new QueryClient();
 const App = () => {
   // Log analytics initialization on mount
   if (typeof window !== 'undefined') {
-    console.log('✅ Vercel Analytics active');
+    console.log('Vercel Analytics active');
   }
 
   return (

@@ -3,12 +3,13 @@
  * Displays three timeframe panels with OHLC charts and tension histograms
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { useKlines } from '@/hooks/useKlines';
 import { OhlcChart } from '@/components/ohlc/OhlcChart';
 import { SnapshotButton } from '@/components/SnapshotButton';
 import { getRecommendedThreshold } from '@/lib/tension';
 import type { DataSource } from '@/lib/binance';
+import { Activity, RefreshCw } from 'lucide-react';
 
 // Timeframe configurations
 const TIMEFRAMES = [
@@ -41,7 +42,7 @@ interface SinglePanelProps {
   dataSource: DataSource;
 }
 
-function SinglePanel({ timeframe, symbol, dataSource }: SinglePanelProps) {
+const SinglePanel = memo(function SinglePanel({ timeframe, symbol, dataSource }: SinglePanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { klines, tensionData, isLoading, error, lastUpdated, nextRefreshIn } =
@@ -58,69 +59,57 @@ function SinglePanel({ timeframe, symbol, dataSource }: SinglePanelProps) {
   return (
     <div
       ref={containerRef}
-      className="bg-card border border-border rounded-lg p-4 shadow-sm"
+      className="bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col h-full"
     >
       {/* Panel Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <h2 className="text-base lg:text-lg font-semibold">
-              {timeframe.label} <span className="text-muted-foreground">({timeframe.description})</span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-amber-500' : 'bg-green-500'} ${isLoading ? 'animate-pulse' : ''}`} />
+          <div>
+            <h2 className="text-lg font-semibold leading-none">
+              {timeframe.label}
             </h2>
+            <span className="text-xs text-muted-foreground">{timeframe.description}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <SnapshotButton 
-            containerRef={containerRef} 
-            symbol={symbol}
-            timeframe={timeframe.label}
-          />
-        </div>
+        <SnapshotButton 
+          containerRef={containerRef} 
+          symbol={symbol}
+          timeframe={timeframe.label}
+        />
       </div>
 
-      {/* Stats Row */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-        <div className="flex items-center gap-1">
-          <span>Candles:</span>
-          <span className="font-mono text-foreground">{klines.length}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span>Tension Points:</span>
-          <span className="font-mono text-foreground">{tensionData.length}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span>Latest:</span>
-          <span className="font-mono text-foreground">
-            {lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : 'N/A'}
-          </span>
-        </div>
-        {nextRefreshIn > 0 && (
-          <div className="flex items-center gap-1">
-            <span>Next refresh:</span>
-            <span className="font-mono text-foreground">{Math.ceil(nextRefreshIn / 1000)}s</span>
+      {/* Chart Area */}
+      <div className="flex-grow min-h-[300px] relative bg-secondary/5 rounded-lg border border-border/50 overflow-hidden">
+        {error ? (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-destructive p-4 text-center">
+            Error: {error}
           </div>
+        ) : (
+          <OhlcChart
+            klines={klines}
+            tensionData={tensionData}
+            threshold={recommendedThreshold}
+            height={300}
+            className="w-full h-full"
+          />
         )}
       </div>
 
-      {/* Chart */}
-      {error ? (
-        <div className="text-sm text-red-500 p-4 bg-red-500/10 rounded border border-red-500/20">
-          Error: {error}
+      {/* Footer Stats */}
+      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground border-t border-border/50 pt-3">
+        <div className="flex gap-3">
+          <span>Candles: <span className="text-foreground font-mono">{klines.length}</span></span>
+          <span>Tension: <span className="text-foreground font-mono">{tensionData.length}</span></span>
         </div>
-      ) : (
-        <OhlcChart
-          klines={klines}
-          tensionData={tensionData}
-          threshold={recommendedThreshold}
-          height={300}
-          className="w-full"
-        />
-      )}
+        <div className="font-mono opacity-70">
+          {lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '--:--:--'}
+        </div>
+      </div>
     </div>
   );
-}
+});
 
 interface MTMPanelProps {
   symbol: string;
@@ -130,24 +119,31 @@ interface MTMPanelProps {
 export function MTMPanel({ symbol, dataSource = 'futures' }: MTMPanelProps) {
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">📊</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+            <Activity className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Market Tension Map</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="text-xl font-bold tracking-tight">Market Tension Map</h2>
+            <p className="text-sm text-muted-foreground">
               Real-time OHLC analysis with tension indicators
             </p>
           </div>
         </div>
+        
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/50 px-3 py-1.5 rounded-full border border-border">
+          <RefreshCw className="w-3 h-3 animate-spin-slow" />
+          <span>Auto-refresh active (15s)</span>
+        </div>
       </div>
 
-      {/* Three Timeframe Panels */}
-      {TIMEFRAMES.map((tf) => (
-        <SinglePanel key={tf.id} timeframe={tf} symbol={symbol} dataSource={dataSource} />
-      ))}
+      {/* Grid Layout for Timeframes */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {TIMEFRAMES.map((tf) => (
+          <SinglePanel key={tf.id} timeframe={tf} symbol={symbol} dataSource={dataSource} />
+        ))}
+      </div>
     </div>
   );
 }

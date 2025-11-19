@@ -1,20 +1,21 @@
 import { SectionLayout } from "./ui/SectionLayout";
+import { Target, AlertTriangle, BarChart3 } from "lucide-react";
 
 const questions = [
   {
     q: "Why semi-predictive instead of predictive?",
     a: "Because markets aren't clockwork. They're conversations between millions of participants, each with incomplete information. Semi-predictive models acknowledge this chaos while finding patterns within it.",
-    emoji: "🎯"
+    icon: Target
   },
   {
     q: "What's the biggest mistake traders make?",
     a: "Believing they can outsmart randomness instead of working with it. Successful trading isn't about being right more often—it's about being wrong less expensively.",
-    emoji: "⚠️"
+    icon: AlertTriangle
   },
   {
     q: "How do you define edge?",
     a: "Edge isn't a guaranteed win. It's a slight statistical advantage repeated over time. Like a casino's 2% house edge—small, consistent, and compounding.",
-    emoji: "📊"
+    icon: BarChart3
   }
 ];
 
@@ -50,7 +51,9 @@ export const Philosophy = () => {
             key={idx}
             className="group p-8 rounded-xl bg-card border border-border hover:border-primary/20 hover:shadow-lg transition-all duration-300"
           >
-            <div className="text-3xl mb-6 opacity-80 group-hover:scale-110 transition-transform duration-300">{item.emoji}</div>
+            <div className="mb-6 opacity-80 group-hover:scale-110 transition-transform duration-300 text-primary">
+              <item.icon className="w-8 h-8" />
+            </div>
             <h3 className="text-xl font-semibold mb-4 text-foreground">{item.q}</h3>
             <p className="text-muted-foreground leading-relaxed">
               {item.a}
