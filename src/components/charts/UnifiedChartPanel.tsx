@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { QuantChart, ChartDataPoint, Overlay } from './QuantChart';
 import { useKlines } from '@/hooks/useKlines';
 import { useMultiRvwap } from '@/hooks/useMultiRvwap';
+import { getRecommendedThreshold } from '@/lib/tension';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -82,7 +83,7 @@ export const UnifiedChartPanel = () => {
         dataKey: 'tension',
         color: '#3b82f6', // Blue base
         opacity: 0.4,
-        threshold: 80, // Highlight high tension
+        threshold: getRecommendedThreshold(interval), // Highlight high tension
       });
     }
 

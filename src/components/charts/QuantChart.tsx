@@ -70,9 +70,12 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     // offset 0 means we see the last maxVisibleBars
     // offset > 0 means we shift back
     const end = data.length - Math.floor(offset);
-    const start = Math.max(0, end - maxVisibleBars);
+    const start = end - maxVisibleBars;
     
-    const visibleData = data.slice(start, Math.max(start, end));
+    // Slice data safely
+    const sliceStart = Math.max(0, start);
+    const sliceEnd = Math.max(0, end);
+    const visibleData = data.slice(sliceStart, sliceEnd);
 
     let min = Infinity;
     let max = -Infinity;
@@ -137,7 +140,10 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       const dx = e.clientX - dragStart.x;
       const barsMoved = dx / totalBarWidth;
       // Dragging right (dx > 0) -> Move into history -> Increase offset
-      const newOffset = Math.max(0, dragStart.offset + barsMoved);
+      // Allow negative offset (scrolling into future)
+      const maxVisibleBars = Math.floor((dimensions.width - padding.right) / totalBarWidth);
+      const minOffset = -maxVisibleBars / 2;
+      const newOffset = Math.max(minOffset, dragStart.offset + barsMoved);
       setOffset(newOffset);
       return; // Skip hover update while dragging for performance?
     }
@@ -207,7 +213,8 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         
         const newStart = indexAtMouse - (mouseX / newTotalWidth);
         const newEnd = newStart + newMaxVisibleBars;
-        const newOffset = Math.max(0, data.length - newEnd);
+        const minOffset = -newMaxVisibleBars / 2;
+        const newOffset = Math.max(minOffset, data.length - newEnd);
         
         setZoom(newZoom);
         setOffset(newOffset);
@@ -235,6 +242,12 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     canvas.height = dimensions.height * dpr;
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+
+    // Calculate X-axis shift for negative scrolling (future/empty space)
+    // startIndex can be negative. visibleData starts at Math.max(0, startIndex).
+    // If startIndex is -10, visibleData[0] is data[0], which should be at index 10.
+    // shift = Math.max(0, startIndex) - startIndex
+    const xShift = Math.max(0, startIndex) - startIndex;
 
     // Draw Grid
     if (showGrid) {
@@ -287,7 +300,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         const val = d[overlay.dataKey];
         if (typeof val !== 'number') return;
         
-        const x = getX(i);
+        const x = getX(i + xShift);
         const y = getY(val);
         
         // Clip to chart area if RVWAP is way off scale
@@ -308,7 +321,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
 
     // Draw Candles
     visibleData.forEach((d, i) => {
-      const x = getX(i);
+      const x = getX(i + xShift);
       const openY = getY(d.open);
       const closeY = getY(d.close);
       const highY = getY(d.high);
@@ -387,45 +400,71 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       gradient.addColorStop(0, `${overlay.color}40`); // 25% opacity
       gradient.addColorStop(1, `${overlay.color}05`); // ~0% opacity
 
-      ctx.beginPath();
-      let started = false;
-      
-      visibleData.forEach((d, i) => {
-        const val = d[overlay.dataKey];
-        if (typeof val !== 'number') return;
-
-        const x = getX(i);
-        const y = getPulseY(val);
-        
-        if (!started) {
-          ctx.moveTo(x, dimensions.height - padding.bottom); // Start at bottom
-          ctx.lineTo(x, y);
-          started = true;
-        } else {
-          ctx.lineTo(x, y);
+      // Helper to draw the area path
+      const drawAreaPath = () => {
+        ctx.beginPath();
+        let started = false;
+        visibleData.forEach((d, i) => {
+          const val = d[overlay.dataKey];
+          if (typeof val !== 'number') return;
+          const x = getX(i + xShift);
+          const y = getPulseY(val);
+          if (!started) {
+            ctx.moveTo(x, dimensions.height - padding.bottom);
+            ctx.lineTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        if (visibleData.length > 0) {
+            const lastX = getX(visibleData.length - 1 + xShift);
+            ctx.lineTo(lastX, dimensions.height - padding.bottom);
+            ctx.closePath();
         }
-      });
-      
-      // Close path for fill
-      if (visibleData.length > 0) {
-          const lastX = getX(visibleData.length - 1);
-          ctx.lineTo(lastX, dimensions.height - padding.bottom);
-          ctx.closePath();
-          ctx.fillStyle = gradient;
+      };
+
+      // Draw Main Area
+      drawAreaPath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Draw Highlight Area (Red Gradient for > Threshold)
+      if (overlay.threshold) {
+          const threshY = getPulseY(overlay.threshold);
+          
+          ctx.save();
+          ctx.beginPath();
+          // Clip region: Top of panel down to threshold line
+          // Note: threshY is the Y coordinate of the threshold line.
+          // Values > threshold have Y < threshY.
+          // So we clip everything above threshY.
+          ctx.rect(0, panelTop, dimensions.width, Math.max(0, threshY - panelTop));
+          ctx.clip();
+          
+          drawAreaPath();
+          
+          // Red gradient
+          const redGradient = ctx.createLinearGradient(0, panelTop, 0, dimensions.height - padding.bottom);
+          redGradient.addColorStop(0, '#ef444460'); // Red 
+          redGradient.addColorStop(1, '#ef444400'); // Transparent
+          ctx.fillStyle = redGradient;
           ctx.fill();
+          
+          ctx.restore();
       }
 
       // Draw Line on top
       ctx.beginPath();
-      started = false;
+      let started = false;
       visibleData.forEach((d, i) => {
         const val = d[overlay.dataKey];
         if (typeof val !== 'number') return;
-        const x = getX(i);
+        const x = getX(i + xShift);
         const y = getPulseY(val);
         
         if (started) {
-             const prevX = getX(i-1);
+             const prevX = getX(i-1 + xShift);
              const prevVal = visibleData[i-1][overlay.dataKey];
              const prevY = getPulseY(prevVal);
              
@@ -453,7 +492,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
           const lastIdx = visibleData.length - 1;
           const lastVal = visibleData[lastIdx][overlay.dataKey];
           if (typeof lastVal === 'number') {
-              const x = getX(lastIdx);
+              const x = getX(lastIdx + xShift);
               const y = getPulseY(lastVal);
               
               ctx.beginPath();
@@ -488,7 +527,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         const val = d[overlay.dataKey];
         if (typeof val !== 'number') return;
 
-        const x = getX(i);
+        const x = getX(i + xShift);
         const barHeight = (val / maxVal) * histHeight;
         const y = histBottom - barHeight;
         
@@ -565,7 +604,8 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       // Find index
       const index = visibleData.indexOf(hoverData);
       if (index >= 0) {
-          const candleX = getX(index);
+          const xShift = Math.max(0, startIndex) - startIndex;
+          const candleX = getX(index + xShift);
           // Glow effect
           ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
           ctx.shadowBlur = 10;
@@ -574,7 +614,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
           ctx.shadowBlur = 0;
       }
     }
-  }, [mousePos, hoverData, dimensions, minPrice, scaleY, visibleData]);
+  }, [mousePos, hoverData, dimensions, minPrice, scaleY, visibleData, startIndex]);
 
   return (
     <div 

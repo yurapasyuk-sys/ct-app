@@ -236,7 +236,7 @@ export function getRecommendedPeriod(interval: string): number {
   const periodMap: Record<string, number> = {
     '15m': 55,
     '1h': 40,
-    '4h': 35,
+    '4h': 40,
   };
 
   return periodMap[interval] || 40;
@@ -249,7 +249,7 @@ export function getRecommendedThreshold(interval: string): number {
   const thresholdMap: Record<string, number> = {
     '15m': 74,
     '1h': 75,
-    '4h': 80,
+    '4h': 90,
   };
 
   return thresholdMap[interval] || 75;
