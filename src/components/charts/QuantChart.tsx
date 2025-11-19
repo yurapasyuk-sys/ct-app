@@ -446,8 +446,8 @@ export const QuantChart: React.FC<QuantChartProps> = ({
           
           // Red gradient
           const redGradient = ctx.createLinearGradient(0, panelTop, 0, dimensions.height - padding.bottom);
-          redGradient.addColorStop(0, '#ef444460'); // Red 
-          redGradient.addColorStop(1, '#ef444400'); // Transparent
+          redGradient.addColorStop(0, '#e11d4860'); // Rose-600
+          redGradient.addColorStop(1, '#e11d4800'); // Transparent
           ctx.fillStyle = redGradient;
           ctx.fill();
           
@@ -475,9 +475,9 @@ export const QuantChart: React.FC<QuantChartProps> = ({
              // Color logic
              let strokeColor = overlay.color;
              if (overlay.threshold && val > overlay.threshold) {
-                 strokeColor = '#ef4444'; // Red for high tension
+                 strokeColor = '#e11d48'; // Rose-600 for high tension
              } else if (val < 20) {
-                 strokeColor = '#10b981'; // Green for low tension
+                 strokeColor = '#0891b2'; // Cyan-600 for low tension
              }
              
              ctx.strokeStyle = strokeColor;
@@ -498,7 +498,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
               ctx.beginPath();
               ctx.arc(x, y, 4, 0, Math.PI * 2);
               ctx.fillStyle = overlay.color;
-              if (overlay.threshold && lastVal > overlay.threshold) ctx.fillStyle = '#ef4444';
+              if (overlay.threshold && lastVal > overlay.threshold) ctx.fillStyle = '#e11d48';
               ctx.fill();
               
               ctx.beginPath();

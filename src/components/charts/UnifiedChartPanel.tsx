@@ -82,7 +82,7 @@ export const UnifiedChartPanel = () => {
         id: 'Market Pulse',
         type: 'pulse', // New type
         dataKey: 'tension',
-        color: '#3b82f6', // Blue base
+        color: '#64748b', // Slate 500 (Neutral technical)
         opacity: 0.4,
         threshold: getRecommendedThreshold(interval), // Highlight high tension
       });
