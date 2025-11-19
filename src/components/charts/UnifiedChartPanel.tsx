@@ -19,6 +19,7 @@ export const UnifiedChartPanel = () => {
     symbol,
     interval,
     lookbackDays: 90, 
+    minRefreshMs: 5000, // Update every 5 seconds
     dataSource: 'futures',
   });
 

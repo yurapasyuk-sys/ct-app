@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   fetchKlines,
+  fetchKlinesMultiBatch,
   calculateStartTime,
   type Kline,
   type DataSource,
@@ -66,6 +67,24 @@ function isCacheValid(entry: CacheEntry, minRefreshMs: number): boolean {
   return now - entry.timestamp < minRefreshMs;
 }
 
+/**
+ * Calculate total candles needed for lookback
+ */
+function calculateTotalCandles(lookbackDays: number, interval: string): number {
+  const minutesPerDay = 24 * 60;
+  let intervalMinutes = 60; // default 1h
+  
+  if (interval.endsWith('m')) {
+    intervalMinutes = parseInt(interval.replace('m', ''));
+  } else if (interval.endsWith('h')) {
+    intervalMinutes = parseInt(interval.replace('h', '')) * 60;
+  } else if (interval.endsWith('d')) {
+    intervalMinutes = parseInt(interval.replace('d', '')) * 24 * 60;
+  }
+  
+  return Math.ceil((lookbackDays * minutesPerDay) / intervalMinutes);
+}
+
 export function useKlines({
   symbol,
   interval,
@@ -118,15 +137,18 @@ export function useKlines({
     setError(null);
 
     try {
-      const startTime = calculateStartTime(lookbackDays);
-      const data = await fetchKlines(
+      // Calculate how many candles we need to cover the lookback period
+      const totalCandles = calculateTotalCandles(lookbackDays, interval);
+      
+      // Use multi-batch fetch to get the LATEST candles going back enough time
+      // This ensures we always have the most recent data
+      const data = await fetchKlinesMultiBatch(
         {
           symbol,
           interval,
-          startTime,
-          limit: 1000,
           dataSource,
         },
+        totalCandles,
         abortControllerRef.current.signal
       );
 
