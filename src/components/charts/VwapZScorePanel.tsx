@@ -30,37 +30,45 @@ export const VwapZScorePanel = () => {
             </Tabs>
         </div>
       </CardHeader>
-      <CardContent className="p-4 flex-1 min-h-0 overflow-y-auto">
+      <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
          {isLoading && data.length === 0 ? (
              <div className="h-full flex items-center justify-center">
                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
              </div>
          ) : (
-             <div className="flex flex-col gap-4 h-full">
-                <ZScoreChart 
-                  title="Z-Score VWAP 365" 
-                  data={data.map(d => ({ timestamp: d.timestamp, value: d.z365 }))} 
-                  height={120}
-                  className="flex-1 min-h-[100px]"
-                />
-                <ZScoreChart 
-                  title="Z-Score VWAP 180" 
-                  data={data.map(d => ({ timestamp: d.timestamp, value: d.z180 }))} 
-                  height={120}
-                  className="flex-1 min-h-[100px]"
-                />
-                <ZScoreChart 
-                  title="Z-Score VWAP 90" 
-                  data={data.map(d => ({ timestamp: d.timestamp, value: d.z90 }))} 
-                  height={120}
-                  className="flex-1 min-h-[100px]"
-                />
-                <ZScoreChart 
-                  title="Z-Score VWAP 30" 
-                  data={data.map(d => ({ timestamp: d.timestamp, value: d.z30 }))} 
-                  height={120}
-                  className="flex-1 min-h-[100px]"
-                />
+             <div className="flex flex-col h-full divide-y divide-border/40">
+                <div className="flex-1 min-h-0 p-2">
+                    <ZScoreChart 
+                    title="Z-Score VWAP 365" 
+                    data={data.map(d => ({ timestamp: d.timestamp, value: d.z365 }))} 
+                    height={undefined}
+                    className="h-full"
+                    />
+                </div>
+                <div className="flex-1 min-h-0 p-2">
+                    <ZScoreChart 
+                    title="Z-Score VWAP 180" 
+                    data={data.map(d => ({ timestamp: d.timestamp, value: d.z180 }))} 
+                    height={undefined}
+                    className="h-full"
+                    />
+                </div>
+                <div className="flex-1 min-h-0 p-2">
+                    <ZScoreChart 
+                    title="Z-Score VWAP 90" 
+                    data={data.map(d => ({ timestamp: d.timestamp, value: d.z90 }))} 
+                    height={undefined}
+                    className="h-full"
+                    />
+                </div>
+                <div className="flex-1 min-h-0 p-2">
+                    <ZScoreChart 
+                    title="Z-Score VWAP 30" 
+                    data={data.map(d => ({ timestamp: d.timestamp, value: d.z30 }))} 
+                    height={undefined}
+                    className="h-full"
+                    />
+                </div>
              </div>
          )}
       </CardContent>

@@ -189,7 +189,7 @@ export const ZScoreChart: React.FC<ZScoreChartProps> = ({
 
   return (
     <div className={`flex flex-col ${className}`}>
-      <div className="flex justify-between items-center px-2 mb-1">
+      <div className="flex justify-between items-center px-2 mb-1 shrink-0">
         <span className="text-xs font-medium text-muted-foreground">{title}</span>
         {hoverData && (
           <div className="flex gap-2 text-xs font-mono">
@@ -204,8 +204,8 @@ export const ZScoreChart: React.FC<ZScoreChartProps> = ({
       </div>
       <div 
         ref={containerRef} 
-        className="w-full relative cursor-crosshair"
-        style={{ height }}
+        className="w-full relative cursor-crosshair flex-1 min-h-0"
+        style={height ? { height } : undefined}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
