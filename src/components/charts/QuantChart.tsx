@@ -57,10 +57,14 @@ export const QuantChart: React.FC<QuantChartProps> = ({
   const totalBarWidth = candleWidth + gap;
 
   // Calculate visible range and scales
-  const { visibleData, minPrice, maxPrice, priceRange, scaleY, startIndex } = useMemo(() => {
+  const { visibleData, minPrice, maxPrice, priceRange, scaleY, startIndex, hasBottomPanel, mainChartHeight, indicatorHeight } = useMemo(() => {
     if (!dimensions.width || data.length === 0) {
-      return { visibleData: [], minPrice: 0, maxPrice: 0, priceRange: 0, scaleY: 0, startIndex: 0 };
+      return { visibleData: [], minPrice: 0, maxPrice: 0, priceRange: 0, scaleY: 0, startIndex: 0, hasBottomPanel: false, mainChartHeight: 0, indicatorHeight: 0 };
     }
+
+    const hasBottomPanel = overlays.some(o => o.type === 'pulse');
+    const mainChartHeight = hasBottomPanel ? dimensions.height * 0.75 : dimensions.height;
+    const indicatorHeight = hasBottomPanel ? dimensions.height * 0.25 : 0;
 
     const maxVisibleBars = Math.floor((dimensions.width - padding.right) / totalBarWidth);
     // offset 0 means we see the last maxVisibleBars
@@ -76,9 +80,6 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     visibleData.forEach((d) => {
       min = Math.min(min, d.low);
       max = Math.max(max, d.high);
-      // Only include overlays in scale if they are NOT 'pulse' (MTM) or explicitly excluded
-      // RVWAP is price-based, so it should technically be on scale, but user asked for it NOT to change scale.
-      // So we ONLY use OHLC for min/max.
     });
 
     if (min === Infinity) { min = 0; max = 100; }
@@ -93,14 +94,18 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       minPrice: paddedMin,
       maxPrice: paddedMax,
       priceRange: paddedMax - paddedMin,
-      scaleY: (dimensions.height - padding.top - padding.bottom) / (paddedMax - paddedMin || 1),
+      scaleY: (mainChartHeight - padding.top - padding.bottom) / (paddedMax - paddedMin || 1),
       startIndex: start,
+      hasBottomPanel,
+      mainChartHeight,
+      indicatorHeight
     };
   }, [data, dimensions.width, dimensions.height, overlays, padding, offset, totalBarWidth]);
 
   // Helper to convert price to Y coordinate
   const getY = (price: number) => {
-    return dimensions.height - padding.bottom - (price - minPrice) * scaleY;
+    // Price is always in main chart
+    return mainChartHeight - padding.bottom - (price - minPrice) * scaleY;
   };
 
   // Helper to convert index to X coordinate
@@ -155,17 +160,57 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         const zoomSpeed = 0.001;
         const scrollSpeed = 0.5;
 
-        if (e.ctrlKey || e.metaKey) {
-            // Zoom
-            const newZoom = Math.max(0.1, Math.min(5, zoom - e.deltaY * zoomSpeed));
-            setZoom(newZoom);
-        } else {
-            // Scroll
-            // deltaY > 0 (scroll down) -> move forward (decrease offset)
-            // deltaY < 0 (scroll up) -> move back (increase offset)
-            const newOffset = Math.max(0, offset - (e.deltaY * scrollSpeed / totalBarWidth));
-            setOffset(newOffset);
-        }
+        // Zoom on Wheel (Standard behavior for modern charts)
+        // Calculate zoom center (mouse position)
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        
+        // Current state
+        const currentZoom = zoom;
+        const currentOffset = offset;
+        
+        // Calculate new zoom
+        // deltaY > 0 (scroll down) -> Zoom Out
+        // deltaY < 0 (scroll up) -> Zoom In
+        const zoomFactor = Math.exp(-e.deltaY * zoomSpeed);
+        const newZoom = Math.max(0.1, Math.min(20, currentZoom * zoomFactor));
+        
+        // Calculate new offset to keep mouseX pointing to same time
+        // X = (Index - StartIndex) * TotalWidth + TotalWidth/2
+        // We want Index at MouseX to remain constant
+        
+        // Current dimensions
+        const currentCandleWidth = Math.max(1, baseCandleWidth * currentZoom);
+        const currentGap = Math.max(0, currentCandleWidth * gapRatio);
+        const currentTotalWidth = currentCandleWidth + currentGap;
+        
+        const maxVisibleBars = Math.floor((dimensions.width - padding.right) / currentTotalWidth);
+        const currentEnd = data.length - Math.floor(currentOffset);
+        const currentStart = Math.max(0, currentEnd - maxVisibleBars);
+        
+        // Index under mouse
+        const barsFromLeft = (mouseX) / currentTotalWidth;
+        const indexAtMouse = currentStart + barsFromLeft;
+        
+        // New dimensions
+        const newCandleWidth = Math.max(1, baseCandleWidth * newZoom);
+        const newGap = Math.max(0, newCandleWidth * gapRatio);
+        const newTotalWidth = newCandleWidth + newGap;
+        
+        const newMaxVisibleBars = Math.floor((dimensions.width - padding.right) / newTotalWidth);
+        
+        // We want: newStart + (mouseX / newTotalWidth) = indexAtMouse
+        // newStart = indexAtMouse - (mouseX / newTotalWidth)
+        // newEnd = newStart + newMaxVisibleBars
+        // newOffset = data.length - newEnd
+        
+        const newStart = indexAtMouse - (mouseX / newTotalWidth);
+        const newEnd = newStart + newMaxVisibleBars;
+        const newOffset = Math.max(0, data.length - newEnd);
+        
+        setZoom(newZoom);
+        setOffset(newOffset);
     }
   };
 
@@ -196,10 +241,10 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)'; // Darker grid for light theme
       ctx.lineWidth = 1;
       
-      // Horizontal lines
+      // Horizontal lines (Main Chart)
       const gridSteps = 5;
       for (let i = 0; i <= gridSteps; i++) {
-        const y = padding.top + (i * (dimensions.height - padding.top - padding.bottom)) / gridSteps;
+        const y = padding.top + (i * (mainChartHeight - padding.top - padding.bottom)) / gridSteps;
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(dimensions.width - padding.right, y);
@@ -219,6 +264,16 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       ctx.lineTo(dimensions.width - padding.right, dimensions.height);
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
       ctx.stroke();
+
+      // Separator Line if split panel
+      if (hasBottomPanel) {
+          ctx.beginPath();
+          ctx.moveTo(0, mainChartHeight);
+          ctx.lineTo(dimensions.width, mainChartHeight);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+      }
     }
 
     // Draw Overlays (Lines)
@@ -236,7 +291,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         const y = getY(val);
         
         // Clip to chart area if RVWAP is way off scale
-        if (y < padding.top || y > dimensions.height - padding.bottom) {
+        if (y < padding.top || y > mainChartHeight - padding.bottom) {
             // We could break the line or clamp it. 
             // For now, let canvas handle clipping naturally via path, but maybe we should clip rect?
         }
@@ -290,14 +345,45 @@ export const QuantChart: React.FC<QuantChartProps> = ({
 
     // Draw Market Pulse (Pulse Type)
     overlays.filter(o => o.type === 'pulse').forEach(overlay => {
-      const pulseHeight = dimensions.height * 0.25; // Bottom 25%
-      const pulseBottom = dimensions.height - padding.bottom;
+      // Pulse Panel Dimensions
+      const panelTop = mainChartHeight;
+      const panelHeight = indicatorHeight;
+      const panelBottom = dimensions.height - padding.bottom; // Leave space for X-axis labels?
+      // Actually padding.bottom is global.
+      // Let's say panelBottom is dimensions.height - padding.bottom
+      // And panelTop is mainChartHeight + padding.top (small gap)
       
-      // Find max value for scaling (0-100 usually)
-      const maxVal = 100; 
+      // We need a local scale for Pulse (0-100)
+      const minVal = 0;
+      const maxVal = 100;
+      const pulseScaleY = (panelHeight - padding.bottom) / (maxVal - minVal);
+      
+      const getPulseY = (val: number) => {
+          return dimensions.height - padding.bottom - (val - minVal) * pulseScaleY;
+      };
+
+      // Draw Pulse Grid/Axis
+      if (showGrid) {
+          // 50 line
+          const y50 = getPulseY(50);
+          ctx.beginPath();
+          ctx.setLineDash([2, 2]);
+          ctx.moveTo(0, y50);
+          ctx.lineTo(dimensions.width - padding.right, y50);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Labels (0, 50, 100)
+          ctx.fillStyle = '#64748b';
+          ctx.textAlign = 'left';
+          ctx.fillText('100', dimensions.width - padding.right + 5, getPulseY(100) + 4);
+          ctx.fillText('50', dimensions.width - padding.right + 5, y50 + 4);
+          ctx.fillText('0', dimensions.width - padding.right + 5, getPulseY(0) + 4);
+      }
 
       // Create Gradient
-      const gradient = ctx.createLinearGradient(0, pulseBottom - pulseHeight, 0, pulseBottom);
+      const gradient = ctx.createLinearGradient(0, panelTop, 0, dimensions.height - padding.bottom);
       gradient.addColorStop(0, `${overlay.color}40`); // 25% opacity
       gradient.addColorStop(1, `${overlay.color}05`); // ~0% opacity
 
@@ -309,10 +395,10 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         if (typeof val !== 'number') return;
 
         const x = getX(i);
-        const y = pulseBottom - (val / maxVal) * pulseHeight;
+        const y = getPulseY(val);
         
         if (!started) {
-          ctx.moveTo(x, pulseBottom); // Start at bottom
+          ctx.moveTo(x, dimensions.height - padding.bottom); // Start at bottom
           ctx.lineTo(x, y);
           started = true;
         } else {
@@ -323,7 +409,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       // Close path for fill
       if (visibleData.length > 0) {
           const lastX = getX(visibleData.length - 1);
-          ctx.lineTo(lastX, pulseBottom);
+          ctx.lineTo(lastX, dimensions.height - padding.bottom);
           ctx.closePath();
           ctx.fillStyle = gradient;
           ctx.fill();
@@ -336,16 +422,12 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         const val = d[overlay.dataKey];
         if (typeof val !== 'number') return;
         const x = getX(i);
-        const y = pulseBottom - (val / maxVal) * pulseHeight;
-        
-        // Color change based on deviation (threshold)
-        // We can't easily change stroke color mid-path in 2D canvas without multiple paths.
-        // For simplicity, let's draw segments.
+        const y = getPulseY(val);
         
         if (started) {
              const prevX = getX(i-1);
              const prevVal = visibleData[i-1][overlay.dataKey];
-             const prevY = pulseBottom - (prevVal / maxVal) * pulseHeight;
+             const prevY = getPulseY(prevVal);
              
              ctx.beginPath();
              ctx.moveTo(prevX, prevY);
@@ -372,11 +454,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
           const lastVal = visibleData[lastIdx][overlay.dataKey];
           if (typeof lastVal === 'number') {
               const x = getX(lastIdx);
-              const y = pulseBottom - (lastVal / maxVal) * pulseHeight;
-              
-              // Pulse effect (simulated with static rings for now, or use time state for animation)
-              // Since we are in a useEffect that depends on data, we don't have a rAF loop.
-              // We can just draw a static "glow" to imply pulse.
+              const y = getPulseY(lastVal);
               
               ctx.beginPath();
               ctx.arc(x, y, 4, 0, Math.PI * 2);
