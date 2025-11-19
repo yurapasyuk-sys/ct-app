@@ -87,7 +87,7 @@ export const UnifiedChartPanel = () => {
              <QuantChart 
                 data={chartData} 
                 overlays={overlays} 
-                height={undefined} // Let it fill container
+                height="100%" // Let it fill container
                 className="h-full w-full"
              />
          )}

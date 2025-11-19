@@ -24,7 +24,7 @@ export interface Overlay {
 interface QuantChartProps {
   data: ChartDataPoint[];
   overlays?: Overlay[];
-  height?: number;
+  height?: number | string;
   className?: string;
   showGrid?: boolean;
   padding?: { top: number; bottom: number; right: number };
@@ -64,8 +64,8 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     }
 
     const hasBottomPanel = overlays.some(o => o.type === 'pulse' || o.type === 'oscillator');
-    const mainChartHeight = hasBottomPanel ? dimensions.height * 0.75 : dimensions.height;
-    const indicatorHeight = hasBottomPanel ? dimensions.height * 0.25 : 0;
+    const mainChartHeight = hasBottomPanel ? dimensions.height * 0.7 : dimensions.height;
+    const indicatorHeight = hasBottomPanel ? dimensions.height * 0.3 : 0;
 
     const maxVisibleBars = Math.floor((dimensions.width - padding.right) / totalBarWidth);
     // offset 0 means we see the last maxVisibleBars
