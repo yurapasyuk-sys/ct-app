@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import BonusPage from "./pages/BonusPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/bonus" element={<BonusPage />} />
             
             {/* Redirect old routes to new dashboard */}
             <Route path="/dashboard/mtm" element={<Navigate to="/dashboard" replace />} />

@@ -1,24 +1,25 @@
 import { SectionLayout } from "./ui/SectionLayout";
-import { Gift, ExternalLink } from "lucide-react";
+import { Gift, ExternalLink, GraduationCap, BarChart2, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const bonuses = [
   {
-    title: "Project Alpha",
-    description: "Exclusive trading benefits and fee discounts for early adopters.",
-    link: "#",
-    logo: null // Placeholder for logo
+    title: "Cryptomannn Academy",
+    description: "Comprehensive crypto trading education focusing on market structure and psychology.",
+    link: "/bonus#cryptomannn",
+    icon: GraduationCap
   },
   {
-    title: "Project Beta",
-    description: "Advanced analytics tools access and premium community features.",
-    link: "#",
-    logo: null
+    title: "Scope360",
+    description: "Advanced market intelligence and on-chain analytics platform.",
+    link: "/bonus#scope360",
+    icon: BarChart2
   },
   {
-    title: "Project Gamma",
-    description: "Institutional-grade data feeds and execution infrastructure.",
-    link: "#",
-    logo: null
+    title: "OKX",
+    description: "Leading exchange with exclusive fee discounts and mystery boxes for our community.",
+    link: "/bonus#okx",
+    icon: ShieldCheck
   }
 ];
 
@@ -27,11 +28,9 @@ export const Bonus = () => {
     <SectionLayout number="06" title="Bonus" className="bg-secondary/20">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {bonuses.map((bonus, idx) => (
-          <a
+          <Link
             key={idx}
-            href={bonus.link}
-            target="_blank"
-            rel="noopener noreferrer"
+            to={bonus.link}
             className="flex flex-col p-8 bg-card rounded-xl border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-lg group relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -39,8 +38,7 @@ export const Bonus = () => {
             </div>
 
             <div className="w-16 h-16 rounded-xl bg-secondary flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform duration-300 border border-border">
-              {/* Logo Placeholder */}
-              <Gift className="w-8 h-8" />
+              <bonus.icon className="w-8 h-8" />
             </div>
             
             <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center gap-2">
@@ -54,10 +52,10 @@ export const Bonus = () => {
 
             <div className="mt-auto">
               <span className="inline-flex items-center justify-center w-full py-2 rounded-lg bg-primary/10 text-primary font-medium text-sm group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-                Claim Bonus
+                View Details
               </span>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
     </SectionLayout>
