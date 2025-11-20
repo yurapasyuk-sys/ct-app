@@ -47,9 +47,9 @@ export const FeeComparisonChart = () => {
           <Slider
             value={tradeSize}
             onValueChange={setTradeSize}
-            min={1000}
-            max={50000}
-            step={1000}
+            min={10000}
+            max={1000000}
+            step={10000}
             className="w-full"
           />
           <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 text-center">
