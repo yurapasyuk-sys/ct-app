@@ -24,12 +24,12 @@ const partners = [
   {
     id: "scope360",
     name: "Scope360",
-    description: "Advanced market intelligence and on-chain analytics platform for serious traders.",
+    description: "Scope360 is an advanced trading journal and analytics platform designed for conscious traders who demand a clear view of their performance. It combines automatic trade import, deep statistics, and behavioral analytics to help you track progress and identify patterns.",
     details: [
-      "Real-time order flow visualization",
-      "Liquidity heatmaps",
-      "CEX/DEX arbitrage opportunities",
-      "Wallet tracking and alerts"
+      "Automatic trade import via API from exchanges",
+      "Real-time visualization of trading patterns",
+      "Deep analysis of strategies and mistakes",
+      "Discipline and emotional control tools"
     ],
     link: "#",
     icon: BarChart2,

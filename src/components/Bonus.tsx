@@ -11,7 +11,7 @@ const bonuses = [
   },
   {
     title: "Scope360",
-    description: "Advanced market intelligence and on-chain analytics platform.",
+    description: "Advanced trading journal and analytics platform with automatic trade import and behavioral analysis.",
     link: "/bonus#scope360",
     icon: BarChart2
   },
