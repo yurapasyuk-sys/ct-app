@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { ZScoreChart } from './ZScoreChart';
+import React, { useState, useMemo } from 'react';
 import { useVwapZScore } from '@/hooks/useVwapZScore';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Maximize2, X } from 'lucide-react';
-import { OhlcChart } from '@/components/ohlc/OhlcChart';
+import { Loader2, Maximize2 } from 'lucide-react';
+import { QuantChart, type Overlay } from '@/components/charts/QuantChart';
 import { cn } from '@/lib/utils';
 
 export const VwapZScorePanel = () => {
@@ -32,22 +31,31 @@ export const VwapZScorePanel = () => {
     return 'text-foreground';
   };
 
-  // Prepare OHLC data for the modal
-  const ohlcData = data.map(d => ({
-    openTime: d.timestamp,
-    open: d.open,
-    high: d.high,
-    low: d.low,
-    close: d.close,
-    volume: 0, // Volume not strictly needed for basic OHLC visualization if not used
-    closeTime: d.timestamp, // Approximation
-    quoteVolume: 0,
-    trades: 0,
-    takerBaseVolume: 0,
-    takerQuoteVolume: 0,
-    takerBuyBaseVolume: 0,
-    takerBuyQuoteVolume: 0
-  }));
+  // Prepare combined data for QuantChart
+  const chartData = useMemo(() => {
+    return data.map(d => ({
+      timestamp: d.timestamp,
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+      z365: d.z365,
+      z180: d.z180,
+      z90: d.z90,
+      z30: d.z30,
+    }));
+  }, [data]);
+
+  const overlays = useMemo<Overlay[]>(() => {
+    if (!selectedPeriod) return [];
+    return [{
+      id: `Z-Score ${selectedPeriod}`,
+      type: 'z-score',
+      dataKey: `z${selectedPeriod}`,
+      color: '#94a3b8', // Base color, overridden by z-score logic
+      domain: [-4, 4]
+    }];
+  }, [selectedPeriod]);
 
   return (
     <>
@@ -92,32 +100,16 @@ export const VwapZScorePanel = () => {
               <span className="text-muted-foreground">|</span>
               <span>{periods.find(p => p.id === selectedPeriod)?.label} Analysis</span>
             </DialogTitle>
-            {/* Close button is handled by Dialog primitive usually, but we can add custom actions if needed */}
           </DialogHeader>
           
-          <div className="flex-1 overflow-hidden flex flex-col p-4 gap-4">
-            {/* Top: OHLC Chart */}
-            <div className="flex-1 min-h-0 border border-border/20 rounded-lg overflow-hidden bg-card/30">
-               <OhlcChart 
-                 klines={ohlcData} 
-                 height={undefined} 
-                 className="h-full w-full"
+          <div className="flex-1 overflow-hidden p-4 bg-card/30">
+            <div className="w-full h-full border border-border/20 rounded-lg overflow-hidden">
+               <QuantChart 
+                 data={chartData} 
+                 overlays={overlays}
+                 height="100%" 
+                 className="w-full h-full"
                />
-            </div>
-
-            {/* Bottom: Selected VWAP Z-Score */}
-            <div className="h-[30%] min-h-[200px] border border-border/20 rounded-lg overflow-hidden bg-card/30 p-2">
-              {selectedPeriod && (
-                <ZScoreChart 
-                  title={`Z-Score VWAP ${selectedPeriod}`}
-                  data={data.map(d => ({ 
-                    timestamp: d.timestamp, 
-                    value: d[`z${selectedPeriod}` as keyof typeof d] as number 
-                  }))}
-                  height={undefined}
-                  className="h-full w-full"
-                />
-              )}
             </div>
           </div>
         </DialogContent>

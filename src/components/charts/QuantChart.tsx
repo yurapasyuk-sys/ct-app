@@ -12,7 +12,7 @@ export interface ChartDataPoint {
 
 export interface Overlay {
   id: string;
-  type: 'line' | 'histogram' | 'area' | 'pulse' | 'oscillator';
+  type: 'line' | 'histogram' | 'area' | 'pulse' | 'oscillator' | 'z-score';
   dataKey: string;
   color: string;
   width?: number;
@@ -63,7 +63,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       return { visibleData: [], minPrice: 0, maxPrice: 0, priceRange: 0, scaleY: 0, startIndex: 0, hasBottomPanel: false, mainChartHeight: 0, indicatorHeight: 0 };
     }
 
-    const hasBottomPanel = overlays.some(o => o.type === 'pulse' || o.type === 'oscillator');
+    const hasBottomPanel = overlays.some(o => o.type === 'pulse' || o.type === 'oscillator' || o.type === 'z-score');
     const mainChartHeight = hasBottomPanel ? dimensions.height * 0.7 : dimensions.height;
     const indicatorHeight = hasBottomPanel ? dimensions.height * 0.3 : 0;
 
@@ -543,7 +543,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     });
 
     // Draw Oscillator (Z-Score etc)
-    overlays.filter(o => o.type === 'oscillator').forEach(overlay => {
+    overlays.filter(o => o.type === 'oscillator' || o.type === 'z-score').forEach(overlay => {
       const panelTop = mainChartHeight;
       const panelHeight = indicatorHeight;
       const panelBottom = dimensions.height - padding.bottom;
@@ -586,26 +586,58 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       }
 
       // Draw Line
-      ctx.beginPath();
-      ctx.strokeStyle = overlay.color;
       ctx.lineWidth = overlay.width || 2;
       
-      let started = false;
-      visibleData.forEach((d, i) => {
-        const val = d[overlay.dataKey];
-        if (typeof val !== 'number') return;
-        
-        const x = getX(i + xShift);
-        const y = getOscY(val);
-        
-        if (!started) {
-          ctx.moveTo(x, y);
-          started = true;
-        } else {
-          ctx.lineTo(x, y);
+      if (overlay.type === 'z-score') {
+        // Multi-colored segments for Z-Score
+        for (let i = 0; i < visibleData.length - 1; i++) {
+            const d1 = visibleData[i];
+            const d2 = visibleData[i+1];
+            const val1 = d1[overlay.dataKey];
+            const val2 = d2[overlay.dataKey];
+            
+            if (typeof val1 !== 'number' || typeof val2 !== 'number') continue;
+            
+            const x1 = getX(i + xShift);
+            const y1 = getOscY(val1);
+            const x2 = getX(i + 1 + xShift);
+            const y2 = getOscY(val2);
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            
+            // Color Logic
+            let color = '#94a3b8'; // Neutral
+            if (val1 < -2) color = '#0891b2'; // Cyan-600
+            else if (val1 > 2) color = '#e11d48'; // Rose-600
+            else if (val1 < -0.5) color = '#22d3ee'; // Cyan-400
+            else if (val1 > 0.5) color = '#fb7185'; // Rose-400
+            
+            ctx.strokeStyle = color;
+            ctx.stroke();
         }
-      });
-      ctx.stroke();
+      } else {
+        // Standard Oscillator
+        ctx.beginPath();
+        ctx.strokeStyle = overlay.color;
+        let started = false;
+        visibleData.forEach((d, i) => {
+            const val = d[overlay.dataKey];
+            if (typeof val !== 'number') return;
+            
+            const x = getX(i + xShift);
+            const y = getOscY(val);
+            
+            if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+            } else {
+            ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+      }
     });
 
   }, [dimensions, visibleData, minPrice, maxPrice, overlays, showGrid]);
