@@ -2,9 +2,32 @@ import React, { useState, useMemo } from 'react';
 import { useVwapZScore } from '@/hooks/useVwapZScore';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Maximize2 } from 'lucide-react';
+import { Loader2, Maximize2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { QuantChart, type Overlay } from '@/components/charts/QuantChart';
 import { cn } from '@/lib/utils';
+
+const Sparkline = ({ data, color }: { data: number[], color: string }) => {
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const width = 100;
+  const height = 40;
+  
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((d - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="w-full h-10 opacity-50">
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible">
+        <polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+};
 
 export const VwapZScorePanel = () => {
   const [symbol] = useState('BTCUSDT');
@@ -25,10 +48,18 @@ export const VwapZScorePanel = () => {
     return data[data.length - 1][key];
   };
 
-  const getValueColor = (value: number) => {
-    if (value > 2) return 'text-red-500';
-    if (value < -2) return 'text-green-500';
-    return 'text-foreground';
+  const getSparklineData = (key: 'z365' | 'z180' | 'z90' | 'z30') => {
+    if (!data || data.length === 0) return [];
+    // Get last 30 points
+    return data.slice(-30).map(d => d[key] as number);
+  };
+
+  const getStatus = (value: number) => {
+    if (value > 2) return { label: 'Overbought', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: TrendingUp };
+    if (value < -2) return { label: 'Oversold', color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20', icon: TrendingDown };
+    if (value > 1) return { label: 'Elevated', color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-400/20', icon: TrendingUp };
+    if (value < -1) return { label: 'Depressed', color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20', icon: TrendingDown };
+    return { label: 'Neutral', color: 'text-muted-foreground', bg: 'bg-secondary/50', border: 'border-border/40', icon: Minus };
   };
 
   // Prepare combined data for QuantChart
@@ -62,30 +93,54 @@ export const VwapZScorePanel = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-full">
         {periods.map((period) => {
           const value = getLastValue(period.dataKey);
+          const sparkData = getSparklineData(period.dataKey);
+          const status = getStatus(value);
+          const StatusIcon = status.icon;
+
           return (
             <Card 
               key={period.id}
-              className="relative group cursor-pointer hover:bg-secondary/50 transition-colors border-border/40 bg-card/50 backdrop-blur-sm flex flex-col items-center justify-center p-4"
+              className={cn(
+                "relative group cursor-pointer transition-all duration-300 flex flex-col justify-between overflow-hidden",
+                "hover:shadow-lg hover:-translate-y-1",
+                status.bg,
+                status.border,
+                "border bg-opacity-30 backdrop-blur-sm"
+              )}
               onClick={() => setSelectedPeriod(period.id)}
             >
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Maximize2 className="w-4 h-4 text-muted-foreground" />
               </div>
               
-              <div className="text-sm font-medium text-muted-foreground mb-2">
-                {period.label}
+              <div className="p-4 pb-0 z-10">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  {period.label}
+                </div>
+                
+                {isLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-primary mt-2" />
+                ) : (
+                  <div className="flex items-baseline gap-2">
+                    <span className={cn("text-3xl font-bold font-mono tracking-tight", status.color)}>
+                      {value > 0 ? '+' : ''}{value.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-mono">σ</span>
+                  </div>
+                )}
+                
+                <div className={cn("flex items-center gap-1.5 mt-2 text-xs font-medium px-2 py-1 rounded-full w-fit", status.bg, status.color)}>
+                    <StatusIcon className="w-3 h-3" />
+                    {status.label}
+                </div>
               </div>
               
-              {isLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              ) : (
-                <div className={cn("text-2xl font-bold font-mono", getValueColor(value))}>
-                  {value.toFixed(2)}
-                </div>
-              )}
-              
-              <div className="text-xs text-muted-foreground mt-1">
-                Z-Score Deviation
+              <div className="w-full h-16 mt-2 px-0 relative">
+                 {/* Gradient Fade for Sparkline */}
+                 <div className={cn("absolute inset-0 bg-gradient-to-t from-background/10 to-transparent z-0")} />
+                 <div className="px-4">
+                    <Sparkline data={sparkData} color={value > 0 ? '#fb7185' : '#22d3ee'} />
+                 </div>
               </div>
             </Card>
           );
