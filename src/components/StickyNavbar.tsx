@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { id: 'philosophy', label: 'Philosophy', href: '#philosophy' },
   { id: 'experience', label: 'Experience', href: '#experience' },
   { id: 'models', label: 'Models', href: '#models' },
+  { id: 'bonus', label: 'Bonus', href: '#bonus' },
   { id: 'connect', label: 'Connect', href: '#connect' },
 ];
 

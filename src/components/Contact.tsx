@@ -24,7 +24,7 @@ const contacts = [
 
 export const Contact = () => {
   return (
-    <SectionLayout number="06" title="Connect" className="bg-secondary/20">
+    <SectionLayout number="07" title="Connect" className="bg-secondary/20">
       <div className="mb-12 text-lg text-muted-foreground max-w-2xl">
         For research questions, collaborations, or consulting inquiries.
       </div>

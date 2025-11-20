@@ -4,6 +4,7 @@ import { Experience } from "@/components/Experience";
 import { Ideas } from "@/components/Ideas";
 import { Models } from "@/components/Models";
 import { ToolsOverview } from "@/components/ToolsOverview";
+import { Bonus } from "@/components/Bonus";
 import { Contact } from "@/components/Contact";
 import { StickyNavbar } from "@/components/StickyNavbar";
 import { Suspense, lazy } from "react";
@@ -39,6 +40,10 @@ const Index = () => {
 
         <div id="tools">
           <ToolsOverview />
+        </div>
+
+        <div id="bonus">
+          <Bonus />
         </div>
         
         <div id="connect">
