@@ -362,15 +362,12 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       // Pulse Panel Dimensions
       const panelTop = mainChartHeight;
       const panelHeight = indicatorHeight;
-      const panelBottom = dimensions.height - padding.bottom; // Leave space for X-axis labels?
-      // Actually padding.bottom is global.
-      // Let's say panelBottom is dimensions.height - padding.bottom
-      // And panelTop is mainChartHeight + padding.top (small gap)
+      const pulsePaddingTop = 15; // Micro offset to prevent hitting the ceiling
       
       // We need a local scale for Pulse (0-100)
       const minVal = 0;
       const maxVal = 100;
-      const pulseScaleY = (panelHeight - padding.bottom) / (maxVal - minVal);
+      const pulseScaleY = (panelHeight - padding.bottom - pulsePaddingTop) / (maxVal - minVal);
       
       const getPulseY = (val: number) => {
           return dimensions.height - padding.bottom - (val - minVal) * pulseScaleY;

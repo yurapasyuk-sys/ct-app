@@ -60,11 +60,15 @@ export const ZScoreChart: React.FC<ZScoreChartProps> = ({
   };
 
   const getSegmentColor = (val: number) => {
-    if (val < -2) return '#22c55e'; // Green (Risk On)
-    if (val > 2) return '#ef4444'; // Red (Risk Off)
-    if (val >= -0.5 && val <= 0.5) return '#94a3b8'; // Slate (Neutral)
-    if (val < -0.5) return '#3b82f6'; // Blue (Bullish)
-    return '#f97316'; // Orange (Bearish)
+    // Bloomberg 2025 Palette Match
+    // Low Z-Score (Undervalued) -> Cyan (Matches Pulse Low Tension)
+    // High Z-Score (Overvalued) -> Rose (Matches Pulse High Tension)
+    
+    if (val < -2) return '#0891b2'; // Cyan-600 (Extreme Undervalued)
+    if (val > 2) return '#e11d48'; // Rose-600 (Extreme Overvalued)
+    if (val >= -0.5 && val <= 0.5) return '#94a3b8'; // Slate-400 (Neutral)
+    if (val < -0.5) return '#22d3ee'; // Cyan-400 (Undervalued)
+    return '#fb7185'; // Rose-400 (Overvalued)
   };
 
   // Draw Loop
@@ -86,12 +90,12 @@ export const ZScoreChart: React.FC<ZScoreChartProps> = ({
     const yMinus2 = getY(-2);
     const y0 = getY(0);
 
-    // Red Zone (> 2)
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.05)';
+    // Red/Rose Zone (> 2)
+    ctx.fillStyle = 'rgba(225, 29, 72, 0.05)'; // Rose-600 low opacity
     ctx.fillRect(0, 0, dimensions.width, y2);
 
-    // Green Zone (< -2)
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.05)';
+    // Green/Cyan Zone (< -2)
+    ctx.fillStyle = 'rgba(8, 145, 178, 0.05)'; // Cyan-600 low opacity
     ctx.fillRect(0, yMinus2, dimensions.width, dimensions.height - yMinus2);
 
     // 2. Draw Grid Lines
@@ -111,14 +115,14 @@ export const ZScoreChart: React.FC<ZScoreChartProps> = ({
     ctx.beginPath();
     ctx.moveTo(0, y2);
     ctx.lineTo(dimensions.width, y2);
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+    ctx.strokeStyle = 'rgba(225, 29, 72, 0.3)'; // Rose-600
     ctx.stroke();
 
     // -2
     ctx.beginPath();
     ctx.moveTo(0, yMinus2);
     ctx.lineTo(dimensions.width, yMinus2);
-    ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
+    ctx.strokeStyle = 'rgba(8, 145, 178, 0.3)'; // Cyan-600
     ctx.stroke();
     
     ctx.setLineDash([]);
