@@ -74,3 +74,23 @@ Should return JSON with VPIN data.
 ---
 
 **Note:** `.env.local` is for local development only. Production uses Vercel environment variables.
+
+## 🔐 **Supabase Authentication Setup**
+
+To enable Google Login, add these variables to Vercel:
+
+#### **Variable 3:**
+```
+Name:  VITE_SUPABASE_URL
+Value: https://ahydalhnwemdiesxsnpz.supabase.co
+Environment: Production, Preview, Development
+```
+
+#### **Variable 4:**
+```
+Name:  VITE_SUPABASE_ANON_KEY
+Value: [YOUR_SUPABASE_ANON_KEY]
+Environment: Production, Preview, Development
+```
+
+> **Note:** Get the `VITE_SUPABASE_ANON_KEY` from your Supabase Project Settings > API.
