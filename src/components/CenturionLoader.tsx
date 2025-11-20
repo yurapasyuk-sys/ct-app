@@ -55,36 +55,58 @@ export const CenturionLoader = ({ onComplete }: { onComplete: () => void }) => {
 
        {/* Helmet Container */}
        <div className="mb-8 relative w-32 h-32">
-         {/* Front View - Strict/Aggressive Spartan Style */}
+         {/* Front View - High Detail Aggressive */}
          <div className={`absolute inset-0 transition-all duration-500 transform ${showProfile ? 'opacity-0 scale-90 rotate-y-90' : 'opacity-100 scale-100 rotate-y-0'}`} style={{ backfaceVisibility: 'hidden' }}>
-           <svg viewBox="0 0 16 16" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
-             {/* Crest */}
-             <rect x="7" y="1" width="2" height="1" className="fill-foreground" />
-             <rect x="6" y="2" width="4" height="1" className="fill-foreground" />
-             <rect x="5" y="3" width="6" height="1" className="fill-foreground" />
+           <svg viewBox="0 0 24 24" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
+             {/* Crest (Red/Accent usually, but using foreground for strict theme) */}
+             <rect x="11" y="2" width="2" height="2" className="fill-foreground/90" />
+             <rect x="10" y="3" width="4" height="1" className="fill-foreground/90" />
+             <rect x="9" y="4" width="6" height="1" className="fill-foreground/80" />
              
-             {/* Helmet Main Shape */}
-             <path d="M4 4h8v9h-1v2h-1v-2h-4v2h-1v-2h-1v-9z" className="fill-foreground" />
+             {/* Helmet Dome */}
+             <rect x="7" y="5" width="10" height="1" className="fill-foreground" />
+             <rect x="6" y="6" width="12" height="2" className="fill-foreground" />
+             <rect x="5" y="8" width="14" height="1" className="fill-foreground" />
              
-             {/* Eye Slit - T-Shape Visor */}
-             <rect x="5" y="7" width="6" height="1" className="fill-background" />
-             <rect x="7" y="7" width="2" height="5" className="fill-background" />
+             {/* Cheek Guards & Jaw */}
+             <rect x="5" y="9" width="3" height="8" className="fill-foreground" />
+             <rect x="16" y="9" width="3" height="8" className="fill-foreground" />
+             <rect x="6" y="17" width="2" height="1" className="fill-foreground" />
+             <rect x="16" y="17" width="2" height="1" className="fill-foreground" />
+             
+             {/* Nose Guard (Aggressive T-Shape) */}
+             <rect x="11" y="9" width="2" height="5" className="fill-foreground" />
+             <rect x="10" y="8" width="4" height="1" className="fill-foreground" />
+             
+             {/* Shading/Detail */}
+             <rect x="6" y="6" width="1" height="2" className="fill-background/20" />
+             <rect x="17" y="6" width="1" height="2" className="fill-background/20" />
+             <rect x="11" y="10" width="2" height="3" className="fill-background/10" />
            </svg>
          </div>
 
-         {/* Side View - Profile */}
+         {/* Side View - High Detail Profile */}
          <div className={`absolute inset-0 transition-all duration-500 transform ${showProfile ? 'opacity-100 scale-100 rotate-y-0' : 'opacity-0 scale-90 -rotate-y-90'}`} style={{ backfaceVisibility: 'hidden' }}>
-           <svg viewBox="0 0 16 16" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
-             {/* Crest Profile */}
-             <rect x="3" y="1" width="8" height="1" className="fill-foreground" />
-             <rect x="2" y="2" width="10" height="1" className="fill-foreground" />
-             <rect x="2" y="3" width="11" height="1" className="fill-foreground" />
+           <svg viewBox="0 0 24 24" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
+             {/* Crest Profile (Flowing back) */}
+             <rect x="4" y="2" width="10" height="1" className="fill-foreground/90" />
+             <rect x="3" y="3" width="12" height="1" className="fill-foreground/90" />
+             <rect x="3" y="4" width="13" height="1" className="fill-foreground/80" />
+             <rect x="15" y="5" width="2" height="1" className="fill-foreground/80" />
              
-             {/* Helmet Profile */}
-             <path d="M4 4h7v3h1v5h-1v2h-7z" className="fill-foreground" />
+             {/* Helmet Dome Profile */}
+             <rect x="5" y="5" width="10" height="1" className="fill-foreground" />
+             <rect x="4" y="6" width="12" height="2" className="fill-foreground" />
+             <rect x="4" y="8" width="12" height="1" className="fill-foreground" />
              
-             {/* Eye Slit Profile */}
-             <rect x="8" y="7" width="4" height="1" className="fill-background" />
+             {/* Face Guard Profile */}
+             <rect x="4" y="9" width="4" height="8" className="fill-foreground" /> {/* Back of head */}
+             <rect x="12" y="9" width="4" height="2" className="fill-foreground" /> {/* Brow */}
+             <rect x="13" y="11" width="3" height="6" className="fill-foreground" /> {/* Cheek guard */}
+             <rect x="12" y="16" width="4" height="1" className="fill-foreground" /> {/* Jaw line */}
+             
+             {/* Eye Slit Detail */}
+             <rect x="8" y="9" width="4" height="1" className="fill-background/10" />
            </svg>
          </div>
        </div>
