@@ -54,59 +54,75 @@ export const CenturionLoader = ({ onComplete }: { onComplete: () => void }) => {
        </div>
 
        {/* Helmet Container */}
-       <div className="mb-8 relative w-32 h-32">
+       <div className="mb-8 relative w-40 h-40">
          {/* Front View - High Detail Aggressive */}
          <div className={`absolute inset-0 transition-all duration-500 transform ${showProfile ? 'opacity-0 scale-90 rotate-y-90' : 'opacity-100 scale-100 rotate-y-0'}`} style={{ backfaceVisibility: 'hidden' }}>
-           <svg viewBox="0 0 24 24" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
-             {/* Crest (Red/Accent usually, but using foreground for strict theme) */}
-             <rect x="11" y="2" width="2" height="2" className="fill-foreground/90" />
-             <rect x="10" y="3" width="4" height="1" className="fill-foreground/90" />
-             <rect x="9" y="4" width="6" height="1" className="fill-foreground/80" />
+           <svg viewBox="0 0 32 32" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
+             {/* Crest */}
+             <rect x="15" y="2" width="2" height="2" className="fill-foreground/90" />
+             <rect x="14" y="3" width="4" height="1" className="fill-foreground/90" />
+             <rect x="13" y="4" width="6" height="1" className="fill-foreground/80" />
              
              {/* Helmet Dome */}
-             <rect x="7" y="5" width="10" height="1" className="fill-foreground" />
-             <rect x="6" y="6" width="12" height="2" className="fill-foreground" />
-             <rect x="5" y="8" width="14" height="1" className="fill-foreground" />
+             <rect x="10" y="5" width="12" height="1" className="fill-foreground" />
+             <rect x="9" y="6" width="14" height="2" className="fill-foreground" />
+             <rect x="8" y="8" width="16" height="1" className="fill-foreground" />
              
              {/* Cheek Guards & Jaw */}
-             <rect x="5" y="9" width="3" height="8" className="fill-foreground" />
-             <rect x="16" y="9" width="3" height="8" className="fill-foreground" />
-             <rect x="6" y="17" width="2" height="1" className="fill-foreground" />
-             <rect x="16" y="17" width="2" height="1" className="fill-foreground" />
+             <rect x="8" y="9" width="4" height="10" className="fill-foreground" />
+             <rect x="20" y="9" width="4" height="10" className="fill-foreground" />
+             <rect x="9" y="19" width="3" height="1" className="fill-foreground" />
+             <rect x="20" y="19" width="3" height="1" className="fill-foreground" />
              
              {/* Nose Guard (Aggressive T-Shape) */}
-             <rect x="11" y="9" width="2" height="5" className="fill-foreground" />
-             <rect x="10" y="8" width="4" height="1" className="fill-foreground" />
+             <rect x="15" y="9" width="2" height="6" className="fill-foreground" />
+             <rect x="14" y="8" width="4" height="1" className="fill-foreground" />
+             
+             {/* Eyes (Darkness) */}
+             <rect x="12" y="10" width="3" height="1" className="fill-background/80" />
+             <rect x="17" y="10" width="3" height="1" className="fill-background/80" />
              
              {/* Shading/Detail */}
-             <rect x="6" y="6" width="1" height="2" className="fill-background/20" />
-             <rect x="17" y="6" width="1" height="2" className="fill-background/20" />
-             <rect x="11" y="10" width="2" height="3" className="fill-background/10" />
+             <rect x="9" y="6" width="1" height="2" className="fill-background/20" />
+             <rect x="22" y="6" width="1" height="2" className="fill-background/20" />
+             <rect x="15" y="10" width="2" height="4" className="fill-background/10" />
            </svg>
          </div>
 
-         {/* Side View - High Detail Profile */}
+         {/* Side View - Amex Centurion Style Profile */}
          <div className={`absolute inset-0 transition-all duration-500 transform ${showProfile ? 'opacity-100 scale-100 rotate-y-0' : 'opacity-0 scale-90 -rotate-y-90'}`} style={{ backfaceVisibility: 'hidden' }}>
-           <svg viewBox="0 0 24 24" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
-             {/* Crest Profile (Flowing back) */}
-             <rect x="4" y="2" width="10" height="1" className="fill-foreground/90" />
-             <rect x="3" y="3" width="12" height="1" className="fill-foreground/90" />
-             <rect x="3" y="4" width="13" height="1" className="fill-foreground/80" />
-             <rect x="15" y="5" width="2" height="1" className="fill-foreground/80" />
+           <svg viewBox="0 0 32 32" className="w-full h-full" style={{ imageRendering: 'pixelated' }}>
+             {/* Circular Border Hint */}
+             <path d="M16 1a15 15 0 1 0 15 15A15 15 0 0 0 16 1zm0 1a14 14 0 1 1-14 14A14 14 0 0 1 16 2z" className="fill-foreground/10" />
+
+             {/* Plume (The iconic fan shape) */}
+             <rect x="8" y="4" width="10" height="1" className="fill-foreground/90" />
+             <rect x="6" y="5" width="14" height="1" className="fill-foreground/90" />
+             <rect x="5" y="6" width="16" height="1" className="fill-foreground/90" />
+             <rect x="4" y="7" width="4" height="12" className="fill-foreground/80" /> {/* Back tail */}
              
-             {/* Helmet Dome Profile */}
-             <rect x="5" y="5" width="10" height="1" className="fill-foreground" />
-             <rect x="4" y="6" width="12" height="2" className="fill-foreground" />
-             <rect x="4" y="8" width="12" height="1" className="fill-foreground" />
+             {/* Helmet Cap */}
+             <rect x="8" y="7" width="12" height="1" className="fill-foreground" />
+             <rect x="8" y="8" width="13" height="4" className="fill-foreground" />
              
-             {/* Face Guard Profile */}
-             <rect x="4" y="9" width="4" height="8" className="fill-foreground" /> {/* Back of head */}
-             <rect x="12" y="9" width="4" height="2" className="fill-foreground" /> {/* Brow */}
-             <rect x="13" y="11" width="3" height="6" className="fill-foreground" /> {/* Cheek guard */}
-             <rect x="12" y="16" width="4" height="1" className="fill-foreground" /> {/* Jaw line */}
+             {/* Visor/Brim */}
+             <rect x="18" y="8" width="5" height="1" className="fill-foreground" />
+             <rect x="21" y="9" width="2" height="1" className="fill-foreground" />
              
-             {/* Eye Slit Detail */}
-             <rect x="8" y="9" width="4" height="1" className="fill-background/10" />
+             {/* Face Profile */}
+             <rect x="20" y="12" width="2" height="1" className="fill-foreground" /> {/* Brow */}
+             <rect x="20" y="13" width="1" height="2" className="fill-foreground" /> {/* Nose bridge */}
+             <rect x="21" y="15" width="2" height="1" className="fill-foreground" /> {/* Nose tip */}
+             <rect x="20" y="17" width="2" height="1" className="fill-foreground" /> {/* Mouth/Chin */}
+             <rect x="19" y="18" width="3" height="1" className="fill-foreground" /> {/* Jaw */}
+             <rect x="15" y="18" width="4" height="1" className="fill-foreground" /> {/* Jawline back */}
+             
+             {/* Neck */}
+             <rect x="13" y="19" width="6" height="5" className="fill-foreground" />
+             
+             {/* Tunic/Shoulder */}
+             <rect x="8" y="24" width="14" height="4" className="fill-foreground" />
+             <rect x="9" y="25" width="12" height="1" className="fill-background/20" /> {/* Tunic detail */}
            </svg>
          </div>
        </div>
