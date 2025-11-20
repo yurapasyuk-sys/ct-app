@@ -3,6 +3,7 @@ import { SectionLayout } from "@/components/ui/SectionLayout";
 import { ExternalLink, ShieldCheck, GraduationCap, BarChart2 } from "lucide-react";
 import { Suspense, lazy, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { FeeComparisonChart } from "@/components/charts/FeeComparisonChart";
 
 const PixelBackground = lazy(() => import("@/components/PixelBackground"));
 
@@ -118,6 +119,12 @@ const BonusPage = () => {
                         </div>
                       ))}
                     </div>
+
+                    {partner.id === 'okx' && (
+                      <div className="mb-8">
+                        <FeeComparisonChart />
+                      </div>
+                    )}
 
                     <a 
                       href={partner.link}
