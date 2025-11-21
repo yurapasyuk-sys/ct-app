@@ -13,7 +13,7 @@ const PixelBackground = lazy(() => import("@/components/PixelBackground"));
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background relative selection:bg-primary/20 selection:text-primary">
+    <div className="force-light min-h-screen bg-background relative selection:bg-primary/20 selection:text-primary">
       <div className="fixed inset-0 z-0 pointer-events-none">
         <Suspense fallback={null}>
           <PixelBackground />
