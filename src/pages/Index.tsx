@@ -7,11 +7,16 @@ import { ToolsOverview } from "@/components/ToolsOverview";
 import { Bonus } from "@/components/Bonus";
 import { Contact } from "@/components/Contact";
 import { StickyNavbar } from "@/components/StickyNavbar";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 
 const PixelBackground = lazy(() => import("@/components/PixelBackground"));
 
 const Index = () => {
+  useEffect(() => {
+    // Reset dashboard intro flag when visiting the landing page
+    sessionStorage.removeItem('dashboard_intro_shown');
+  }, []);
+
   return (
     <div className="force-light min-h-screen bg-background relative selection:bg-primary/20 selection:text-primary">
       <div className="fixed inset-0 z-0 pointer-events-none">

@@ -5,11 +5,18 @@ import { CenturionLoader } from '@/components/CenturionLoader';
 import { useState } from 'react';
 
 const Dashboard = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    return !sessionStorage.getItem('dashboard_intro_shown');
+  });
+
+  const handleLoaderComplete = () => {
+    sessionStorage.setItem('dashboard_intro_shown', 'true');
+    setIsLoading(false);
+  };
 
   return (
     <>
-      {isLoading && <CenturionLoader onComplete={() => setIsLoading(false)} />}
+      {isLoading && <CenturionLoader onComplete={handleLoaderComplete} />}
       <div className={`flex flex-col h-full w-full overflow-hidden ${isLoading ? 'hidden' : ''}`}>
         {/* Header */}
         <header className="h-14 border-b border-border/40 bg-background/95 backdrop-blur flex items-center px-6 justify-between shrink-0">
