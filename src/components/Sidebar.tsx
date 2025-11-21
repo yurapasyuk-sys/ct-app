@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export const Sidebar = () => {
-  const { user, signInWithGoogle, signOut } = useAuth();
+  const { user, profile, signInWithGoogle, signOut } = useAuth();
 
   return (
     <div className="h-screen w-64 bg-card border-r border-border flex flex-col p-4">
@@ -14,7 +14,13 @@ export const Sidebar = () => {
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground font-mono mt-1 tracking-widest">TERMINAL</p>
           {user && (
-            <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-mono border border-primary/20">PRO</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+              profile?.tier === 'ultra' 
+                ? 'bg-purple-500/20 text-purple-400 border-purple-500/20' 
+                : 'bg-primary/20 text-primary border-primary/20'
+            }`}>
+              {profile?.tier === 'ultra' ? 'ULTRA' : 'PRO'}
+            </span>
           )}
         </div>
       </div>
@@ -45,12 +51,14 @@ export const Sidebar = () => {
         {user ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3 px-2">
-              <Avatar className="h-8 w-8 border border-border">
+              <Avatar className={`h-8 w-8 border ${profile?.tier === 'ultra' ? 'border-purple-500/50' : 'border-border'}`}>
                 <AvatarImage src={user.user_metadata.avatar_url} />
                 <AvatarFallback><User size={14} /></AvatarFallback>
               </Avatar>
               <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-medium truncate">{user.user_metadata.full_name || 'User'}</span>
+                <span className="text-xs font-medium truncate flex items-center gap-1">
+                  {user.user_metadata.full_name || 'User'}
+                </span>
                 <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
               </div>
             </div>
