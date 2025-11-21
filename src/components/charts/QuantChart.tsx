@@ -330,13 +330,12 @@ export const QuantChart: React.FC<QuantChartProps> = ({
 
       const isUp = d.close >= d.open;
       
-      // Bloomberg 2025 Colors
-      // Up: Body #b1b2b7, Border #212223, Wick #212223
-      // Down: Body #68696d, Border #212223, Wick #212223
+      // Terminal Colors (Dark Mode Optimized)
+      // Up: Emerald-400, Down: Rose-400
       
-      const bodyColor = isUp ? '#b1b2b7' : '#68696d';
-      const borderColor = '#212223';
-      const wickColor = '#212223';
+      const bodyColor = isUp ? '#34d399' : '#f87171';
+      const borderColor = isUp ? '#34d399' : '#f87171';
+      const wickColor = isUp ? '#34d399' : '#f87171';
 
       ctx.fillStyle = bodyColor;
       ctx.strokeStyle = borderColor; // Border color
@@ -353,8 +352,9 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       const bodyHeight = Math.max(1, Math.abs(closeY - openY));
       const bodyY = Math.min(openY, closeY);
       
+      // Fill for both (Solid candles)
       ctx.fillRect(x - candleWidth / 2, bodyY, candleWidth, bodyHeight);
-      ctx.strokeRect(x - candleWidth / 2, bodyY, candleWidth, bodyHeight);
+      // ctx.strokeRect(x - candleWidth / 2, bodyY, candleWidth, bodyHeight); // Optional border
     });
 
     // Draw Market Pulse (Pulse Type)
@@ -608,11 +608,11 @@ export const QuantChart: React.FC<QuantChartProps> = ({
             ctx.lineTo(x2, y2);
             
             // Color Logic
-            let color = '#94a3b8'; // Neutral
-            if (val1 < -2) color = '#0891b2'; // Cyan-600
-            else if (val1 > 2) color = '#e11d48'; // Rose-600
-            else if (val1 < -0.5) color = '#22d3ee'; // Cyan-400
-            else if (val1 > 0.5) color = '#fb7185'; // Rose-400
+            let color = '#cbd5e1'; // Slate-300
+            if (val1 < -2) color = '#22d3ee'; // Cyan-400
+            else if (val1 > 2) color = '#fb7185'; // Rose-400
+            else if (val1 < -0.5) color = '#67e8f9'; // Cyan-300
+            else if (val1 > 0.5) color = '#fda4af'; // Rose-300
             
             ctx.strokeStyle = color;
             ctx.stroke();
