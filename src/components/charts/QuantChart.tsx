@@ -19,6 +19,7 @@ export interface Overlay {
   opacity?: number;
   threshold?: number; // For histogram coloring
   domain?: [number, number]; // Custom domain for oscillator/panel
+  yAxisId?: string; // 'left' | 'right' or custom id
 }
 
 interface QuantChartProps {
@@ -27,7 +28,7 @@ interface QuantChartProps {
   height?: number | string;
   className?: string;
   showGrid?: boolean;
-  padding?: { top: number; bottom: number; right: number };
+  padding?: { top: number; bottom: number; right: number; left?: number };
   chartType?: 'candle' | 'line' | 'area';
   panelRatio?: number;
 }
@@ -38,7 +39,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
   height = 400,
   className = '',
   showGrid = true,
-  padding = { top: 20, bottom: 30, right: 60 },
+  padding = { top: 20, bottom: 30, right: 60, left: 0 },
   chartType = 'candle',
   panelRatio = 0.3,
 }) => {
@@ -62,9 +63,9 @@ export const QuantChart: React.FC<QuantChartProps> = ({
   const totalBarWidth = candleWidth + gap;
 
   // Calculate visible range and scales
-  const { visibleData, minPrice, maxPrice, priceRange, scaleY, startIndex, hasBottomPanel, mainChartHeight, indicatorHeight } = useMemo(() => {
+  const { visibleData, minPrice, maxPrice, priceRange, scaleY, startIndex, hasBottomPanel, mainChartHeight, indicatorHeight, extraScales } = useMemo(() => {
     if (!dimensions.width || data.length === 0) {
-      return { visibleData: [], minPrice: 0, maxPrice: 0, priceRange: 0, scaleY: 0, startIndex: 0, hasBottomPanel: false, mainChartHeight: 0, indicatorHeight: 0 };
+      return { visibleData: [], minPrice: 0, maxPrice: 0, priceRange: 0, scaleY: 0, startIndex: 0, hasBottomPanel: false, mainChartHeight: 0, indicatorHeight: 0, extraScales: {} };
     }
 
     const hasBottomPanel = overlays.some(o => o.type === 'pulse' || o.type === 'oscillator' || o.type === 'z-score');
@@ -72,7 +73,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     const mainChartHeight = hasBottomPanel ? dimensions.height * (1 - ratio) : dimensions.height;
     const indicatorHeight = hasBottomPanel ? dimensions.height * ratio : 0;
 
-    const maxVisibleBars = Math.floor((dimensions.width - padding.right) / totalBarWidth);
+    const maxVisibleBars = Math.floor((dimensions.width - (padding.right + (padding.left || 0))) / totalBarWidth);
     // offset 0 means we see the last maxVisibleBars
     // offset > 0 means we shift back
     const end = data.length - Math.floor(offset);
@@ -98,6 +99,41 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     const paddedMin = min - range * 0.05;
     const paddedMax = max + range * 0.05;
 
+    // Calculate extra scales for overlays with yAxisId
+    const extraScales: Record<string, { min: number, max: number, scale: number }> = {};
+    const axisIds = Array.from(new Set(overlays.map(o => o.yAxisId).filter(Boolean)));
+
+    axisIds.forEach(axisId => {
+        let axisMin = Infinity;
+        let axisMax = -Infinity;
+        
+        // Find all overlays using this axis
+        const axisOverlays = overlays.filter(o => o.yAxisId === axisId);
+        
+        visibleData.forEach(d => {
+            axisOverlays.forEach(o => {
+                const val = d[o.dataKey];
+                if (typeof val === 'number') {
+                    axisMin = Math.min(axisMin, val);
+                    axisMax = Math.max(axisMax, val);
+                }
+            });
+        });
+
+        if (axisMin === Infinity) { axisMin = 0; axisMax = 100; }
+        
+        const axisRange = axisMax - axisMin;
+        const pMin = axisMin - axisRange * 0.05;
+        const pMax = axisMax + axisRange * 0.05;
+        const pRange = pMax - pMin;
+        
+        extraScales[axisId!] = {
+            min: pMin,
+            max: pMax,
+            scale: (mainChartHeight - padding.top - padding.bottom) / (pRange || 1)
+        };
+    });
+
     return {
       visibleData,
       minPrice: paddedMin,
@@ -107,19 +143,24 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       startIndex: start,
       hasBottomPanel,
       mainChartHeight,
-      indicatorHeight
+      indicatorHeight,
+      extraScales
     };
   }, [data, dimensions.width, dimensions.height, overlays, padding, offset, totalBarWidth]);
 
   // Helper to convert price to Y coordinate
-  const getY = (price: number) => {
+  const getY = (price: number, axisId?: string) => {
+    if (axisId && extraScales[axisId]) {
+        const { min, scale } = extraScales[axisId];
+        return mainChartHeight - padding.bottom - (price - min) * scale;
+    }
     // Price is always in main chart
     return mainChartHeight - padding.bottom - (price - minPrice) * scaleY;
   };
 
   // Helper to convert index to X coordinate
   const getX = (index: number) => {
-    return index * totalBarWidth + totalBarWidth / 2;
+    return (padding.left || 0) + index * totalBarWidth + totalBarWidth / 2;
   };
 
   // Event Handlers
@@ -284,6 +325,35 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.stroke();
 
+      // Draw Extra Scales on Left
+      const extraAxisIds = Object.keys(extraScales);
+      extraAxisIds.forEach((axisId, idx) => {
+          const { min, max } = extraScales[axisId];
+          const axisX = (padding.left || 60) - (idx * 50); // Stagger axes if multiple
+          
+          // Draw Axis Line
+          ctx.beginPath();
+          ctx.moveTo(axisX, padding.top);
+          ctx.lineTo(axisX, mainChartHeight - padding.bottom);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+          ctx.stroke();
+
+          // Draw Labels
+          const steps = 5;
+          for (let i = 0; i <= steps; i++) {
+              const y = padding.top + (i * (mainChartHeight - padding.top - padding.bottom)) / steps;
+              const price = max - (i * (max - min)) / steps;
+              
+              // Find color of overlay using this axis
+              const overlay = overlays.find(o => o.yAxisId === axisId);
+              ctx.fillStyle = overlay?.color || '#94a3b8';
+              
+              ctx.font = '10px "Inter", sans-serif';
+              ctx.textAlign = 'right';
+              ctx.fillText(price.toFixed(2), axisX - 5, y + 4);
+          }
+      });
+
       // Separator Line if split panel
       if (hasBottomPanel) {
           ctx.beginPath();
@@ -307,7 +377,7 @@ export const QuantChart: React.FC<QuantChartProps> = ({
         if (typeof val !== 'number') return;
         
         const x = getX(i + xShift);
-        const y = getY(val);
+        const y = getY(val, overlay.yAxisId);
         
         // Clip to chart area if RVWAP is way off scale
         if (y < padding.top || y > mainChartHeight - padding.bottom) {

@@ -90,6 +90,10 @@ const calculateCorrelation = (klinesA: any[], klinesB: any[], period: number = 2
   return correlations;
 };
 
+import { Checkbox } from '@/components/ui/checkbox';
+
+// ...existing code...
+
 export const CrossPairAnalyzer = () => {
   const [symbolA, setSymbolA] = useState('BTCUSDT');
   const [symbolB, setSymbolB] = useState('ETHUSDT');
@@ -98,6 +102,7 @@ export const CrossPairAnalyzer = () => {
   const [loadingSymbols, setLoadingSymbols] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [showRawPrices, setShowRawPrices] = useState(false);
   const [openA, setOpenA] = useState(false);
   const [openB, setOpenB] = useState(false);
 
@@ -197,7 +202,9 @@ export const CrossPairAnalyzer = () => {
           low,
           close,
           rawRatio: kA.close / kB.close,
-          correlation: correlations[i]
+          correlation: correlations[i],
+          priceA: kA.close,
+          priceB: kB.close
         });
       });
 
@@ -309,6 +316,17 @@ export const CrossPairAnalyzer = () => {
         </Button>
       </div>
 
+      <div className="flex items-center space-x-2">
+        <Checkbox 
+          id="show-raw" 
+          checked={showRawPrices} 
+          onCheckedChange={(checked) => setShowRawPrices(checked as boolean)} 
+        />
+        <Label htmlFor="show-raw" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Show Raw Prices (Left Axis)
+        </Label>
+      </div>
+
       <Alert className="bg-secondary/20 border-primary/20">
         <AlertCircle className="h-4 w-4 text-primary" />
         <AlertDescription className="text-xs text-muted-foreground">
@@ -331,6 +349,7 @@ export const CrossPairAnalyzer = () => {
               className="w-full h-full"
               chartType="area"
               panelRatio={0.5}
+              padding={{ top: 20, bottom: 30, right: 60, left: showRawPrices ? 100 : 0 }}
               overlays={[
                 {
                   id: 'correlation',
@@ -339,7 +358,25 @@ export const CrossPairAnalyzer = () => {
                   color: '#fbbf24', // Amber
                   domain: [-1, 1],
                   width: 2
-                }
+                },
+                ...(showRawPrices ? [
+                  {
+                    id: 'priceA',
+                    type: 'line' as const,
+                    dataKey: 'priceA',
+                    color: '#22d3ee', // Cyan
+                    width: 1,
+                    yAxisId: 'left-A'
+                  },
+                  {
+                    id: 'priceB',
+                    type: 'line' as const,
+                    dataKey: 'priceB',
+                    color: '#f472b6', // Pink
+                    width: 1,
+                    yAxisId: 'left-B'
+                  }
+                ] : [])
               ]}
             />
           ) : (
