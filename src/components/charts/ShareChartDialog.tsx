@@ -128,49 +128,42 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, t
 
         <div className="flex flex-col items-center gap-6 py-4">
           {/* The Card Preview Area */}
-          <div className="relative bg-black p-8 rounded-lg border border-zinc-800 shadow-2xl max-w-full overflow-hidden" ref={cardRef}>
-            {/* Card Header */}
-            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 bg-green-500/10 rounded flex items-center justify-center border border-green-500/20">
-                  <Terminal className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <h3 className="font-mono font-bold text-zinc-100 tracking-wider">CENTURION</h3>
-                  <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Terminal Access</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-zinc-400 font-mono">OPERATOR</p>
-                <p className="text-sm font-mono text-green-500">{user?.email?.split('@')[0] || 'ANONYMOUS'}</p>
-              </div>
-            </div>
-
+          <div className="relative bg-black p-4 border-2 border-zinc-800 max-w-full overflow-hidden" ref={cardRef}>
             {/* Chart Image */}
-            <div className="relative bg-zinc-900/50 rounded border border-zinc-800/50 overflow-hidden min-h-[300px] min-w-[600px] flex items-center justify-center">
+            <div className="relative border-2 border-zinc-800 bg-black overflow-hidden mb-4 min-h-[400px] min-w-[800px] flex items-center justify-center">
               {isCapturing ? (
                 <div className="text-zinc-500 font-mono animate-pulse">Acquiring Signal...</div>
               ) : previewUrl ? (
-                <img src={previewUrl} alt="Chart Analysis" className="w-full h-auto object-contain" />
+                <img src={previewUrl} alt="Chart Analysis" className="w-full h-auto object-contain block" />
               ) : (
                 <div className="text-red-500 font-mono">Signal Lost</div>
               )}
             </div>
 
             {/* Card Footer */}
-            <div className="mt-6 flex justify-between items-end">
-              <div>
-                <h2 className="text-xl font-bold text-zinc-100 font-mono mb-1">{title}</h2>
-                <p className="text-xs text-zinc-500 font-mono">{new Date().toUTCString()}</p>
+            <div className="flex justify-between items-end font-mono text-zinc-300">
+              {/* Left Side */}
+              <div className="flex flex-col">
+                <h1 className="text-3xl font-bold tracking-tighter leading-none mb-1 text-white">
+                  Centurion <span className="font-normal text-zinc-500">terminal</span>
+                </h1>
+                <p className="text-xs text-zinc-600">available at borkiss.trade</p>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                 <div className="flex gap-2">
-                    {tags.map((tag) => (
-                      <span key={tag} className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-400 font-mono">
-                        {tag}
-                      </span>
-                    ))}
-                 </div>
+
+              {/* Right Side */}
+              <div className="flex flex-col items-end">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-zinc-600">user</span>
+                  <span className="text-lg font-bold text-white">{user?.email?.split('@')[0] || 'Anonymous'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                   <div className="w-4 h-4 bg-zinc-800 rounded-sm flex items-center justify-center">
+                      <div className="w-2 h-2 bg-zinc-600 rounded-full" />
+                   </div>
+                   <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider">
+                      {user?.user_metadata?.tier || 'PRO'}
+                   </span>
+                </div>
               </div>
             </div>
           </div>
