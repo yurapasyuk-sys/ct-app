@@ -14,12 +14,15 @@ interface ShareChartDialogProps {
 }
 
 export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, title, trigger, tags = ['QUANT'] }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const isUltra = profile?.tier === 'ultra';
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous';
 
   const generatePreview = async () => {
     if (!targetRef.current) return;
@@ -159,11 +162,11 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, t
                   <span className="text-[10px] text-zinc-600 uppercase tracking-wider">user</span>
                   <span className={cn(
                     "text-lg font-bold",
-                    user?.user_metadata?.tier === 'ultra' 
+                    isUltra 
                       ? "text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500" 
                       : "text-white"
                   )}>
-                    {user?.email?.split('@')[0] || 'Anonymous'}
+                    {displayName}
                   </span>
                 </div>
                 
@@ -171,11 +174,11 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, t
                   <div className="flex items-center gap-2">
                      <span className={cn(
                         "text-xs font-bold tracking-widest uppercase px-1.5 py-0.5 rounded",
-                        user?.user_metadata?.tier === 'ultra' 
+                        isUltra 
                           ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-yellow-500 border border-yellow-500/30" 
                           : "bg-zinc-800 text-zinc-400 border border-zinc-700"
                      )}>
-                        {user?.user_metadata?.tier === 'ultra' ? 'ULTRA' : 'PRO'}
+                        {isUltra ? 'ULTRA' : 'PRO'}
                      </span>
                   </div>
                 )}
