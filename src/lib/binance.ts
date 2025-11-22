@@ -27,6 +27,13 @@ export interface FetchKlinesParams {
   dataSource?: DataSource;
 }
 
+export interface BinanceSymbol {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  status: string;
+}
+
 interface RetryConfig {
   maxRetries: number;
   baseDelay: number;
@@ -187,6 +194,109 @@ function getIntervalMs(interval: string): number {
   if (unit === 'd') return value * 24 * 60 * 60 * 1000;
   if (unit === 'w') return value * 7 * 24 * 60 * 60 * 1000;
   return 0;
+}
+
+/**
+ * Fetch list of all symbols from Binance Futures
+ */
+export async function fetchFuturesSymbols(signal?: AbortSignal): Promise<BinanceSymbol[]> {
+  const baseUrl = getBaseUrl('futures');
+  const url = `${baseUrl}/exchangeInfo`;
+
+  try {
+    const response = await fetch(url, { signal });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch exchange info: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.symbols || !Array.isArray(data.symbols)) {
+      throw new Error('Invalid exchange info response');
+    }
+
+    // Filter only TRADING symbols
+    return data.symbols
+      .filter((s: any) => s.status === 'TRADING' && s.contractType === 'PERPETUAL')
+      .map((s: any) => ({
+        symbol: s.symbol,
+        baseAsset: s.baseAsset,
+        quoteAsset: s.quoteAsset,
+        status: s.status,
+      }));
+  } catch (error) {
+    console.error('[fetchFuturesSymbols] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all available klines for a symbol from its listing date
+ */
+export async function fetchAllKlines(
+  params: FetchKlinesParams,
+  signal?: AbortSignal
+): Promise<Kline[]> {
+  const { symbol, interval, dataSource = 'futures' } = params;
+  
+  // Start from a very early date (Binance Futures launched in 2019)
+  const earlyStartTime = new Date('2019-01-01').getTime();
+  const now = Date.now();
+  const intervalMs = getIntervalMs(interval);
+  const batchSize = 1000;
+  
+  console.log(`[fetchAllKlines] Fetching complete history for ${symbol}`);
+
+  const allKlines: Kline[] = [];
+  let currentEndTime = now;
+  let iterations = 0;
+  const maxIterations = 500; // Safety limit
+
+  while (iterations < maxIterations) {
+    const batch = await fetchKlines(
+      {
+        symbol,
+        interval,
+        endTime: currentEndTime,
+        limit: batchSize,
+        dataSource,
+      },
+      signal
+    );
+
+    if (batch.length === 0) {
+      break; // No more data
+    }
+
+    // Prepend to maintain chronological order
+    allKlines.unshift(...batch);
+
+    // Move endTime to the oldest candle we just fetched
+    const oldestTime = batch[0].openTime;
+    
+    if (oldestTime <= earlyStartTime) {
+      break; // Reached the beginning
+    }
+
+    // Set next endTime to 1ms before the oldest candle
+    currentEndTime = oldestTime - 1;
+    iterations++;
+
+    // Small delay to avoid rate limits
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  // Remove duplicates based on openTime
+  const seenTimestamps = new Set<number>();
+  const uniqueKlines = allKlines.filter(k => {
+    if (seenTimestamps.has(k.openTime)) return false;
+    seenTimestamps.add(k.openTime);
+    return true;
+  });
+
+  console.log(`[fetchAllKlines] Fetched ${uniqueKlines.length} candles for ${symbol}`);
+  return uniqueKlines.sort((a, b) => a.openTime - b.openTime);
 }
 
 /**
