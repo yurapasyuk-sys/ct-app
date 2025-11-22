@@ -2,9 +2,12 @@ import { UnifiedChartPanel } from '@/components/charts/UnifiedChartPanel';
 import { MarketPulseAlerts } from '@/components/MarketPulseAlerts';
 import { VwapZScorePanel } from '@/components/charts/VwapZScorePanel';
 import { CenturionLoader } from '@/components/CenturionLoader';
+import MobileDashboard from '@/components/MobileDashboard';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useState } from 'react';
 
 const Dashboard = () => {
+  const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(() => {
     return !sessionStorage.getItem('dashboard_intro_shown');
   });
@@ -13,6 +16,10 @@ const Dashboard = () => {
     sessionStorage.setItem('dashboard_intro_shown', 'true');
     setIsLoading(false);
   };
+
+  if (isMobile) {
+    return <MobileDashboard />;
+  }
 
   return (
     <>

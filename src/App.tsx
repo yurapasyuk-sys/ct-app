@@ -13,10 +13,17 @@ import NotFound from "./pages/NotFound";
 import Macro from "./pages/Macro";
 import Labs from "./pages/Labs";
 import { Sidebar } from "./components/Sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const queryClient = new QueryClient();
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return <main className="h-screen w-full bg-background overflow-hidden">{children}</main>;
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
