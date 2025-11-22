@@ -67,44 +67,74 @@
   }
 
   .dark {
-    /* Dark Theme - Centurion Terminal */
-    --background: 0 0% 3%;
-    --foreground: 0 0% 98%;
+    /* Dark Theme - Centurion Terminal (Singularity v6) */
+    /* UI Foundation */
+    --background: 240 10% 3.9%; /* #09090b */
+    --foreground: 240 5% 90%;   /* #e4e4e7 */
 
-    --card: 0 0% 3%;
-    --card-foreground: 0 0% 98%;
+    --card: 240 5.9% 10%;       /* #18181b */
+    --card-foreground: 240 5% 90%;
 
-    --popover: 0 0% 3%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 5.9% 10%;
+    --popover-foreground: 240 5% 90%;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
+    --primary: 240 5% 90%;
+    --primary-foreground: 240 5.9% 10%;
 
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%; /* #27272a */
+    --secondary-foreground: 240 5% 90%;
 
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 3.8% 65%; /* #a1a1aa */
 
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 240 5% 90%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%; /* #ef4444 */
+    --destructive-foreground: 240 5% 90%;
 
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 240 3.7% 15.9%; /* #27272a */
+    --input: 240 3.7% 15.9%;
+    --ring: 240 3.8% 65%;
 
     /* Sidebar Dark */
-    --sidebar-background: 0 0% 3%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 240 3.8% 65%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 240 5% 90%;
     --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5% 90%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217 91% 60%;
+
+    /* --- Custom Palette (Singularity v6) --- */
+    
+    /* Sentiment */
+    --color-bull: 158 82% 39%; /* #10b981 */
+    --color-bear: 0 84% 60%;   /* #ef4444 */
+    --color-neutral: 215 16% 47%; /* #64748b */
+
+    /* Data Series */
+    --chart-1: 217 91% 60%; /* #3b82f6 Blue */
+    --chart-2: 262 83% 66%; /* #8b5cf6 Purple */
+    --chart-3: 38 92% 50%;  /* #f59e0b Amber */
+    --chart-4: 189 94% 43%; /* #06b6d4 Cyan */
+    --chart-5: 330 81% 60%; /* #ec4899 Pink */
+    --chart-6: 173 80% 40%; /* #14b8a6 Teal */
+
+    /* Market Pulse */
+    --pulse-cold: 189 82% 31%;    /* #0e7490 */
+    --pulse-neutral: 262 83% 66%; /* #8b5cf6 */
+    --pulse-hot: 343 88% 60%;     /* #f43f5e */
+
+    /* VWAP Z-Score */
+    --z-cheap: 160 100% 45%;     /* #00e396 */
+    --z-fair: 215 14% 34%;       /* #4b5563 */
+    --z-expensive: 16 100% 50%;  /* #ff4500 */
+
+    /* Tiers */
+    --tier-pro: 215 19% 65%;     /* #94a3b8 */
+    --tier-ultra: 51 100% 50%;   /* #ffd700 */
   }
 
   .force-light {

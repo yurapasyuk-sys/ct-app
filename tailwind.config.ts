@@ -57,6 +57,40 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Custom Palette (Singularity v6)
+        bull: "hsl(var(--color-bull))",
+        bear: "hsl(var(--color-bear))",
+        neutral: "hsl(var(--color-neutral))",
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
+          6: "hsl(var(--chart-6))",
+        },
+        pulse: {
+          cold: "hsl(var(--pulse-cold))",
+          neutral: "hsl(var(--pulse-neutral))",
+          hot: "hsl(var(--pulse-hot))",
+        },
+        z: {
+          cheap: "hsl(var(--z-cheap))",
+          fair: "hsl(var(--z-fair))",
+          expensive: "hsl(var(--z-expensive))",
+        },
+        tier: {
+          pro: "hsl(var(--tier-pro))",
+          ultra: "hsl(var(--tier-ultra))",
+        },
+      },
+      boxShadow: {
+        'glow-bull': '0 0 10px rgba(16, 185, 129, 0.4)',
+        'glow-bear': '0 0 10px rgba(239, 68, 68, 0.4)',
+        'glow-pulse-extreme': '0 0 20px rgba(244, 63, 94, 0.6)',
+        'glow-z-cheap': '0 0 15px rgba(0, 227, 150, 0.5)',
+        'glow-z-expensive': '0 0 15px rgba(255, 69, 0, 0.5)',
+        'glow-ultra': '0 0 25px rgba(255, 215, 0, 0.3)',
       },
       borderRadius: {
         lg: "var(--radius)",
