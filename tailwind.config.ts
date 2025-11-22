@@ -70,9 +70,9 @@ export default {
           6: "hsl(var(--chart-6))",
         },
         pulse: {
-          cold: "hsl(var(--pulse-cold))",
-          neutral: "hsl(var(--pulse-neutral))",
-          hot: "hsl(var(--pulse-hot))",
+          cold: "hsl(var(--pulse-0-cold))",
+          neutral: "hsl(var(--pulse-50-neutral))",
+          hot: "hsl(var(--pulse-100-hot))",
         },
         z: {
           cheap: "hsl(var(--z-cheap))",
@@ -85,12 +85,12 @@ export default {
         },
       },
       boxShadow: {
-        'glow-bull': '0 0 10px rgba(16, 185, 129, 0.4)',
-        'glow-bear': '0 0 10px rgba(239, 68, 68, 0.4)',
-        'glow-pulse-extreme': '0 0 20px rgba(244, 63, 94, 0.6)',
-        'glow-z-cheap': '0 0 15px rgba(0, 227, 150, 0.5)',
-        'glow-z-expensive': '0 0 15px rgba(255, 69, 0, 0.5)',
-        'glow-ultra': '0 0 25px rgba(255, 215, 0, 0.3)',
+        'glow-bull': 'var(--fx-glow-bull)',
+        'glow-bear': 'var(--fx-glow-bear)',
+        'glow-pulse-extreme': 'var(--fx-glow-pulse-extreme)',
+        'glow-z-cheap': 'var(--fx-glow-z-cheap)',
+        'glow-z-expensive': 'var(--fx-glow-z-expensive)',
+        'glow-ultra': 'var(--fx-glow-ultra)',
       },
       borderRadius: {
         lg: "var(--radius)",
