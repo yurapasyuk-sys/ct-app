@@ -48,6 +48,48 @@ const calculateGARCH = (klines: any[]) => {
   });
 };
 
+// Helper to calculate rolling correlation of log returns
+const calculateCorrelation = (klinesA: any[], klinesB: any[], period: number = 20) => {
+  // Calculate log returns first
+  const returnsA = [];
+  const returnsB = [];
+  
+  for (let i = 1; i < klinesA.length; i++) {
+    returnsA.push(Math.log(klinesA[i].close / klinesA[i-1].close));
+    returnsB.push(Math.log(klinesB[i].close / klinesB[i-1].close));
+  }
+
+  const correlations = new Array(klinesA.length).fill(0);
+
+  // We need at least 'period' returns to calculate correlation
+  // returns array is 1 shorter than klines
+  for (let i = period; i < returnsA.length; i++) {
+    const sliceA = returnsA.slice(i - period, i);
+    const sliceB = returnsB.slice(i - period, i);
+
+    const meanA = sliceA.reduce((a, b) => a + b, 0) / period;
+    const meanB = sliceB.reduce((a, b) => a + b, 0) / period;
+
+    let num = 0;
+    let denA = 0;
+    let denB = 0;
+
+    for (let j = 0; j < period; j++) {
+      const diffA = sliceA[j] - meanA;
+      const diffB = sliceB[j] - meanB;
+      num += diffA * diffB;
+      denA += diffA * diffA;
+      denB += diffB * diffB;
+    }
+
+    const correlation = num / Math.sqrt(denA * denB);
+    // Map to the corresponding kline index (i + 1 because returns are shifted)
+    correlations[i + 1] = isNaN(correlation) ? 0 : correlation;
+  }
+
+  return correlations;
+};
+
 export const CrossPairAnalyzer = () => {
   const [symbolA, setSymbolA] = useState('BTCUSDT');
   const [symbolB, setSymbolB] = useState('ETHUSDT');
@@ -105,15 +147,22 @@ export const CrossPairAnalyzer = () => {
         return;
       }
 
-      // Calculate GARCH sigmas
+      // Calculate GARCH sigmas on full history to preserve volatility memory
       const sigmaA = calculateGARCH(klinesA);
       const sigmaB = calculateGARCH(klinesB);
       const sigmaA_map = new Map(klinesA.map((k, i) => [k.openTime, sigmaA[i]]));
       const sigmaB_map = new Map(klinesB.map((k, i) => [k.openTime, sigmaB[i]]));
 
+      // Create aligned arrays for correlation calculation
+      const alignedA = commonTimestamps.map(t => mapA.get(t)!);
+      const alignedB = commonTimestamps.map(t => mapB.get(t)!);
+      
+      // Calculate Correlation on aligned data
+      const correlations = calculateCorrelation(alignedA, alignedB, 20);
+
       const combined: ChartDataPoint[] = [];
 
-      commonTimestamps.forEach(timestamp => {
+      commonTimestamps.forEach((timestamp, i) => {
         const kA = mapA.get(timestamp)!;
         const kB = mapB.get(timestamp)!;
         const sA = sigmaA_map.get(timestamp) || 0.01;
@@ -123,15 +172,23 @@ export const CrossPairAnalyzer = () => {
         const volA = kA.close * sA;
         const volB = kB.close * sB;
 
-        if (volA === 0 || volB === 0 || kB.close === 0) return;
-
-        const adjPriceA = kA.close / volA;
-        const adjPriceB = kB.close / volB;
+        if (volA === 0 || volB === 0 || kB.close === 0 || kB.open === 0 || kB.high === 0 || kB.low === 0) return;
 
         const open = (kA.open / volA) / (kB.open / volB);
         const close = (kA.close / volA) / (kB.close / volB);
-        const high = (kA.high / volA) / (kB.low / volB);
-        const low = (kA.low / volA) / (kB.high / volB);
+        
+        // Fix for "crooked" wicks:
+        // Instead of worst-case (High/Low), we assume positive correlation for crypto pairs.
+        // We calculate tentative high/low based on High/High and Low/Low ratios.
+        const rawHigh = (kA.high / volA) / (kB.high / volB);
+        const rawLow = (kA.low / volA) / (kB.low / volB);
+
+        // Ensure High/Low encompass the Open/Close (basic candle validity)
+        const vals = [open, close, rawHigh, rawLow].filter(v => !isNaN(v) && isFinite(v));
+        if (vals.length < 2) return;
+
+        const high = Math.max(...vals);
+        const low = Math.min(...vals);
 
         combined.push({
           timestamp,
@@ -139,7 +196,8 @@ export const CrossPairAnalyzer = () => {
           high,
           low,
           close,
-          rawRatio: kA.close / kB.close
+          rawRatio: kA.close / kB.close,
+          correlation: correlations[i]
         });
       });
 
@@ -271,7 +329,16 @@ export const CrossPairAnalyzer = () => {
               data={chartData} 
               height="100%" 
               className="w-full h-full"
-              overlays={[]}
+              overlays={[
+                {
+                  id: 'correlation',
+                  type: 'oscillator',
+                  dataKey: 'correlation',
+                  color: '#fbbf24', // Amber
+                  domain: [-1, 1],
+                  width: 2
+                }
+              ]}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
