@@ -343,6 +343,7 @@ export const CrossPairAnalyzer = () => {
           <ShareChartDialog 
             targetRef={chartRef} 
             title={`${symbolA}/${symbolB} Analysis`} 
+            tags={['GARCH(1,1)', 'QUANT']}
           />
         </CardHeader>
         <CardContent className="p-0 h-[calc(100%-3.5rem)]">

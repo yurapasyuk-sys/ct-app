@@ -10,9 +10,10 @@ interface ShareChartDialogProps {
   targetRef: React.RefObject<HTMLElement>;
   title: string;
   trigger?: React.ReactNode;
+  tags?: string[];
 }
 
-export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, title, trigger }) => {
+export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, title, trigger, tags = ['QUANT'] }) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -154,8 +155,11 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, t
               </div>
               <div className="flex flex-col items-end gap-1">
                  <div className="flex gap-2">
-                    <span className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-400 font-mono">GARCH(1,1)</span>
-                    <span className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-400 font-mono">QUANT</span>
+                    {tags.map((tag) => (
+                      <span key={tag} className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-400 font-mono">
+                        {tag}
+                      </span>
+                    ))}
                  </div>
               </div>
             </div>
