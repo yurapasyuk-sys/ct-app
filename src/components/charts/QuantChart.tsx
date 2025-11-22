@@ -788,12 +788,12 @@ export const QuantChart: React.FC<QuantChartProps> = ({
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             
-            // Toxic/Terminal Logic
+            // Singularity v6 Logic
             let color = '#a1a1aa'; // Zinc-400 (Neutral)
-            if (val1 < -2) color = '#00FFFF'; // Neon Cyan
-            else if (val1 > 2) color = '#FF00FF'; // Neon Magenta
-            else if (val1 < -0.5) color = '#00BFFF'; // Deep Sky Blue
-            else if (val1 > 0.5) color = '#FF1493'; // Deep Pink
+            if (val1 < -2) color = '#10b981'; // Emerald-500 (Cheap/Buy)
+            else if (val1 > 2) color = '#ef4444'; // Red-500 (Expensive/Sell)
+            else if (val1 < -0.5) color = '#2dd4bf'; // Teal-400 (Mild Cheap)
+            else if (val1 > 0.5) color = '#f43f5e'; // Rose-500 (Mild Expensive)
             
             ctx.strokeStyle = color;
             ctx.stroke();
