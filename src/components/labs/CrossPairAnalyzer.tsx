@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { computeGarchVolatility } from '@/lib/garch';
 
 // Helper to calculate ATR
 const calculateATR = (klines: any[], period: number = 14) => {
@@ -105,19 +106,24 @@ export const CrossPairAnalyzer = () => {
         return;
       }
 
-      // Calculate ATRs for full datasets
-      const atrA = calculateATR(klinesA);
-      const atrB = calculateATR(klinesB);
-      const atrA_map = new Map(klinesA.map((k, i) => [k.openTime, atrA[i]]));
-      const atrB_map = new Map(klinesB.map((k, i) => [k.openTime, atrB[i]]));
+      // Calculate volatility using GARCH(1,1) on full price series
+      const pricesA = klinesA.map(k => k.close);
+      const pricesB = klinesB.map(k => k.close);
+
+      // Use coarse fit to adapt parameters per asset
+      const sigmaA_full = computeGarchVolatility(pricesA, { fit: true });
+      const sigmaB_full = computeGarchVolatility(pricesB, { fit: true });
+
+      const sigmaA_map = new Map(klinesA.map((k, i) => [k.openTime, sigmaA_full[i] || 1e-8]));
+      const sigmaB_map = new Map(klinesB.map((k, i) => [k.openTime, sigmaB_full[i] || 1e-8]));
 
       const combined: ChartDataPoint[] = [];
 
       commonTimestamps.forEach(timestamp => {
         const kA = mapA.get(timestamp)!;
         const kB = mapB.get(timestamp)!;
-        const volA = atrA_map.get(timestamp) || 1;
-        const volB = atrB_map.get(timestamp) || 1;
+        const volA = sigmaA_map.get(timestamp) || 1e-8;
+        const volB = sigmaB_map.get(timestamp) || 1e-8;
 
         if (volA === 0 || volB === 0 || kB.close === 0) return;
 
