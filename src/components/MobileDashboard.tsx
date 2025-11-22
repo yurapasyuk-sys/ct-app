@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, RotateCw, LayoutDashboard, Activity, TrendingUp } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UnifiedChartPanel } from '@/components/charts/UnifiedChartPanel';
-import { MTMPanel } from '@/components/mtm/MTMPanel';
+import { MobileVwapPanel } from '@/components/mobile/MobileVwapPanel';
 import { RvwapPanel } from '@/components/rvwap/RvwapPanel';
 import { MarketPulseAlerts } from '@/components/MarketPulseAlerts';
 import { CenturionLoader } from '@/components/CenturionLoader';
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 
 const MobileDashboard = () => {
   const [showLoading, setShowLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'mtm' | 'rvwap'>('overview');
+  const [activeTab, setActiveTab] = useState<'pulse' | 'vwap' | 'rvwap'>('pulse');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLoadingComplete = () => {
@@ -67,15 +67,15 @@ const MobileDashboard = () => {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden bg-zinc-950 relative">
         <div className="min-h-full p-4 pb-24">
-          {activeTab === 'overview' && (
+          {activeTab === 'pulse' && (
             <div className="h-[60vh] min-h-[400px] w-full">
               <UnifiedChartPanel />
             </div>
           )}
           
-          {activeTab === 'mtm' && (
-            <div className="pb-4">
-              <MTMPanel symbol="BTCUSDT" />
+          {activeTab === 'vwap' && (
+            <div className="h-[60vh] min-h-[400px] w-full">
+              <MobileVwapPanel />
             </div>
           )}
 
@@ -90,25 +90,25 @@ const MobileDashboard = () => {
       {/* Bottom Navigation */}
       <nav className="h-16 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur-lg fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 pb-safe">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => setActiveTab('pulse')}
           className={cn(
             "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-            activeTab === 'overview' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
-          )}
-        >
-          <LayoutDashboard className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Overview</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('mtm')}
-          className={cn(
-            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-            activeTab === 'mtm' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
+            activeTab === 'pulse' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
           )}
         >
           <Activity className="h-5 w-5" />
-          <span className="text-[10px] font-medium">MTM</span>
+          <span className="text-[10px] font-medium">Pulse</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('vwap')}
+          className={cn(
+            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
+            activeTab === 'vwap' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
+          )}
+        >
+          <TrendingUp className="h-5 w-5" />
+          <span className="text-[10px] font-medium">VWAP</span>
         </button>
 
         <button
@@ -118,7 +118,7 @@ const MobileDashboard = () => {
             activeTab === 'rvwap' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
           )}
         >
-          <TrendingUp className="h-5 w-5" />
+          <LayoutDashboard className="h-5 w-5" />
           <span className="text-[10px] font-medium">RVWAP</span>
         </button>
 
