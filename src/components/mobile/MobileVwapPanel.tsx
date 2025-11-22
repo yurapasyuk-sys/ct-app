@@ -59,6 +59,7 @@ export const MobileVwapPanel = () => {
   const overlays: Overlay[] = useMemo(() => {
     return [{
       id: 'Session VWAP',
+      label: 'Session VWAP',
       type: 'line',
       dataKey: 'vwap',
       color: '#22D3EE', // Cyan-400
@@ -97,6 +98,7 @@ export const MobileVwapPanel = () => {
                   overlays={overlays} 
                   height="100%" 
                   className="h-full w-full"
+                  mainSeriesName="Price"
                />
              </div>
          )}

@@ -12,6 +12,7 @@ export interface ChartDataPoint {
 
 export interface Overlay {
   id: string;
+  label?: string; // Display name for legend
   type: 'line' | 'histogram' | 'area' | 'pulse' | 'oscillator' | 'z-score';
   dataKey: string;
   color: string;
@@ -31,7 +32,31 @@ interface QuantChartProps {
   padding?: { top: number; bottom: number; right: number; left?: number };
   chartType?: 'candle' | 'line' | 'area';
   panelRatio?: number;
+  mainSeriesName?: string;
+  showLegend?: boolean;
 }
+
+const Legend = ({ items }: { items: { color: string; label: string; type?: string }[] }) => {
+  if (items.length === 0) return null;
+  return (
+    <div className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm p-2 rounded border border-border/50 text-xs z-10 pointer-events-none shadow-sm">
+      <div className="flex flex-col gap-1">
+        {items.map((item, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div 
+              className={`w-3 h-3 ${item.type === 'candle' ? '' : 'rounded-full'}`} 
+              style={{ 
+                backgroundColor: item.color,
+                border: item.type === 'candle' ? '1px solid ' + item.color : 'none'
+              }} 
+            />
+            <span className="text-muted-foreground font-medium">{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const QuantChart: React.FC<QuantChartProps> = ({
   data,
@@ -42,6 +67,8 @@ export const QuantChart: React.FC<QuantChartProps> = ({
   padding = { top: 20, bottom: 30, right: 60, left: 0 },
   chartType = 'candle',
   panelRatio = 0.3,
+  mainSeriesName,
+  showLegend = true,
 }) => {
   const { containerRef, dimensions } = useChartDimensions();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -146,7 +173,29 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       indicatorHeight,
       extraScales
     };
-  }, [data, dimensions.width, dimensions.height, overlays, padding, offset, totalBarWidth]);
+  }, [dimensions, data, offset, zoom, overlays, panelRatio, padding]);
+
+  const legendItems = useMemo(() => {
+    if (!showLegend) return [];
+    const items = [];
+
+    // Main Series
+    // Only show main series if it's not just a container for overlays
+    // If chartType is 'candle', we use green.
+    const mainName = mainSeriesName || (chartType === 'candle' ? 'Price' : 'Value');
+    const mainColor = '#00FF9D'; // Hardcoded in render logic
+    
+    // We assume there is always a main series unless explicitly disabled (which isn't an option yet)
+    // But for CrossPairAnalyzer, the main series IS the ratio.
+    items.push({ color: mainColor, label: mainName, type: chartType });
+
+    // Overlays
+    overlays.forEach(o => {
+      items.push({ color: o.color, label: o.label || o.id, type: o.type });
+    });
+
+    return items;
+  }, [showLegend, mainSeriesName, chartType, overlays]);
 
   // Helper to convert price to Y coordinate
   const getY = (price: number, axisId?: string) => {
@@ -891,12 +940,14 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       {/* Interaction Layer */}
       <canvas
         ref={overlayCanvasRef}
-        className="absolute inset-0 z-20 cursor-crosshair"
+        className="absolute top-0 left-0 pointer-events-none"
         style={{ width: '100%', height: '100%' }}
       />
+      
+      <Legend items={legendItems} />
 
-      {/* Floating Tooltip */}
-      {hoverData && (
+      {/* Tooltip */}
+      {hoverData && mousePos && (
         <div className="absolute top-2 left-2 z-30 bg-background/80 backdrop-blur-sm border border-border p-2 rounded text-xs font-mono shadow-lg pointer-events-none">
           <div className="flex gap-4">
             <span className="text-muted-foreground">O: <span className="text-foreground">{hoverData.open.toFixed(2)}</span></span>

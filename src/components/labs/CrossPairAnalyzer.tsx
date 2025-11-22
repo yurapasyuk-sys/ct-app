@@ -408,10 +408,12 @@ export const CrossPairAnalyzer = () => {
                 className="w-full h-full"
                 chartType="area"
                 panelRatio={0.5}
+                mainSeriesName="Vol Adjusted Ratio"
                 padding={{ top: 20, bottom: 30, right: 60, left: showRawPrices ? 100 : 0 }}
                 overlays={[
                   {
                     id: 'correlation',
+                    label: 'Correlation (20p)',
                     type: 'oscillator',
                     dataKey: 'correlation',
                     color: '#fbbf24', // Amber
@@ -421,6 +423,7 @@ export const CrossPairAnalyzer = () => {
                   ...(showRawPrices ? [
                     {
                       id: 'priceA',
+                      label: symbolA,
                       type: 'line' as const,
                       dataKey: 'priceA',
                       color: '#22d3ee', // Cyan
@@ -429,6 +432,7 @@ export const CrossPairAnalyzer = () => {
                     },
                     {
                       id: 'priceB',
+                      label: symbolB,
                       type: 'line' as const,
                       dataKey: 'priceB',
                       color: '#f472b6', // Pink

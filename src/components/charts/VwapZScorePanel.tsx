@@ -83,6 +83,7 @@ export const VwapZScorePanel = () => {
     if (!selectedPeriod) return [];
     return [{
       id: `Z-Score ${selectedPeriod}`,
+      label: `Z-Score (${selectedPeriod}d)`,
       type: 'z-score',
       dataKey: `z${selectedPeriod}`,
       color: '#94a3b8', // Base color, overridden by z-score logic
@@ -173,6 +174,7 @@ export const VwapZScorePanel = () => {
                  overlays={overlays}
                  height="100%" 
                  className="w-full h-full"
+                 mainSeriesName="Price"
                />
             </div>
           </div>

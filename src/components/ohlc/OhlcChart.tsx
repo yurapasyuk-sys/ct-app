@@ -34,6 +34,7 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
   const overlays = useMemo<Overlay[]>(() => [
     { 
       id: 'Tension', 
+      label: 'Tension',
       type: 'histogram', 
       dataKey: 'tension', 
       color: 'rgba(59, 130, 246, 0.3)', 
@@ -56,6 +57,7 @@ export function OhlcChart({ klines, tensionData, threshold = 0, height = 300, cl
           overlays={overlays} 
           height={height} 
           className={className}
+          mainSeriesName="Price"
         />
         <Watermark visible={true} />
       </div>

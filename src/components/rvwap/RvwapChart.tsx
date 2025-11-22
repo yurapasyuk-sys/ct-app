@@ -48,13 +48,13 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
   const overlays = useMemo<Overlay[]>(() => {
     if (multiData) {
       return [
-        { id: '30D', type: 'line', dataKey: 'rvwap30', color: '#3B82F6', width: 2 },
-        { id: '90D', type: 'line', dataKey: 'rvwap90', color: '#22D3EE', width: 2 },
-        { id: '365D', type: 'line', dataKey: 'rvwap365', color: '#0EA5E9', width: 2 },
+        { id: '30D', label: 'RVWAP 30D', type: 'line', dataKey: 'rvwap30', color: '#3B82F6', width: 2 },
+        { id: '90D', label: 'RVWAP 90D', type: 'line', dataKey: 'rvwap90', color: '#22D3EE', width: 2 },
+        { id: '365D', label: 'RVWAP 365D', type: 'line', dataKey: 'rvwap365', color: '#0EA5E9', width: 2 },
       ];
     }
     return [
-      { id: 'RVWAP', type: 'line', dataKey: 'rvwapSingle', color: '#22D3EE', width: 2 }
+      { id: 'RVWAP', label: 'RVWAP', type: 'line', dataKey: 'rvwapSingle', color: '#22D3EE', width: 2 }
     ];
   }, [multiData]);
 
@@ -73,6 +73,7 @@ export function RvwapChart({ data, multiData, klines, height = 400, className = 
           overlays={overlays} 
           height={height} 
           className={className}
+          mainSeriesName="Price"
         />
         <Watermark visible={true} />
       </div>

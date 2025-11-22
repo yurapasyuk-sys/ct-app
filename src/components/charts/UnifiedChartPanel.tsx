@@ -99,6 +99,7 @@ export const UnifiedChartPanel = () => {
                   overlays={overlays} 
                   height="100%" // Let it fill container
                   className="h-full w-full"
+                  mainSeriesName="Price"
                />
              </div>
          )}
