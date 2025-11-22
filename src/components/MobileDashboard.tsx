@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Bell, RotateCw, LayoutDashboard, Activity, TrendingUp } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Bell, RotateCw, Activity, TrendingUp } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { UnifiedChartPanel } from '@/components/charts/UnifiedChartPanel';
-import { MobileVwapPanel } from '@/components/mobile/MobileVwapPanel';
-import { RvwapPanel } from '@/components/rvwap/RvwapPanel';
+import { VwapZScorePanel } from '@/components/charts/VwapZScorePanel';
 import { MarketPulseAlerts } from '@/components/MarketPulseAlerts';
 import { CenturionLoader } from '@/components/CenturionLoader';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 const MobileDashboard = () => {
   const [showLoading, setShowLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pulse' | 'vwap' | 'rvwap'>('pulse');
+  const [activeTab, setActiveTab] = useState<'pulse' | 'vwap'>('pulse');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLoadingComplete = () => {
@@ -74,14 +73,8 @@ const MobileDashboard = () => {
           )}
           
           {activeTab === 'vwap' && (
-            <div className="h-[60vh] min-h-[400px] w-full">
-              <MobileVwapPanel />
-            </div>
-          )}
-
-          {activeTab === 'rvwap' && (
-            <div className="pb-4">
-              <RvwapPanel symbol="BTCUSDT" dataSource="spot" />
+            <div className="h-full w-full">
+              <VwapZScorePanel />
             </div>
           )}
         </div>
@@ -109,17 +102,6 @@ const MobileDashboard = () => {
         >
           <TrendingUp className="h-5 w-5" />
           <span className="text-[10px] font-medium">VWAP</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('rvwap')}
-          className={cn(
-            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-            activeTab === 'rvwap' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
-          )}
-        >
-          <LayoutDashboard className="h-5 w-5" />
-          <span className="text-[10px] font-medium">RVWAP</span>
         </button>
 
         <button

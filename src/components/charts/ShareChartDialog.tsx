@@ -158,12 +158,12 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, t
 
               {/* Right Side */}
               <div className="flex flex-col items-end gap-1">
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-center gap-2">
                   <span className="text-[10px] text-zinc-600 uppercase tracking-wider">user</span>
                   <span className={cn(
                     "text-lg font-bold",
                     isUltra 
-                      ? "text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500" 
+                      ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.3)]" 
                       : "text-white"
                   )}>
                     {displayName}
@@ -175,7 +175,7 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({ targetRef, t
                      <span className={cn(
                         "text-xs font-bold tracking-widest uppercase px-1.5 py-0.5 rounded",
                         isUltra 
-                          ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-yellow-500 border border-yellow-500/30" 
+                          ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/30" 
                           : "bg-zinc-800 text-zinc-400 border border-zinc-700"
                      )}>
                         {isUltra ? 'ULTRA' : 'PRO'}
