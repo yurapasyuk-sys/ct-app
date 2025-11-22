@@ -45,6 +45,18 @@ const MobileDashboard = () => {
     }, 50);
   };
 
+  // Failsafe: ensure loader is removed after max 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (showLoading) {
+        console.log('⚠️ MobileDashboard: Force removing loader');
+        setShowLoading(false);
+        setContentOpacity(1);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [showLoading]);
+
   // Swipe gesture handling
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.changedTouches[0].screenX;
