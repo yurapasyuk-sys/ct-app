@@ -792,57 +792,83 @@ export const QuantChart: React.FC<QuantChartProps> = ({
       const x = mousePos.x;
       const y = mousePos.y;
 
+      // Snap to candle center
+      let snapX = x;
+      const index = visibleData.indexOf(hoverData);
+      if (index >= 0) {
+          const xShift = Math.max(0, startIndex) - startIndex;
+          snapX = getX(index + xShift);
+      }
+
       // Crosshair
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.setLineDash([4, 4]);
       ctx.lineWidth = 1;
 
-      // Vertical
+      // Vertical (Snapped)
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, dimensions.height);
+      ctx.moveTo(snapX, 0);
+      ctx.lineTo(snapX, dimensions.height);
       ctx.stroke();
 
-      // Horizontal
+      // Horizontal (Mouse Y)
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(dimensions.width, y);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Price Label (Right)
-      const price = minPrice + ((dimensions.height - padding.bottom - y) / scaleY);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(dimensions.width - 60, y - 10, 60, 20);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(price.toFixed(2), dimensions.width - 55, y + 4);
+      // Price Label (Right - Main Axis)
+      if (y > padding.top && y < mainChartHeight - padding.bottom) {
+        const price = minPrice + ((mainChartHeight - padding.bottom - y) / scaleY);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(dimensions.width - 60, y - 10, 60, 20);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(price.toFixed(2), dimensions.width - 55, y + 4);
+      }
+
+      // Extra Scales Labels (Left)
+      if (extraScales) {
+        Object.keys(extraScales).forEach((axisId, idx) => {
+            const { min, scale } = extraScales[axisId];
+            if (y > padding.top && y < mainChartHeight - padding.bottom) {
+                const val = min + (mainChartHeight - padding.bottom - y) / scale;
+                const axisX = (padding.left || 60) - (idx * 50);
+                
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(axisX - 50, y - 10, 50, 20);
+                
+                // Find color
+                const overlay = overlays.find(o => o.yAxisId === axisId);
+                ctx.fillStyle = overlay?.color || '#94a3b8';
+                ctx.textAlign = 'right';
+                ctx.fillText(val.toFixed(2), axisX - 5, y + 4);
+            }
+        });
+      }
 
       // Time Label (Bottom)
       const date = new Date(hoverData.timestamp);
       const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(x - 25, dimensions.height - 20, 50, 20);
+      ctx.fillRect(snapX - 25, dimensions.height - 20, 50, 20);
       ctx.fillStyle = '#94a3b8';
       ctx.textAlign = 'center';
-      ctx.fillText(timeStr, x, dimensions.height - 6);
+      ctx.fillText(timeStr, snapX, dimensions.height - 6);
       
       // Highlight current candle
-      // Find index
-      const index = visibleData.indexOf(hoverData);
       if (index >= 0) {
-          const xShift = Math.max(0, startIndex) - startIndex;
-          const candleX = getX(index + xShift);
           // Glow effect
           ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
           ctx.shadowBlur = 10;
           ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-          ctx.fillRect(candleX - candleWidth/2 - 1, padding.top, candleWidth + 2, dimensions.height - padding.bottom - padding.top);
+          ctx.fillRect(snapX - candleWidth/2 - 1, padding.top, candleWidth + 2, mainChartHeight - padding.bottom - padding.top);
           ctx.shadowBlur = 0;
       }
     }
-  }, [mousePos, hoverData, dimensions, minPrice, scaleY, visibleData, startIndex]);
+  }, [mousePos, hoverData, dimensions, minPrice, scaleY, visibleData, startIndex, extraScales, overlays, mainChartHeight]);
 
   return (
     <div 
