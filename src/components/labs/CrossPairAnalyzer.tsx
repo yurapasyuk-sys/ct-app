@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { fetchFuturesSymbols, fetchAllKlines, type BinanceSymbol } from '@/lib/binance';
+import { fetchFuturesSymbols, fetchAllKlines, type BinanceSymbol, type Kline } from '@/lib/binance';
 import { QuantChart, type ChartDataPoint, type Overlay } from '@/components/charts/QuantChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,17 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { ShareChartDialog } from '@/components/charts/ShareChartDialog';
+
+const MACRO_ASSETS = [
+  { symbol: 'ES', name: 'S&P 500' },
+  { symbol: 'NQ', name: 'Nasdaq 100' },
+  { symbol: 'DXY', name: 'US Dollar Index' },
+  { symbol: 'RTY', name: 'Russell 2000' },
+  { symbol: 'GC', name: 'Gold' },
+  { symbol: 'NIKKEI', name: 'Nikkei 225' },
+  { symbol: 'US10Y', name: 'US 10Y Yield' },
+  { symbol: 'US05Y', name: 'US 5Y Yield' },
+];
 
 // Helper to calculate GARCH(1,1) volatility
 const calculateGARCH = (klines: any[]) => {
@@ -121,6 +132,18 @@ export const CrossPairAnalyzer = () => {
     loadSymbols();
   }, []);
 
+  const fetchAssetData = async (symbol: string, interval: string): Promise<Kline[]> => {
+    const isMacro = MACRO_ASSETS.some(m => m.symbol === symbol);
+    
+    if (isMacro) {
+      const res = await fetch(`/api/macro-history?symbol=${symbol}&interval=${interval}`);
+      if (!res.ok) throw new Error('Failed to fetch macro data');
+      return await res.json();
+    } else {
+      return await fetchAllKlines({ symbol, interval, dataSource: 'futures' });
+    }
+  };
+
   const handleAnalyze = async () => {
     setIsLoading(true);
     setChartData([]);
@@ -128,8 +151,8 @@ export const CrossPairAnalyzer = () => {
     try {
       // Fetch all available data for both symbols
       const [klinesA, klinesB] = await Promise.all([
-        fetchAllKlines({ symbol: symbolA, interval, dataSource: 'futures' }),
-        fetchAllKlines({ symbol: symbolB, interval, dataSource: 'futures' })
+        fetchAssetData(symbolA, interval),
+        fetchAssetData(symbolB, interval)
       ]);
 
       if (!klinesA.length || !klinesB.length) {
@@ -237,7 +260,22 @@ export const CrossPairAnalyzer = () => {
               <Command>
                 <CommandInput placeholder="Search symbol..." />
                 <CommandEmpty>No symbol found.</CommandEmpty>
-                <CommandGroup className="max-h-[300px] overflow-auto">
+                <CommandGroup heading="Macro Assets">
+                  {MACRO_ASSETS.map((asset) => (
+                    <CommandItem
+                      key={asset.symbol}
+                      value={asset.symbol}
+                      onSelect={() => {
+                        setSymbolA(asset.symbol);
+                        setOpenA(false);
+                      }}
+                    >
+                      <span className="font-mono font-bold mr-2">{asset.symbol}</span>
+                      <span className="text-muted-foreground text-xs">{asset.name}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+                <CommandGroup heading="Crypto Futures" className="max-h-[300px] overflow-auto">
                   {symbols.map((sym) => (
                     <CommandItem
                       key={sym.symbol}
@@ -278,7 +316,22 @@ export const CrossPairAnalyzer = () => {
               <Command>
                 <CommandInput placeholder="Search symbol..." />
                 <CommandEmpty>No symbol found.</CommandEmpty>
-                <CommandGroup className="max-h-[300px] overflow-auto">
+                <CommandGroup heading="Macro Assets">
+                  {MACRO_ASSETS.map((asset) => (
+                    <CommandItem
+                      key={asset.symbol}
+                      value={asset.symbol}
+                      onSelect={() => {
+                        setSymbolB(asset.symbol);
+                        setOpenB(false);
+                      }}
+                    >
+                      <span className="font-mono font-bold mr-2">{asset.symbol}</span>
+                      <span className="text-muted-foreground text-xs">{asset.name}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+                <CommandGroup heading="Crypto Futures" className="max-h-[300px] overflow-auto">
                   {symbols.map((sym) => (
                     <CommandItem
                       key={sym.symbol}
