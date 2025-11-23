@@ -241,8 +241,8 @@ export const CrossPairAnalyzer = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-end">
-        <div className="grid gap-2 flex-1">
+      <div className="flex flex-col md:flex-row gap-4 md:items-end">
+        <div className="grid gap-2 w-full md:flex-1">
           <Label>Asset A (Numerator)</Label>
           <Popover open={openA} onOpenChange={setOpenA}>
             <PopoverTrigger asChild>
@@ -250,7 +250,7 @@ export const CrossPairAnalyzer = () => {
                 variant="outline"
                 role="combobox"
                 aria-expanded={openA}
-                className="justify-between font-mono"
+                className="justify-between font-mono w-full"
               >
                 {symbolA}
                 <ArrowRightLeft className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -294,11 +294,11 @@ export const CrossPairAnalyzer = () => {
           </Popover>
         </div>
         
-        <div className="flex items-center justify-center pb-2">
+        <div className="flex items-center justify-center pb-2 hidden md:flex">
             <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
         </div>
         
-        <div className="grid gap-2 flex-1">
+        <div className="grid gap-2 w-full md:flex-1">
           <Label>Asset B (Denominator)</Label>
           <Popover open={openB} onOpenChange={setOpenB}>
             <PopoverTrigger asChild>
@@ -306,7 +306,7 @@ export const CrossPairAnalyzer = () => {
                 variant="outline"
                 role="combobox"
                 aria-expanded={openB}
-                className="justify-between font-mono"
+                className="justify-between font-mono w-full"
               >
                 {symbolB}
                 <ArrowRightLeft className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -350,10 +350,10 @@ export const CrossPairAnalyzer = () => {
           </Popover>
         </div>
 
-        <div className="grid gap-2 w-[120px]">
+        <div className="grid gap-2 w-full md:w-[120px]">
           <Label>Timeframe</Label>
           <Select value={interval} onValueChange={setInterval}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -363,7 +363,7 @@ export const CrossPairAnalyzer = () => {
           </Select>
         </div>
         
-        <Button onClick={handleAnalyze} disabled={isLoading || loadingSymbols}>
+        <Button onClick={handleAnalyze} disabled={isLoading || loadingSymbols} className="w-full md:w-auto">
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
           Analyze Pair
         </Button>
@@ -388,7 +388,7 @@ export const CrossPairAnalyzer = () => {
         </AlertDescription>
       </Alert>
 
-      <Card className="h-[calc(100vh-16rem)] min-h-[600px] border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card className="h-[500px] md:h-[calc(100vh-16rem)] min-h-[400px] md:min-h-[600px] border-border/40 bg-card/50 backdrop-blur-sm">
         <CardHeader className="py-3 border-b border-border/40 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             {symbolA} / {symbolB} <span className="text-muted-foreground text-xs font-normal">(Vol Adjusted, {interval})</span>
