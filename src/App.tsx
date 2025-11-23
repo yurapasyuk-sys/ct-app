@@ -8,7 +8,6 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
-import BonusPage from "./pages/BonusPage";
 import NotFound from "./pages/NotFound";
 import Macro from "./pages/Macro";
 import Labs from "./pages/Labs";
@@ -68,8 +67,6 @@ const App = () => {
                   </DashboardLayout>
                 } />
 
-                <Route path="/bonus" element={<BonusPage />} />
-                
                 {/* Redirect old routes to new dashboard */}
                 <Route path="/dashboard/mtm" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard/test" element={<Navigate to="/dashboard" replace />} />

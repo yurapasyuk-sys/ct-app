@@ -163,13 +163,15 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({
                     <h1 className="text-2xl font-bold tracking-tight text-white uppercase">
                       Centurion
                     </h1>
-                    {isUltra ? (
-                      <span className="text-2xl font-bold tracking-tight uppercase bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-700 text-transparent bg-clip-text drop-shadow-sm">
-                        ULTRA
-                      </span>
-                    ) : (
-                      <span className="text-2xl font-bold tracking-tight text-white uppercase">PRO</span>
-                    )}
+                    {user ? (
+                      isUltra ? (
+                        <span className="text-2xl font-bold tracking-tight uppercase bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-700 text-transparent bg-clip-text drop-shadow-sm">
+                          ULTRA
+                        </span>
+                      ) : (
+                        <span className="text-2xl font-bold tracking-tight text-white uppercase">PRO</span>
+                      )
+                    ) : null}
                   </div>
                   <span className="text-lg text-zinc-500 uppercase tracking-widest">Terminal</span>
                 </div>
