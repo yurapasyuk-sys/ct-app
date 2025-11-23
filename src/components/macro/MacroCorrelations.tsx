@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, TrendingUp, TrendingDown, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -122,13 +123,14 @@ export const MacroCorrelations = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<CorrelationData | null>(null);
+  const [period, setPeriod] = useState('30');
   const chartRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/macro-correlations');
+      const res = await fetch(`/api/macro-correlations?days=${period}`);
       if (!res.ok) throw new Error('Failed to fetch data');
       const json = await res.json();
       setData(json);
@@ -142,7 +144,7 @@ export const MacroCorrelations = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [period]);
 
   const getCorrelationColor = (val: number) => {
     if (val > 0.5) return 'text-[#10b981]'; // Bull (Emerald-500)
@@ -161,10 +163,20 @@ export const MacroCorrelations = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          Macro Correlations (30D)
-        </h2>
+        <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            Macro Correlations ({period}D)
+            </h2>
+            <Tabs value={period} onValueChange={setPeriod} className="h-7">
+                <TabsList className="h-7 bg-secondary/50">
+                    <TabsTrigger value="15" className="text-xs h-6 px-3">15d</TabsTrigger>
+                    <TabsTrigger value="30" className="text-xs h-6 px-3">30d</TabsTrigger>
+                    <TabsTrigger value="60" className="text-xs h-6 px-3">60d</TabsTrigger>
+                    <TabsTrigger value="90" className="text-xs h-6 px-3">90d</TabsTrigger>
+                </TabsList>
+            </Tabs>
+        </div>
         <Button 
           variant="ghost" 
           size="sm" 
@@ -251,7 +263,7 @@ export const MacroCorrelations = () => {
                 targetRef={chartRef} 
                 title={`BTC vs ${selectedAsset?.name}`}
                 symbol="BTC"
-                timeframe="30D"
+                timeframe={`${period}D`}
                 indicator={`Correlation: ${selectedAsset?.correlation.toFixed(2)}`}
             />
           </DialogHeader>

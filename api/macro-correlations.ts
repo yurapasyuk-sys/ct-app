@@ -30,10 +30,10 @@ const DISPLAY_NAMES = {
   'US02Y': 'US 2Y Note'
 };
 
-async function fetchYahooData(symbol: string) {
+async function fetchYahooData(symbol: string, range: string = '90d') {
   try {
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=90d&interval=1d`
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=1d`
     );
     const data = await response.json();
     
@@ -74,8 +74,19 @@ function calculateCorrelation(x: number[], y: number[]) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    const days = parseInt(req.query.days as string) || 30;
+    // Ensure we fetch enough data. If days is 90, we need at least 90 days.
+    // Yahoo ranges: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
+    // 90d is approx 3mo.
+    let fetchRange = '3mo';
+    if (days <= 15) fetchRange = '1mo';
+    else if (days <= 30) fetchRange = '3mo';
+    else if (days <= 60) fetchRange = '3mo';
+    else if (days <= 90) fetchRange = '6mo'; // Use 6mo to be safe for 90 trading days
+    else fetchRange = '1y';
+
     // 1. Fetch BTC Data
-    const btcData = await fetchYahooData(SYMBOLS.BTC);
+    const btcData = await fetchYahooData(SYMBOLS.BTC, fetchRange);
     if (!btcData) {
       return res.status(500).json({ error: 'Failed to fetch BTC data' });
     }
@@ -86,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const [key, symbol] of Object.entries(SYMBOLS)) {
       if (key === 'BTC') continue;
 
-      const assetData = await fetchYahooData(symbol);
+      const assetData = await fetchYahooData(symbol, fetchRange);
       
       if (assetData) {
         // Align data
@@ -110,8 +121,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        // Calculate correlation on the last 30 data points (approx 30 trading days)
-        const lookback = 30;
+        // Calculate correlation on the last N data points
+        // Note: These are trading days, not calendar days.
+        // 30 trading days is approx 45 calendar days.
+        // The user likely means "last 30 days" as in "last 30 data points" or "last 30 calendar days"?
+        // Usually in finance "30 day correlation" means on a window of 30 days.
+        // If we have daily data, let's assume 'days' param means 'number of data points' (trading days) for simplicity and robustness,
+        // or we can filter by date.
+        // Given the previous code used `lookback = 30` on the array, it meant 30 data points.
+        // Let's stick to data points as it's more consistent for correlation calc.
+        const lookback = days;
         const sliceX = alignedX.slice(-lookback);
         const sliceY = alignedY.slice(-lookback);
         
