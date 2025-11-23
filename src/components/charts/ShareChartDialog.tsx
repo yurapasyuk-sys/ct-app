@@ -74,6 +74,16 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({
         backgroundColor: '#000000',
         scale: 4, // 4x Scale for high resolution output
         logging: false,
+        onclone: (clonedDoc) => {
+          const ultraText = clonedDoc.querySelector('[data-ultra-text="true"]') as HTMLElement;
+          if (ultraText) {
+            // Fix for html2canvas bg-clip-text bug: use solid color for export
+            ultraText.style.background = 'none';
+            ultraText.style.webkitTextFillColor = 'initial';
+            ultraText.style.color = '#e2e8f0'; // Platinum color
+            ultraText.style.textShadow = '0 0 10px rgba(255,255,255,0.5)';
+          }
+        }
       });
 
       canvas.toBlob(async (blob) => {
@@ -101,6 +111,16 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({
         backgroundColor: '#000000',
         scale: 4, // 4x Scale for high resolution output
         logging: false,
+        onclone: (clonedDoc) => {
+          const ultraText = clonedDoc.querySelector('[data-ultra-text="true"]') as HTMLElement;
+          if (ultraText) {
+            // Fix for html2canvas bg-clip-text bug: use solid color for export
+            ultraText.style.background = 'none';
+            ultraText.style.webkitTextFillColor = 'initial';
+            ultraText.style.color = '#e2e8f0'; // Platinum color
+            ultraText.style.textShadow = '0 0 10px rgba(255,255,255,0.5)';
+          }
+        }
       });
 
       const link = document.createElement('a');
@@ -165,7 +185,10 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({
                     </h1>
                     {user ? (
                       isUltra ? (
-                        <span className="text-2xl font-bold tracking-tight uppercase bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-700 text-transparent bg-clip-text drop-shadow-sm">
+                        <span 
+                          data-ultra-text="true"
+                          className="text-2xl font-bold tracking-tight uppercase bg-gradient-to-r from-zinc-400 via-zinc-100 to-zinc-400 text-transparent bg-clip-text drop-shadow-sm"
+                        >
                           ULTRA
                         </span>
                       ) : (
