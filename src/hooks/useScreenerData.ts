@@ -209,12 +209,19 @@ export function useScreenerData(): UseScreenerDataResult {
         try {
           // Fetch 10 hourly records to ensure we have 8+ hours of history
           const history = await fetchOpenInterestHistory(symbol, '1h', 10, signal);
+          
+          if (history.length === 0) {
+            return { symbol, oiChange: null, currentOI: null };
+          }
+          
+          // Sort by timestamp ascending to get correct current value
+          const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
+          
           const oiChange = calculateOIChange(history, 8);
-          // Get current OI from the latest history entry
-          const currentOI = history.length > 0 
-            ? parseFloat(history[history.length - 1].sumOpenInterestValue)
-            : null;
-          return { symbol, oiChange, currentOI };
+          // Get current OI from the latest (sorted) history entry
+          const currentOI = parseFloat(sorted[sorted.length - 1].sumOpenInterestValue);
+          
+          return { symbol, oiChange, currentOI: isNaN(currentOI) ? null : currentOI };
         } catch {
           return { symbol, oiChange: null, currentOI: null };
         }
