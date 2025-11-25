@@ -371,10 +371,18 @@ const Screener = () => {
                       {formatLargeNumber(row.quoteVolume24h)}
                     </TableCell>
                     <TableCell className={`text-right font-mono text-sm py-2 whitespace-nowrap ${row.dayOpen !== null ? (row.price >= row.dayOpen ? 'text-green-500' : 'text-red-500') : 'text-muted-foreground'}`}>
-                      {row.dayOpen !== null ? formatPrice(row.dayOpen) : '-'}
+                      {row.dayOpen !== null ? (
+                        ((row.price - row.dayOpen) / row.dayOpen * 100) >= 0 
+                          ? `+${((row.price - row.dayOpen) / row.dayOpen * 100).toFixed(2)}%`
+                          : `${((row.price - row.dayOpen) / row.dayOpen * 100).toFixed(2)}%`
+                      ) : '-'}
                     </TableCell>
                     <TableCell className={`text-right font-mono text-sm py-2 whitespace-nowrap ${row.weekOpen !== null ? (row.price >= row.weekOpen ? 'text-green-500' : 'text-red-500') : 'text-muted-foreground'}`}>
-                      {row.weekOpen !== null ? formatPrice(row.weekOpen) : '-'}
+                      {row.weekOpen !== null ? (
+                        ((row.price - row.weekOpen) / row.weekOpen * 100) >= 0 
+                          ? `+${((row.price - row.weekOpen) / row.weekOpen * 100).toFixed(2)}%`
+                          : `${((row.price - row.weekOpen) / row.weekOpen * 100).toFixed(2)}%`
+                      ) : '-'}
                     </TableCell>
                   </TableRow>
                 ))
