@@ -1,4 +1,4 @@
-import React from 'react';
+  >import React from 'react';
 import { LayoutDashboard, LogOut, LogIn, User, Moon, Sun, Globe, FlaskConical, ScanSearch } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';

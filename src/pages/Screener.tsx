@@ -19,7 +19,7 @@ import {
   formatPercent,
   formatFundingRate,
 } from "@/lib/screener/calculations";
-import { fetchFuturesKlines } from "@/lib/screener/api";
+import { fetchKlines } from "@/lib/screener/api";
 
 // ============================================
 // MINI CHART COMPONENT
@@ -39,7 +39,7 @@ const MiniChart: React.FC<MiniChartProps> = ({ symbol, onClose }) => {
       setLoading(true);
       try {
         // Fetch last 24 x 5m candles (2 hours)
-        const data = await fetchFuturesKlines(symbol, '5m', 24);
+        const data = await fetchKlines(symbol, '5m', 24);
         setKlines(data);
       } catch (err) {
         console.error('Failed to fetch chart data:', err);

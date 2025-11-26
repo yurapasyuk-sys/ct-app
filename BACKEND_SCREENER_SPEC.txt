@@ -4,11 +4,6 @@
 
 Необходимо создать Rust backend, который будет собирать, хранить и отдавать данные по всем 535+ USDT Perpetual парам с Binance Futures. Frontend должен получать полный snapshot всех данных за < 100ms.
 
-**Источник данных: Binance Futures Open API (публичный, без API ключей)**
-- REST API: `https://fapi.binance.com/fapi/v1/`
-- WebSocket: `wss://fstream.binance.com/`
-- Документация: https://binance-docs.github.io/apidocs/futures/en/
-
 ---
 
 ## 1. Архитектура
@@ -526,35 +521,23 @@ backend/
 - При росте — добавить Redis для кэша между инстансами
 - WebSocket: до 10k одновременных подключений на один сервер
 
-### 3. Деплой: Hetzner CPX32 (уже есть)
-- **Сервер: Hetzner CPX32** (4 vCPU AMD, 8 GB RAM, 80 GB SSD)
-- Сервер уже настроен, Copilot готов к работе
-- PostgreSQL установить локально или использовать managed (Supabase/Neon бесплатно)
-- Systemd service для автозапуска
+### 3. Деплой: Docker + Railway/Fly.io
+- **Рекомендация: Railway.app или Fly.io** (простой деплой, автоскейлинг)
+- Dockerfile для контейнеризации
+- PostgreSQL — managed database от провайдера
+- Альтернатива: DigitalOcean App Platform
 
-```bash
-# Systemd service file: /etc/systemd/system/screener-backend.service
-[Unit]
-Description=Screener Backend API
-After=network.target postgresql.service
+```dockerfile
+FROM rust:1.75-slim as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
 
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/screener-backend
-ExecStart=/opt/screener-backend/screener-backend
-Restart=always
-RestartSec=5
-Environment=DATABASE_URL=postgresql://screener:password@localhost:5432/screener
-Environment=RUST_LOG=info
-Environment=PORT=8080
-
-[Install]
-WantedBy=multi-user.target
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/screener-backend /usr/local/bin/
+CMD ["screener-backend"]
 ```
-
-- Nginx reverse proxy для HTTPS (Let's Encrypt)
-- Альтернатива: Docker Compose
 
 ### 4. Мониторинг: Простой (логи + health endpoint)
 - Structured logging (tracing crate)
@@ -573,19 +556,14 @@ WantedBy=multi-user.target
 ## 11. Финальные параметры деплоя
 
 ```yaml
-# Сервер: Hetzner CPX32 (уже есть)
-CPU: 4 vCPU AMD
-RAM: 8 GB
-Disk: 80 GB SSD
-OS: Ubuntu 22.04 / Debian 12
-
-# Database: PostgreSQL (локально или managed)
-PostgreSQL: 15+ 
-Вариант 1: apt install postgresql (локально)
-Вариант 2: Supabase/Neon (бесплатный managed tier)
+# Минимальные требования к серверу:
+CPU: 2 vCPU
+RAM: 2 GB (4 GB рекомендуется)
+Disk: 10 GB SSD
+Database: PostgreSQL 15+ (managed, 1 GB)
 
 # Environment variables:
-DATABASE_URL=postgresql://screener:password@localhost:5432/screener
+DATABASE_URL=postgresql://user:pass@host:5432/screener
 RUST_LOG=info
 PORT=8080
 ```
