@@ -21,10 +21,10 @@ interface RiskRegimeResponse {
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-const API_BASE_URL = 'https://api.borkiss.trade/api/v1';
+const RISK_API_URL = 'https://api.borkiss.trade/api/risk-regime';
 
 export const RoroRegime = () => {
-  const { data, error, isLoading } = useSWR<RiskRegimeResponse>(`${API_BASE_URL}/risk-regime`, fetcher);
+  const { data, error, isLoading } = useSWR<RiskRegimeResponse>(RISK_API_URL, fetcher);
 
   const chartData = useMemo(() => {
     if (!data || !data.history) return [];
