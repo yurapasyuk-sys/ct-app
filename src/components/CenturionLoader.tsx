@@ -68,7 +68,7 @@ export const CenturionLoader = ({ onComplete }: { onComplete: () => void }) => {
          <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-3">
                 <span className="text-white/40 font-mono text-sm tracking-[0.5em] uppercase">TERMINAL</span>
-                <span className="px-1.5 py-0.5 border border-white/20 rounded bg-white/5 text-[10px] font-mono text-white/60">v0.5 beta</span>
+                <span className="px-1.5 py-0.5 border border-white/20 rounded bg-white/5 text-[10px] font-mono text-white/60">v1 alpha</span>
             </div>
             
             {/* Dynamic Status Text */}
