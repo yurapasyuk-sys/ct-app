@@ -35,7 +35,12 @@ const REFRESH_INTERVAL = 60000; // Fallback refresh every 60s if WS fails
 // HOOK IMPLEMENTATION
 // ============================================
 
-export function useScreenerData(): UseScreenerDataResult {
+interface UseScreenerDataOptions {
+  enabled?: boolean;
+}
+
+export function useScreenerData(options: UseScreenerDataOptions = {}): UseScreenerDataResult {
+  const { enabled = true } = options;
   const [data, setData] = useState<ScreenerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +96,8 @@ export function useScreenerData(): UseScreenerDataResult {
   
   // WebSocket connection
   useEffect(() => {
+    if (!enabled) return;
+
     let reconnectTimer: NodeJS.Timeout;
     let isUnmounted = false;
 
@@ -169,7 +176,7 @@ export function useScreenerData(): UseScreenerDataResult {
         abortControllerRef.current.abort();
       }
     };
-  }, [fetchData, updateStateFromMap]);
+  }, [fetchData, updateStateFromMap, enabled]);
   
   return {
     data,

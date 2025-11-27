@@ -10,8 +10,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, X, ChevronRight } from "lucide-react";
+import { Search, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, X, ChevronRight, Lock, LogIn } from "lucide-react";
 import { useScreenerData } from "@/hooks/useScreenerData";
+import { useAuth } from "@/context/AuthContext";
 import { ScreenerRow, KlineData } from "@/lib/screener/types";
 import {
   formatLargeNumber,
@@ -119,7 +120,10 @@ interface SortConfig {
 // ============================================
 
 const Screener = () => {
-  const { data, loading, error, lastUpdate, refresh } = useScreenerData();
+  const { user, profile, loading: authLoading, signInWithGoogle } = useAuth();
+  const isAuthorized = !!(user && profile && (profile.tier === 'pro' || profile.tier === 'ultra'));
+  
+  const { data, loading, error, lastUpdate, refresh } = useScreenerData({ enabled: isAuthorized });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -193,6 +197,38 @@ const Screener = () => {
     const ms = Date.now() - lastUpdate;
     return `${ms}ms ago`;
   };
+
+  // Access Control Check
+  if (authLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user || !profile || (profile.tier !== 'pro' && profile.tier !== 'ultra')) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6 animate-in fade-in duration-500">
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+          <Lock className="w-10 h-10 text-primary" />
+        </div>
+        <div className="max-w-md space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight">Access Restricted</h2>
+          <p className="text-muted-foreground">
+            The Screener is available exclusively for <span className="font-bold text-foreground">PRO</span> and <span className="font-bold text-foreground">ULTRA</span> members. 
+            Please log in to access real-time market screening.
+          </p>
+        </div>
+        {!user && (
+          <Button onClick={() => signInWithGoogle()} size="lg" className="gap-2">
+            <LogIn className="w-4 h-4" />
+            Login with Google
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
