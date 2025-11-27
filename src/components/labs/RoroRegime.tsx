@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Activity, AlertTriangle, Lock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { SnapshotButton } from "@/components/SnapshotButton";
 import {
   ComposedChart,
   Area,
@@ -42,6 +43,7 @@ export const RoroRegime = () => {
   const { profile, loading: authLoading, signInWithGoogle } = useAuth();
   const { data: riskData, error: riskError, isLoading: riskLoading } = useSWR<RiskRegimeResponse>(RISK_API_URL, fetcher);
   const [btcHistory, setBtcHistory] = useState<Record<string, number>>({});
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Debug: Log incoming data
   useEffect(() => {
@@ -221,7 +223,7 @@ export const RoroRegime = () => {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] gap-4">
+    <div className="flex flex-col h-[calc(100vh-100px)] gap-4" ref={containerRef}>
       {/* Top Bar - Stats */}
       <Card className="border-border/40 bg-card/50 backdrop-blur-sm shrink-0">
         <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -247,6 +249,15 @@ export const RoroRegime = () => {
                 </span>
               </div>
             ))}
+          </div>
+          
+          {/* Snapshot Button */}
+          <div className="flex items-center">
+            <SnapshotButton 
+              containerRef={containerRef}
+              symbol="RORO_Regime"
+              timeframe="1D"
+            />
           </div>
         </CardContent>
       </Card>
