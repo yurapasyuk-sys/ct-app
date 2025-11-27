@@ -223,7 +223,7 @@ export const RoroRegime = () => {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] gap-4" ref={containerRef}>
+    <div className="flex flex-col h-[calc(100vh-100px)] gap-4">
       {/* Top Bar - Stats */}
       <Card className="border-border/40 bg-card/50 backdrop-blur-sm shrink-0">
         <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -265,7 +265,7 @@ export const RoroRegime = () => {
       </Card>
 
       {/* Main Chart */}
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm flex-1 min-h-0 flex flex-col">
+      <Card ref={containerRef} className="border-border/40 bg-card/50 backdrop-blur-sm flex-1 min-h-0 flex flex-col">
         <CardHeader className="py-3 border-b border-border/40 shrink-0">
           <CardTitle className="text-center text-lg font-medium">Risk-on/Risk-off regime</CardTitle>
         </CardHeader>
