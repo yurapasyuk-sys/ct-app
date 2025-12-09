@@ -518,27 +518,32 @@ export const RoroRegime = () => {
                         }) => {
                           const { cx, cy, payload } = props;
                           const score = payload.score;
+                          const absScore = Math.abs(score);
 
-                          if (score <= 30) return null;
+                          if (absScore <= 30) return null;
 
-                          // Sizing: >30. Max 100.
+                          // Sizing: >30 or <-30. Max 100.
                           // "every 10 points sizing changes"
-                          // 30-40 -> step 0
-                          // ...
-                          // 90-100 -> step 6
-                          // >100 -> step 7 (capped)
-
                           const step = Math.min(
-                            Math.floor((score - 30) / 10),
+                            Math.floor((absScore - 30) / 10),
                             7,
                           );
                           const radius = 4 + step * 2.5;
 
                           // Color
-                          // > 50: Strong Bull (#673ab7)
-                          // 30-50: Basic Risk-On (#9575cd)
                           let fill = "#9575cd";
-                          if (score > 50) fill = "#673ab7";
+
+                          if (score > 0) {
+                            // Risk On
+                            if (score > 50)
+                              fill = "#673ab7"; // Strong Bull
+                            else fill = "#9575cd"; // Basic Risk-On
+                          } else {
+                            // Risk Off
+                            if (score < -50)
+                              fill = "#4e342e"; // Strong Bear
+                            else fill = "#8d6e63"; // Basic Risk-Off
+                          }
 
                           return (
                             <circle
