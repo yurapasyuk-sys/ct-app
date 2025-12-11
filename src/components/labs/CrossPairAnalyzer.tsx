@@ -1,27 +1,52 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { fetchFuturesSymbols, fetchAllKlines, type BinanceSymbol, type Kline } from '@/lib/binance';
-import { QuantChart, type ChartDataPoint, type Overlay } from '@/components/charts/QuantChart';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowRightLeft, Loader2, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { ShareChartDialog } from '@/components/charts/ShareChartDialog';
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  fetchFuturesSymbols,
+  fetchAllKlines,
+  type BinanceSymbol,
+  type Kline,
+} from "@/lib/binance";
+import {
+  QuantChart,
+  type ChartDataPoint,
+  type Overlay,
+} from "@/components/charts/QuantChart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowRightLeft, Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { ShareChartDialog } from "@/components/charts/ShareChartDialog";
 
 const MACRO_ASSETS = [
-  { symbol: 'ES', name: 'S&P 500' },
-  { symbol: 'NQ', name: 'Nasdaq 100' },
-  { symbol: 'DXY', name: 'US Dollar Index' },
-  { symbol: 'RTY', name: 'Russell 2000' },
-  { symbol: 'GC', name: 'Gold' },
-  { symbol: 'NIKKEI', name: 'Nikkei 225' },
-  { symbol: 'US10Y', name: 'US 10Y Yield' },
-  { symbol: 'US05Y', name: 'US 5Y Yield' },
+  { symbol: "ES", name: "S&P 500" },
+  { symbol: "NQ", name: "Nasdaq 100" },
+  { symbol: "DXY", name: "US Dollar Index" },
+  { symbol: "RTY", name: "Russell 2000" },
+  { symbol: "GC", name: "Gold" },
+  { symbol: "NIKKEI", name: "Nikkei 225" },
+  { symbol: "US10Y", name: "US 10Y Yield" },
+  { symbol: "US05Y", name: "US 5Y Yield" },
 ];
 
 // Helper to calculate GARCH(1,1) volatility
@@ -36,7 +61,7 @@ const calculateGARCH = (klines: any[]) => {
   // GARCH(1,1) parameters
   const omega = 0.000002;
   const alpha = 0.05;
-  const beta = 0.90;
+  const beta = 0.9;
 
   const vars = [];
   // Initial variance estimate (first 30)
@@ -44,7 +69,7 @@ const calculateGARCH = (klines: any[]) => {
   const initN = Math.min(returns.length, 30);
   for (let i = 0; i < initN; i++) sumSq += returns[i] * returns[i];
   let currentVar = sumSq / initN;
-  
+
   vars.push(currentVar);
 
   for (let i = 1; i < returns.length; i++) {
@@ -61,14 +86,18 @@ const calculateGARCH = (klines: any[]) => {
 };
 
 // Helper to calculate rolling correlation of log returns
-const calculateCorrelation = (klinesA: any[], klinesB: any[], period: number = 20) => {
+const calculateCorrelation = (
+  klinesA: any[],
+  klinesB: any[],
+  period: number = 20,
+) => {
   // Calculate log returns first
   const returnsA = [];
   const returnsB = [];
-  
+
   for (let i = 1; i < klinesA.length; i++) {
-    returnsA.push(Math.log(klinesA[i].close / klinesA[i-1].close));
-    returnsB.push(Math.log(klinesB[i].close / klinesB[i-1].close));
+    returnsA.push(Math.log(klinesA[i].close / klinesA[i - 1].close));
+    returnsB.push(Math.log(klinesB[i].close / klinesB[i - 1].close));
   }
 
   const correlations = new Array(klinesA.length).fill(0);
@@ -102,17 +131,71 @@ const calculateCorrelation = (klinesA: any[], klinesB: any[], period: number = 2
   return correlations;
 };
 
-import { Checkbox } from '@/components/ui/checkbox';
+// Helper to calculate rolling cointegration (normalized spread z-score)
+const calculateCointegration = (
+  klinesA: any[],
+  klinesB: any[],
+  period: number = 60,
+) => {
+  const cointegration = new Array(klinesA.length).fill(0);
+
+  // Calculate log prices
+  const logPricesA = klinesA.map((k) => Math.log(k.close));
+  const logPricesB = klinesB.map((k) => Math.log(k.close));
+
+  for (let i = period; i < klinesA.length; i++) {
+    const sliceA = logPricesA.slice(i - period, i);
+    const sliceB = logPricesB.slice(i - period, i);
+
+    // Calculate beta (hedge ratio) using OLS regression
+    const meanA = sliceA.reduce((a, b) => a + b, 0) / period;
+    const meanB = sliceB.reduce((a, b) => a + b, 0) / period;
+
+    let num = 0;
+    let den = 0;
+
+    for (let j = 0; j < period; j++) {
+      num += (sliceB[j] - meanB) * (sliceA[j] - meanA);
+      den += (sliceB[j] - meanB) * (sliceB[j] - meanB);
+    }
+
+    const beta = den !== 0 ? num / den : 1;
+
+    // Calculate spread: log(A) - beta * log(B)
+    const spreads = [];
+    for (let j = 0; j < period; j++) {
+      spreads.push(sliceA[j] - beta * sliceB[j]);
+    }
+
+    // Normalize spread to z-score
+    const spreadMean = spreads.reduce((a, b) => a + b, 0) / period;
+    const spreadStd = Math.sqrt(
+      spreads.reduce((sum, val) => sum + Math.pow(val - spreadMean, 2), 0) /
+        period,
+    );
+
+    const currentSpread = logPricesA[i] - beta * logPricesB[i];
+    const zScore =
+      spreadStd !== 0 ? (currentSpread - spreadMean) / spreadStd : 0;
+
+    cointegration[i] = isNaN(zScore) ? 0 : zScore;
+  }
+
+  return cointegration;
+};
+
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const CrossPairAnalyzer = () => {
-  const [symbolA, setSymbolA] = useState('BTCUSDT');
-  const [symbolB, setSymbolB] = useState('ETHUSDT');
-  const [interval, setInterval] = useState('4h');
+  const [symbolA, setSymbolA] = useState("BTCUSDT");
+  const [symbolB, setSymbolB] = useState("ETHUSDT");
+  const [interval, setInterval] = useState("4h");
   const [symbols, setSymbols] = useState<BinanceSymbol[]>([]);
   const [loadingSymbols, setLoadingSymbols] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [showRawPrices, setShowRawPrices] = useState(false);
+  const [useGarch, setUseGarch] = useState(true);
   const [openA, setOpenA] = useState(false);
   const [openB, setOpenB] = useState(false);
   const chartRef = React.useRef<HTMLDivElement>(null);
@@ -124,7 +207,7 @@ export const CrossPairAnalyzer = () => {
         const data = await fetchFuturesSymbols();
         setSymbols(data);
       } catch (error) {
-        console.error('Failed to load symbols:', error);
+        console.error("Failed to load symbols:", error);
       } finally {
         setLoadingSymbols(false);
       }
@@ -132,61 +215,73 @@ export const CrossPairAnalyzer = () => {
     loadSymbols();
   }, []);
 
-  const fetchAssetData = async (symbol: string, interval: string): Promise<Kline[]> => {
-    const isMacro = MACRO_ASSETS.some(m => m.symbol === symbol);
-    
+  const fetchAssetData = async (
+    symbol: string,
+    interval: string,
+  ): Promise<Kline[]> => {
+    const isMacro = MACRO_ASSETS.some((m) => m.symbol === symbol);
+
     if (isMacro) {
-      const res = await fetch(`/api/macro-history?symbol=${symbol}&interval=${interval}`);
-      if (!res.ok) throw new Error('Failed to fetch macro data');
+      const res = await fetch(
+        `/api/macro-history?symbol=${symbol}&interval=${interval}`,
+      );
+      if (!res.ok) throw new Error("Failed to fetch macro data");
       return await res.json();
     } else {
-      return await fetchAllKlines({ symbol, interval, dataSource: 'futures' });
+      return await fetchAllKlines({ symbol, interval, dataSource: "futures" });
     }
   };
 
   const handleAnalyze = async () => {
     setIsLoading(true);
     setChartData([]);
-    
+
     try {
       // Fetch all available data for both symbols
       const [klinesA, klinesB] = await Promise.all([
         fetchAssetData(symbolA, interval),
-        fetchAssetData(symbolB, interval)
+        fetchAssetData(symbolB, interval),
       ]);
 
       if (!klinesA.length || !klinesB.length) {
-        console.warn('No data available for one or both symbols');
+        console.warn("No data available for one or both symbols");
         return;
       }
 
       // Align by timestamp and trim to shorter dataset
-      const mapB = new Map(klinesB.map(k => [k.openTime, k]));
-      const mapA = new Map(klinesA.map(k => [k.openTime, k]));
-      
+      const mapB = new Map(klinesB.map((k) => [k.openTime, k]));
+      const mapA = new Map(klinesA.map((k) => [k.openTime, k]));
+
       // Find common timestamps
       const commonTimestamps = klinesA
-        .map(k => k.openTime)
-        .filter(t => mapB.has(t))
+        .map((k) => k.openTime)
+        .filter((t) => mapB.has(t))
         .sort((a, b) => a - b);
 
       if (commonTimestamps.length === 0) {
-        console.warn('No overlapping data between the two symbols');
+        console.warn("No overlapping data between the two symbols");
         return;
       }
 
       // Calculate GARCH sigmas on full history to preserve volatility memory
       const sigmaA = calculateGARCH(klinesA);
       const sigmaB = calculateGARCH(klinesB);
-      const sigmaA_map = new Map(klinesA.map((k, i) => [k.openTime, sigmaA[i]]));
-      const sigmaB_map = new Map(klinesB.map((k, i) => [k.openTime, sigmaB[i]]));
+      const sigmaA_map = new Map(
+        klinesA.map((k, i) => [k.openTime, sigmaA[i]]),
+      );
+      const sigmaB_map = new Map(
+        klinesB.map((k, i) => [k.openTime, sigmaB[i]]),
+      );
 
       // Create aligned arrays for correlation calculation
-      const alignedA = commonTimestamps.map(t => mapA.get(t)!);
-      const alignedB = commonTimestamps.map(t => mapB.get(t)!);
-      
+      const alignedA = commonTimestamps.map((t) => mapA.get(t)!);
+      const alignedB = commonTimestamps.map((t) => mapB.get(t)!);
+
       // Calculate Correlation on aligned data
       const correlations = calculateCorrelation(alignedA, alignedB, 20);
+
+      // Calculate Cointegration on aligned data
+      const cointegrations = calculateCointegration(alignedA, alignedB, 60);
 
       const combined: ChartDataPoint[] = [];
 
@@ -196,23 +291,42 @@ export const CrossPairAnalyzer = () => {
         const sA = sigmaA_map.get(timestamp) || 0.01;
         const sB = sigmaB_map.get(timestamp) || 0.01;
 
-        // Normalize by volatility in price units (Price * Sigma)
-        const volA = kA.close * sA;
-        const volB = kB.close * sB;
+        let open, close, rawHigh, rawLow;
 
-        if (volA === 0 || volB === 0 || kB.close === 0 || kB.open === 0 || kB.high === 0 || kB.low === 0) return;
+        if (useGarch) {
+          // Normalize by volatility in price units (Price * Sigma)
+          const volA = kA.close * sA;
+          const volB = kB.close * sB;
 
-        const open = (kA.open / volA) / (kB.open / volB);
-        const close = (kA.close / volA) / (kB.close / volB);
-        
-        // Fix for "crooked" wicks:
-        // Instead of worst-case (High/Low), we assume positive correlation for crypto pairs.
-        // We calculate tentative high/low based on High/High and Low/Low ratios.
-        const rawHigh = (kA.high / volA) / (kB.high / volB);
-        const rawLow = (kA.low / volA) / (kB.low / volB);
+          if (
+            volA === 0 ||
+            volB === 0 ||
+            kB.close === 0 ||
+            kB.open === 0 ||
+            kB.high === 0 ||
+            kB.low === 0
+          )
+            return;
+
+          open = kA.open / volA / (kB.open / volB);
+          close = kA.close / volA / (kB.close / volB);
+          rawHigh = kA.high / volA / (kB.high / volB);
+          rawLow = kA.low / volA / (kB.low / volB);
+        } else {
+          // Simple cross-pair ratio without GARCH adjustment
+          if (kB.close === 0 || kB.open === 0 || kB.high === 0 || kB.low === 0)
+            return;
+
+          open = kA.open / kB.open;
+          close = kA.close / kB.close;
+          rawHigh = kA.high / kB.high;
+          rawLow = kA.low / kB.low;
+        }
 
         // Ensure High/Low encompass the Open/Close (basic candle validity)
-        const vals = [open, close, rawHigh, rawLow].filter(v => !isNaN(v) && isFinite(v));
+        const vals = [open, close, rawHigh, rawLow].filter(
+          (v) => !isNaN(v) && isFinite(v),
+        );
         if (vals.length < 2) return;
 
         const high = Math.max(...vals);
@@ -226,14 +340,15 @@ export const CrossPairAnalyzer = () => {
           close,
           rawRatio: kA.close / kB.close,
           correlation: correlations[i],
+          cointegration: cointegrations[i],
           priceA: kA.close,
-          priceB: kB.close
+          priceB: kB.close,
         });
       });
 
       setChartData(combined.sort((a, b) => a.timestamp - b.timestamp));
     } catch (error) {
-      console.error('Error analyzing pair:', error);
+      console.error("Error analyzing pair:", error);
     } finally {
       setIsLoading(false);
     }
@@ -270,12 +385,19 @@ export const CrossPairAnalyzer = () => {
                         setOpenA(false);
                       }}
                     >
-                      <span className="font-mono font-bold mr-2">{asset.symbol}</span>
-                      <span className="text-muted-foreground text-xs">{asset.name}</span>
+                      <span className="font-mono font-bold mr-2">
+                        {asset.symbol}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {asset.name}
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
-                <CommandGroup heading="Crypto Futures" className="max-h-[300px] overflow-auto">
+                <CommandGroup
+                  heading="Crypto Futures"
+                  className="max-h-[300px] overflow-auto"
+                >
                   {symbols.map((sym) => (
                     <CommandItem
                       key={sym.symbol}
@@ -293,11 +415,11 @@ export const CrossPairAnalyzer = () => {
             </PopoverContent>
           </Popover>
         </div>
-        
-        <div className="flex items-center justify-center pb-2 hidden md:flex">
-            <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+
+        <div className="items-center justify-center pb-2 hidden md:flex">
+          <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
         </div>
-        
+
         <div className="grid gap-2 w-full md:flex-1">
           <Label>Asset B (Denominator)</Label>
           <Popover open={openB} onOpenChange={setOpenB}>
@@ -326,12 +448,19 @@ export const CrossPairAnalyzer = () => {
                         setOpenB(false);
                       }}
                     >
-                      <span className="font-mono font-bold mr-2">{asset.symbol}</span>
-                      <span className="text-muted-foreground text-xs">{asset.name}</span>
+                      <span className="font-mono font-bold mr-2">
+                        {asset.symbol}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {asset.name}
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
-                <CommandGroup heading="Crypto Futures" className="max-h-[300px] overflow-auto">
+                <CommandGroup
+                  heading="Crypto Futures"
+                  className="max-h-[300px] overflow-auto"
+                >
                   {symbols.map((sym) => (
                     <CommandItem
                       key={sym.symbol}
@@ -362,89 +491,145 @@ export const CrossPairAnalyzer = () => {
             </SelectContent>
           </Select>
         </div>
-        
-        <Button onClick={handleAnalyze} disabled={isLoading || loadingSymbols} className="w-full md:w-auto">
+
+        <Button
+          onClick={handleAnalyze}
+          disabled={isLoading || loadingSymbols}
+          className="w-full md:w-auto"
+        >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
           Analyze Pair
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Checkbox 
-          id="show-raw" 
-          checked={showRawPrices} 
-          onCheckedChange={(checked) => setShowRawPrices(checked as boolean)} 
-        />
-        <Label htmlFor="show-raw" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Show Raw Prices (Left Axis)
-        </Label>
+      <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="use-garch"
+            checked={useGarch}
+            onCheckedChange={(checked) => setUseGarch(checked as boolean)}
+          />
+          <Label
+            htmlFor="use-garch"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Use GARCH Volatility Adjustment
+          </Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="show-raw"
+            checked={showRawPrices}
+            onCheckedChange={(checked) => setShowRawPrices(checked as boolean)}
+          />
+          <Label
+            htmlFor="show-raw"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Show Raw Prices (Left Axis)
+          </Label>
+        </div>
       </div>
 
       <Alert className="bg-secondary/20 border-primary/20">
         <AlertCircle className="h-4 w-4 text-primary" />
         <AlertDescription className="text-xs text-muted-foreground">
-          Displaying <strong>Volatility Adjusted Ratio</strong>: Normalized using GARCH(1,1) volatility model. 
-          This normalizes the spread by the conditional volatility of each asset. Data is trimmed to the shorter asset's history.
+          {useGarch ? (
+            <>
+              Displaying <strong>Volatility Adjusted Ratio</strong>: Normalized
+              using GARCH(1,1) volatility model. This normalizes the spread by
+              the conditional volatility of each asset.
+            </>
+          ) : (
+            <>
+              Displaying <strong>Simple Cross-Pair Ratio</strong>: Direct ratio
+              A/B without volatility adjustment.
+            </>
+          )}{" "}
+          Data is trimmed to the shorter asset's history.
         </AlertDescription>
       </Alert>
 
       <Card className="h-[400px] md:h-[calc(100vh-16rem)] min-h-[400px] md:min-h-[600px] border-border/40 bg-card/50 backdrop-blur-sm">
         <CardHeader className="py-3 border-b border-border/40 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            {symbolA} / {symbolB} <span className="text-muted-foreground text-xs font-normal">(Vol Adjusted, {interval})</span>
+            {symbolA} / {symbolB}{" "}
+            <span className="text-muted-foreground text-xs font-normal">
+              ({useGarch ? "Vol Adjusted" : "Simple Ratio"}, {interval})
+            </span>
           </CardTitle>
-          <ShareChartDialog 
-            targetRef={chartRef} 
-            title={`${symbolA}/${symbolB} Analysis`} 
-            tags={['GARCH(1,1)', 'QUANT']}
+          <ShareChartDialog
+            targetRef={chartRef}
+            title={`${symbolA}/${symbolB} Analysis`}
+            tags={["GARCH(1,1)", "QUANT"]}
           />
         </CardHeader>
         <CardContent className="p-0 h-[calc(100%-3.5rem)]">
           <div ref={chartRef} className="w-full h-full bg-background/50">
             {chartData.length > 0 ? (
-              <QuantChart 
-                data={chartData} 
-                height="100%" 
+              <QuantChart
+                data={chartData}
+                height="100%"
                 className="w-full h-full"
                 chartType="area"
-                panelRatio={0.5}
-                mainSeriesName="Vol Adjusted Ratio"
-                padding={{ top: 20, bottom: 30, right: 60, left: showRawPrices ? 100 : 0 }}
+                panelRatio={0.25}
+                mainSeriesName={
+                  useGarch ? "Vol Adjusted Ratio" : "Simple Ratio"
+                }
+                padding={{
+                  top: 20,
+                  bottom: 30,
+                  right: 60,
+                  left: showRawPrices ? 100 : 0,
+                }}
                 overlays={[
                   {
-                    id: 'correlation',
-                    label: 'Correlation (20p)',
-                    type: 'oscillator',
-                    dataKey: 'correlation',
-                    color: '#f59e0b', // Amber (Chart-3)
+                    id: "correlation",
+                    label: "Correlation (20p)",
+                    type: "oscillator",
+                    dataKey: "correlation",
+                    color: "#f59e0b", // Amber (Chart-3)
                     domain: [-1, 1],
-                    width: 2
+                    width: 2,
                   },
-                  ...(showRawPrices ? [
-                    {
-                      id: 'priceA',
-                      label: symbolA,
-                      type: 'line' as const,
-                      dataKey: 'priceA',
-                      color: '#3b82f6', // Blue (Chart-1)
-                      width: 1,
-                      yAxisId: 'left-A'
-                    },
-                    {
-                      id: 'priceB',
-                      label: symbolB,
-                      type: 'line' as const,
-                      dataKey: 'priceB',
-                      color: '#8b5cf6', // Purple (Chart-2)
-                      width: 1,
-                      yAxisId: 'left-B'
-                    }
-                  ] : [])
+                  {
+                    id: "cointegration",
+                    label: "Cointegration Z-Score (60p)",
+                    type: "oscillator",
+                    dataKey: "cointegration",
+                    color: "#10b981", // Green (Chart-4)
+                    domain: [-3, 3],
+                    width: 2,
+                  },
+                  ...(showRawPrices
+                    ? [
+                        {
+                          id: "priceA",
+                          label: symbolA,
+                          type: "line" as const,
+                          dataKey: "priceA",
+                          color: "#3b82f6", // Blue (Chart-1)
+                          width: 1,
+                          yAxisId: "left-A",
+                        },
+                        {
+                          id: "priceB",
+                          label: symbolB,
+                          type: "line" as const,
+                          dataKey: "priceB",
+                          color: "#8b5cf6", // Purple (Chart-2)
+                          width: 1,
+                          yAxisId: "left-B",
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                {isLoading ? 'Loading market data...' : 'Select symbols and click "Analyze Pair" to view the cross pair chart'}
+                {isLoading
+                  ? "Loading market data..."
+                  : 'Select symbols and click "Analyze Pair" to view the cross pair chart'}
               </div>
             )}
           </div>
