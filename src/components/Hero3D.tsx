@@ -4,7 +4,7 @@ import { Float, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
 const NetworkSignals = () => {
-  const radius = 2.8;
+  const radius = 3.2;
   const detail = 1;
 
   const { nodes, edges } = useMemo(() => {
@@ -45,12 +45,12 @@ const NetworkSignals = () => {
     return { nodes, edges };
   }, []);
 
-  const signalCount = 40;
+  const signalCount = 60;
   const signals = useMemo(() => {
     return new Array(signalCount).fill(0).map(() => ({
       edgeIndex: Math.floor(Math.random() * edges.length),
       progress: Math.random(),
-      speed: 0.02 + Math.random() * 0.03,
+      speed: 0.03 + Math.random() * 0.04,
       direction: Math.random() > 0.5 ? 1 : -1
     }));
   }, [edges]);
@@ -111,11 +111,17 @@ const Core = () => {
     if (!meshRef.current || !innerRef.current || !outerRef.current) return;
 
     // Smooth rotation based on mouse
-    const targetX = mouse.current.y * 0.5;
-    const targetY = mouse.current.x * 0.5;
+    const targetX = mouse.current.y * 1.2;
+    const targetY = mouse.current.x * 1.2;
 
     meshRef.current.rotation.x += (targetX - meshRef.current.rotation.x) * 0.05;
     meshRef.current.rotation.y += (targetY - meshRef.current.rotation.y) * 0.05;
+
+    // Parallax effect
+    const parallaxX = mouse.current.x * 0.5;
+    const parallaxY = mouse.current.y * 0.5;
+    meshRef.current.position.x += (parallaxX - meshRef.current.position.x) * 0.05;
+    meshRef.current.position.y += (parallaxY - meshRef.current.position.y) * 0.05;
 
     // Constant idle rotation
     innerRef.current.rotation.y += 0.002;
@@ -130,7 +136,7 @@ const Core = () => {
       {/* Inner Core - Dense Wireframe */}
       <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
         <mesh ref={innerRef}>
-          <icosahedronGeometry args={[1.8, 2]} />
+          <icosahedronGeometry args={[2.2, 2]} />
           <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.1} />
         </mesh>
       </Float>
@@ -138,7 +144,7 @@ const Core = () => {
       {/* Outer Shell - Sparse Wireframe */}
       <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.2}>
         <mesh ref={outerRef}>
-          <icosahedronGeometry args={[2.8, 1]} />
+          <icosahedronGeometry args={[3.2, 1]} />
           <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.03} />
           <NetworkSignals />
         </mesh>
@@ -146,7 +152,7 @@ const Core = () => {
 
       {/* Glowing Points */}
       <points>
-        <sphereGeometry args={[3.5, 48, 48]} />
+        <sphereGeometry args={[4.0, 48, 48]} />
         <pointsMaterial color="#ffffff" size={0.015} transparent opacity={0.15} sizeAttenuation />
       </points>
     </group>
