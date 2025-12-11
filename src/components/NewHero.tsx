@@ -2,59 +2,7 @@ import { ArrowRight, Terminal, Activity, Cpu, Zap, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { TechnicalGrid } from './TechnicalGrid';
 import { DataStream } from './DataStream';
-
-const HeroAnimation = () => (
-  <div className="relative w-full h-full min-h-[400px] flex items-center justify-center perspective-1000">
-    {/* Central Core - Monochrome Data Flow */}
-    <div className="relative w-64 h-64 md:w-96 md:h-96">
-      {/* Outer Ring - Static */}
-      <div className="absolute inset-0 border border-white/10 rounded-full" />
-      
-      {/* Rotating Data Rings - Slow & Elegant */}
-      <div className="absolute inset-0 rounded-full border-t border-white/30 animate-[spin_8s_linear_infinite]" />
-      <div className="absolute inset-8 rounded-full border-b border-white/20 animate-[spin_12s_linear_infinite_reverse]" />
-      
-      {/* Core Glow - White/Neutral */}
-      <div className="absolute inset-0 bg-white/5 rounded-full blur-3xl animate-pulse" />
-      
-      {/* Central Orb - Glass & Data */}
-      <div className="absolute inset-0 m-auto w-32 h-32 bg-black/90 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.05)]">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-white/10 to-transparent animate-pulse" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center font-mono text-[10px] text-white/80 tracking-widest gap-1">
-          <span>SYSTEM</span>
-          <span className="w-1 h-1 bg-white rounded-full animate-ping" />
-          <span>ACTIVE</span>
-        </div>
-      </div>
-
-      {/* Floating Particles - Data Packets */}
-      {[...Array(8)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute w-1 h-1 bg-white rounded-full"
-          style={{
-            top: '50%',
-            left: '50%',
-            transform: `rotate(${i * 45}deg) translateY(-160px)`,
-            animation: `pulse 3s infinite ${i * 0.2}s`,
-            opacity: 0.6
-          }}
-        />
-      ))}
-      
-      {/* Connecting Lines */}
-      {[...Array(4)].map((_, i) => (
-        <div
-          key={`line-${i}`}
-          className="absolute top-1/2 left-1/2 w-[200px] h-[1px] bg-gradient-to-r from-white/20 to-transparent origin-left"
-          style={{
-            transform: `rotate(${i * 90 + 45}deg)`,
-          }}
-        />
-      ))}
-    </div>
-  </div>
-);
+import { Hero3D } from './Hero3D';
 
 export const NewHero = () => {
   return (
@@ -134,9 +82,19 @@ export const NewHero = () => {
             </div>
           </div>
 
-          {/* Right Animation */}
-          <div className="hidden lg:block h-[600px] w-full">
-            <HeroAnimation />
+          {/* Right Animation - 3D Interactive */}
+          <div className="hidden lg:block h-[800px] w-full absolute right-[-10%] top-1/2 -translate-y-1/2 pointer-events-none">
+             {/* Pointer events none on container to let clicks pass through if needed, but canvas needs events. 
+                 Actually, we want interaction. So pointer-events-auto on the div wrapping Hero3D.
+                 But wait, the Hero3D uses window listener for mouse, so it doesn't need pointer events on the canvas itself for rotation.
+                 However, if we want to allow selecting text below it, we might want to be careful.
+                 The user said "interactive with mouse", usually meaning rotation.
+                 My Hero3D implementation uses window listener, so it works regardless of where the mouse is.
+                 So I can keep the container as is, or adjust positioning.
+             */}
+             <div className="w-full h-full pointer-events-auto">
+                <Hero3D />
+             </div>
           </div>
 
         </div>
