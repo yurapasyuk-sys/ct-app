@@ -1,7 +1,77 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, Stars } from '@react-three/drei';
+import { Float, Stars, Trail } from '@react-three/drei';
 import * as THREE from 'three';
+
+const NeuralImpulses = () => {
+  const groupRef = useRef<THREE.Group>(null);
+  const particleCount = 12;
+  const radius = 2.8;
+
+  // Create particles with random starting positions and velocities
+  const particles = useMemo(() => {
+    return new Array(particleCount).fill(0).map(() => ({
+      position: new THREE.Vector3(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2
+      ).normalize().multiplyScalar(radius),
+      velocity: new THREE.Vector3(
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+        Math.random() - 0.5
+      ).normalize().multiplyScalar(0.05), // Speed of impulse
+      offset: Math.random() * 100
+    }));
+  }, []);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    
+    groupRef.current.children.forEach((child, i) => {
+      const particle = particles[i];
+      
+      // Move particle
+      particle.position.add(particle.velocity);
+      
+      // Constrain to sphere surface
+      particle.position.normalize().multiplyScalar(radius);
+      
+      // Update mesh position
+      child.position.copy(particle.position);
+      
+      // Randomly change direction slightly to simulate "neural" path finding
+      if (Math.random() > 0.95) {
+        particle.velocity.add(
+          new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          ).multiplyScalar(0.05)
+        ).normalize().multiplyScalar(0.05);
+      }
+    });
+  });
+
+  return (
+    <group ref={groupRef}>
+      {particles.map((_, i) => (
+        <Trail
+          key={i}
+          width={2} // Width of the trail
+          length={8} // Length of the trail
+          color={new THREE.Color(1, 1, 1)} // White trail
+          attenuation={(t) => t * t} // Trail fades out
+        >
+          <mesh>
+            <sphereGeometry args={[0.03, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" toneMapped={false} />
+          </mesh>
+        </Trail>
+      ))}
+    </group>
+  );
+};
 
 const Core = () => {
   const meshRef = useRef<THREE.Group>(null);
@@ -56,6 +126,9 @@ const Core = () => {
           <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.03} />
         </mesh>
       </Float>
+      
+      {/* Neural Impulses - Jumping between points */}
+      <NeuralImpulses />
 
       {/* Glowing Points */}
       <points>
@@ -84,7 +157,7 @@ export const Hero3D = () => {
   return (
     <div className="w-full h-full min-h-[600px] relative z-10 fade-in">
       <Canvas
-        camera={{ position: [0, 0, 8], fov: 45 }}
+        camera={{ position: [0, 0, 12], fov: 45 }} // Increased Z distance to fix clipping
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]} // Optimize for high DPI screens
         onCreated={({ gl }) => {
