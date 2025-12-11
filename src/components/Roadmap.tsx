@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Zap, Database, Globe, Cpu, Flag, Activity, Terminal, Layers } from "lucide-react";
 import { Roadmap3DIcon } from "./Roadmap3DIcon";
 
@@ -46,6 +46,8 @@ const milestones = [
 ];
 
 export const Roadmap = () => {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   return (
     <section className="py-32 relative bg-[#050505] overflow-hidden" id="roadmap">
       {/* Background Grid - Subtle */}
@@ -78,6 +80,8 @@ export const Roadmap = () => {
             <div 
               key={idx} 
               className="group relative grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-center"
+              onMouseEnter={() => setHoveredIndex(idx)}
+              onMouseLeave={() => setHoveredIndex(null)}
             >
               {/* Timeline Node */}
               <div className="hidden md:flex col-span-1 justify-center relative">
@@ -115,7 +119,7 @@ export const Roadmap = () => {
 
                 {/* Animation / Visual */}
                 <div className="flex justify-center md:justify-end opacity-80 group-hover:opacity-100 transition-all duration-700 transform group-hover:scale-110">
-                  <Roadmap3DIcon type={item.type} />
+                  <Roadmap3DIcon type={item.type} isHovered={hoveredIndex === idx} />
                 </div>
 
               </div>
