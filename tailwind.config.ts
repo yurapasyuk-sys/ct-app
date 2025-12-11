@@ -146,8 +146,22 @@ export default {
         },
         "data-stream": {
           "0%": { transform: "translateY(0) scaleY(0)", opacity: "0" },
-          "50%": { transform: "translateY(100vh) scaleY(1)", opacity: "1" },
-          "100%": { transform: "translateY(200vh) scaleY(0)", opacity: "0" },
+          "10%": { transform: "translateY(10vh) scaleY(1)", opacity: "1" },
+          "90%": { transform: "translateY(100vh) scaleY(1)", opacity: "1" },
+          "100%": { transform: "translateY(110vh) scaleY(0)", opacity: "0" },
+        },
+        "scan-line": {
+          "0%": { transform: "translateY(-100vh)", opacity: "0" },
+          "50%": { opacity: "1" },
+          "100%": { transform: "translateY(100vh)", opacity: "0" },
+        },
+        "spin-slow": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        "spin-slow-reverse": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(-360deg)" },
         },
       },
       animation: {
@@ -156,7 +170,10 @@ export default {
         blob: "blob 7s infinite",
         shimmer: "shimmer 2s linear infinite",
         "fade-in": "fade-in 0.5s ease-out forwards",
-        "data-stream": "data-stream 5s linear infinite",
+        "data-stream": "data-stream 3s linear infinite",
+        "scan-line": "scan-line 8s linear infinite",
+        "spin-slow": "spin-slow 8s linear infinite",
+        "spin-slow-reverse": "spin-slow-reverse 8s linear infinite",
       },
     },
   },

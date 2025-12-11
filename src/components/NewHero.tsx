@@ -27,7 +27,7 @@ export const NewHero = () => {
           <h1 className="text-7xl md:text-9xl font-bold tracking-tighter text-white leading-[0.9]">
             CENTURION
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-neutral-500 to-neutral-700">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-neutral-300 to-neutral-500">
               ECOSYSTEM
             </span>
           </h1>
