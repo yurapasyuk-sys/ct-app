@@ -7,11 +7,19 @@ import { Hero3D } from './Hero3D';
 export const NewHero = () => {
   return (
     <section className="relative min-h-screen flex items-center bg-[#050505] overflow-hidden selection:bg-white/20 selection:text-white">
+      {/* Background 3D Layer */}
+      <div className="absolute inset-0 z-0">
+        <Hero3D />
+      </div>
+      
+      {/* Overlay Gradient for Readability */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#050505] via-[#050505]/80 to-transparent pointer-events-none" />
+      
       <TechnicalGrid />
       <DataStream />
       
       {/* Ambient Glow - Neutral/White */}
-      <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-white/5 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
+      <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-white/5 rounded-full blur-[120px] pointer-events-none mix-blend-screen z-0" />
 
       <div className="container mx-auto px-6 relative z-10 pt-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -82,19 +90,8 @@ export const NewHero = () => {
             </div>
           </div>
 
-          {/* Right Animation - 3D Interactive */}
-          <div className="hidden lg:block h-[800px] w-full absolute right-[-10%] top-1/2 -translate-y-1/2 pointer-events-none">
-             {/* Pointer events none on container to let clicks pass through if needed, but canvas needs events. 
-                 Actually, we want interaction. So pointer-events-auto on the div wrapping Hero3D.
-                 But wait, the Hero3D uses window listener for mouse, so it doesn't need pointer events on the canvas itself for rotation.
-                 However, if we want to allow selecting text below it, we might want to be careful.
-                 The user said "interactive with mouse", usually meaning rotation.
-                 My Hero3D implementation uses window listener, so it works regardless of where the mouse is.
-                 So I can keep the container as is, or adjust positioning.
-             */}
-             <div className="w-full h-full pointer-events-auto">
-                <Hero3D />
-             </div>
+          {/* Right Column - Empty now as 3D is background */}
+          <div className="hidden lg:block h-[800px] w-full pointer-events-none">
           </div>
 
         </div>

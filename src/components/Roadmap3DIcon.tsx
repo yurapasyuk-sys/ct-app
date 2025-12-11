@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Sphere, Torus, Box, Octahedron } from '@react-three/drei';
+import { Float, MeshDistortMaterial, Sphere, Torus, Box, Octahedron, Icosahedron } from '@react-three/drei';
 import * as THREE from 'three';
 
 const IconScene = ({ type }: { type: string }) => {
@@ -12,42 +12,46 @@ const IconScene = ({ type }: { type: string }) => {
     meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.3;
   });
 
-  const material = (
-    <MeshDistortMaterial
+  // Brighter, more visible material
+  const solidMaterial = (
+    <meshStandardMaterial
       color="#ffffff"
-      roughness={0.2}
-      metalness={0.9}
-      distort={0.3}
-      speed={2}
-      transparent
-      opacity={0.8}
+      roughness={0.3}
+      metalness={0.8}
+      emissive="#ffffff"
+      emissiveIntensity={0.2}
     />
+  );
+
+  const wireframeMaterial = (
+    <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.4} />
   );
 
   switch (type) {
     case 'database': // Metric Explosion
       return (
         <Float speed={4} rotationIntensity={1} floatIntensity={2}>
-          <group>
-            <Octahedron args={[1.2, 0]} ref={meshRef}>
-              <meshStandardMaterial color="#ffffff" wireframe transparent opacity={0.3} />
+          <group scale={1.2}>
+            <Octahedron args={[1, 0]} ref={meshRef}>
+              {wireframeMaterial}
             </Octahedron>
-            <Sphere args={[0.6, 32, 32]}>
-              {material}
-            </Sphere>
+            <Octahedron args={[0.6, 0]}>
+              {solidMaterial}
+            </Octahedron>
           </group>
         </Float>
       );
     case 'heart': // Amex Heart Core
       return (
         <Float speed={5} rotationIntensity={0.5} floatIntensity={0.5}>
-          <Sphere args={[1, 64, 64]} ref={meshRef}>
+          <Sphere args={[0.9, 32, 32]} ref={meshRef}>
              <MeshDistortMaterial
               color="#ffffff"
-              roughness={0.1}
+              roughness={0.2}
               metalness={1}
-              distort={0.6}
+              distort={0.4}
               speed={3}
+              emissive="#444444"
             />
           </Sphere>
         </Float>
@@ -55,41 +59,49 @@ const IconScene = ({ type }: { type: string }) => {
     case 'terminal': // Terminal V2
       return (
         <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-          <Box args={[1.5, 1, 0.1]} ref={meshRef}>
-            <meshPhysicalMaterial 
-              color="#ffffff" 
-              roughness={0.2} 
-              metalness={0.8} 
-              clearcoat={1} 
-              transparent 
-              opacity={0.5} 
-            />
-          </Box>
+          <group ref={meshRef}>
+            <Box args={[1.4, 0.9, 0.1]}>
+              <meshPhysicalMaterial 
+                color="#eeeeee" 
+                roughness={0.2} 
+                metalness={0.1} 
+                transmission={0.6} 
+                thickness={2}
+                clearcoat={1}
+              />
+            </Box>
+            <Box args={[1.2, 0.7, 0.12]} position={[0, 0, 0]}>
+               <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.2} />
+            </Box>
+          </group>
         </Float>
       );
     case 'api': // Data Fusion API
       return (
         <Float speed={6} rotationIntensity={2} floatIntensity={1}>
-          <Torus args={[0.8, 0.2, 16, 32]} ref={meshRef}>
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} />
+          <Torus args={[0.7, 0.25, 16, 32]} ref={meshRef}>
+            <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={1} />
           </Torus>
         </Float>
       );
     case 'ecosystem': // Ecosystem Expansion
       return (
         <Float speed={1} rotationIntensity={0.5} floatIntensity={0.5}>
-          <Sphere args={[1.2, 32, 32]} ref={meshRef}>
-            <meshStandardMaterial color="#ffffff" wireframe transparent opacity={0.2} />
-          </Sphere>
-          <Sphere args={[0.8, 32, 32]}>
-             <meshPhysicalMaterial 
-              color="#ffffff" 
-              roughness={0} 
-              metalness={0.2} 
-              transmission={1} 
-              thickness={2}
-            />
-          </Sphere>
+          <group ref={meshRef}>
+            <Icosahedron args={[1.1, 0]}>
+              {wireframeMaterial}
+            </Icosahedron>
+            <Sphere args={[0.7, 32, 32]}>
+               <meshPhysicalMaterial 
+                color="#ffffff" 
+                roughness={0} 
+                metalness={0.2} 
+                transmission={0.9} 
+                thickness={1.5}
+                ior={1.5}
+              />
+            </Sphere>
+          </group>
         </Float>
       );
     default:
@@ -99,11 +111,11 @@ const IconScene = ({ type }: { type: string }) => {
 
 export const Roadmap3DIcon = ({ type }: { type: string }) => {
   return (
-    <div className="w-24 h-24 relative">
-      <Canvas camera={{ position: [0, 0, 4], fov: 45 }} gl={{ alpha: true, antialias: true }}>
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={1} />
-        <pointLight position={[-10, -10, -10]} intensity={0.5} />
+    <div className="w-32 h-32 relative">
+      <Canvas camera={{ position: [0, 0, 3.5], fov: 45 }} gl={{ alpha: true, antialias: true }}>
+        <ambientLight intensity={1} />
+        <pointLight position={[10, 10, 10]} intensity={2} />
+        <pointLight position={[-10, -10, -10]} intensity={1} />
         <IconScene type={type} />
       </Canvas>
     </div>
