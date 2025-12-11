@@ -550,6 +550,40 @@ export const CrossPairAnalyzer = () => {
         </AlertDescription>
       </Alert>
 
+      {/* Legend */}
+      <div className="flex items-center gap-6 px-4 py-2 bg-card/30 border border-border/40 rounded-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-[#10b981]"></div>
+          <span className="text-xs text-muted-foreground">
+            {useGarch ? "Vol Adjusted Ratio" : "Simple Ratio"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#f59e0b]"></div>
+          <span className="text-xs text-muted-foreground">
+            Correlation (20p)
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+          <span className="text-xs text-muted-foreground">
+            Cointegration Z-Score (60p)
+          </span>
+        </div>
+        {showRawPrices && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#3b82f6]"></div>
+              <span className="text-xs text-muted-foreground">{symbolA}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#8b5cf6]"></div>
+              <span className="text-xs text-muted-foreground">{symbolB}</span>
+            </div>
+          </>
+        )}
+      </div>
+
       <Card className="h-[400px] md:h-[calc(100vh-16rem)] min-h-[400px] md:min-h-[600px] border-border/40 bg-card/50 backdrop-blur-sm">
         <CardHeader className="py-3 border-b border-border/40 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -576,6 +610,7 @@ export const CrossPairAnalyzer = () => {
                 mainSeriesName={
                   useGarch ? "Vol Adjusted Ratio" : "Simple Ratio"
                 }
+                showLegend={false}
                 padding={{
                   top: 20,
                   bottom: 30,
@@ -591,6 +626,7 @@ export const CrossPairAnalyzer = () => {
                     color: "#f59e0b", // Amber (Chart-3)
                     domain: [-1, 1],
                     width: 2,
+                    panelId: 1,
                   },
                   {
                     id: "cointegration",
@@ -600,6 +636,7 @@ export const CrossPairAnalyzer = () => {
                     color: "#10b981", // Green (Chart-4)
                     domain: [-3, 3],
                     width: 2,
+                    panelId: 2,
                   },
                   ...(showRawPrices
                     ? [
