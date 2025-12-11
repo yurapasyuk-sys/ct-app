@@ -1,159 +1,176 @@
+import { useRef, useEffect } from "react";
 import { Zap, Database, Globe, Cpu, Flag } from "lucide-react";
 
 const milestones = [
   {
     quarter: "Q1 2026",
-    title: "Metric Explosion & User Empowerment",
-    description: "+100 new metrics added to dashboard. Expanding the intelligence layer with a vast range of market, behavioral, and sentiment-based indicators.",
-    details: [
-      "Most data-rich trading environment for retail",
-      "Lightweight and beautiful UX/UI",
-      "Deeper insights without switching tools"
-    ],
-    icon: Database,
-    color: "text-blue-400",
-    glow: "shadow-[0_0_20px_rgba(59,130,246,0.3)]",
-    border: "border-blue-500/20"
+    title: "Metric Explosion",
+    description: "Expanding the intelligence layer with a vast range of market, behavioral, and sentiment-based indicators.",
+    details: ["+100 New Metrics", "Deep Insight Layer", "Unified Dashboard"],
+    type: "database"
   },
   {
     quarter: "Q2 2026",
-    title: "Amex Heart — The Analytical Core",
-    description: "Release of Amex Heart Core Engine. Next-generation analytics core in Rust for speed, safety, and precision.",
-    details: [
-      "Real-time data processing & execution management",
-      "Quantitative risk controls (Risk Guard)",
-      "Memory-safe concurrency for mission-critical trading"
-    ],
-    icon: Zap,
-    color: "text-amber-400",
-    glow: "shadow-[0_0_20px_rgba(251,191,36,0.3)]",
-    border: "border-amber-500/20"
+    title: "Amex Heart Core",
+    description: "Next-generation analytics core in Rust for speed, safety, and precision execution.",
+    details: ["50µs Latency", "Risk Guard", "Memory Safety"],
+    type: "heart"
   },
   {
     quarter: "Q3 2026",
-    title: "Terminal V2 — Institutional Experience",
-    description: "Launch of Borkiss Terminal V2. Next-gen terminal powered by Amex Heart Core.",
-    details: [
-      "Performance-optimized front-end with new layout",
-      "Native execution & alert systems",
-      "Advanced modules: funding rate arb, liquidity zones"
-    ],
-    icon: Globe,
-    color: "text-emerald-400",
-    glow: "shadow-[0_0_20px_rgba(52,211,153,0.3)]",
-    border: "border-emerald-500/20"
+    title: "Terminal V2",
+    description: "Institutional-grade experience for retail. Performance-optimized front-end with new layout.",
+    details: ["Native Execution", "Liquidity Zones", "Advanced Charting"],
+    type: "terminal"
   },
   {
     quarter: "Q4 2026",
-    title: "API Infrastructure & Data Fusion",
-    description: "Launch of ultra-fast data engine. Rust-powered low-latency API aggregates raw data → ready metrics.",
-    details: [
-      "Sub-10ms responses (async Rust + in-memory cache)",
-      "Scales via AWS Lambda/EKS",
-      "Plug-and-play for fintech, quants, ML pipelines"
-    ],
-    icon: Cpu,
-    color: "text-purple-400",
-    glow: "shadow-[0_0_20px_rgba(168,85,247,0.3)]",
-    border: "border-purple-500/20"
+    title: "Data Fusion API",
+    description: "Launch of ultra-fast data engine. Rust-powered low-latency API aggregates raw data.",
+    details: ["Sub-10ms Response", "AWS Lambda/EKS", "ML Pipeline Ready"],
+    type: "api"
   },
   {
     quarter: "Strategic",
-    title: "Strategic Alignment",
-    description: "Deep AWS integration and ecosystem expansion.",
-    details: [
-      "Compute & AI hosting",
-      "Open SDK for custom analytics",
-      "Target: fintech startups, algo devs, funds"
-    ],
-    icon: Flag,
-    color: "text-rose-400",
-    glow: "shadow-[0_0_20px_rgba(251,113,133,0.3)]",
-    border: "border-rose-500/20"
+    title: "Ecosystem Expansion",
+    description: "Deep AWS integration and open SDK for custom analytics.",
+    details: ["Compute Hosting", "Open SDK", "Fintech Integration"],
+    type: "ecosystem"
   }
 ];
 
+const HeartAnimation = () => (
+  <div className="relative w-16 h-16 flex items-center justify-center">
+    <div className="absolute inset-0 border border-white/20 transform rotate-45 animate-pulse" />
+    <div className="absolute inset-2 border border-white/40 transform rotate-45" />
+    <div className="w-2 h-2 bg-neutral-200 rounded-full animate-ping" />
+    {/* Data lines flowing out */}
+    <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-white/20 -translate-x-1/2 -translate-y-1/2 rotate-0 animate-spin-slow" />
+    <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-white/20 -translate-x-1/2 -translate-y-1/2 rotate-90 animate-spin-slow" />
+  </div>
+);
+
+const DatabaseAnimation = () => (
+  <div className="relative w-16 h-16 flex flex-col items-center justify-center gap-1">
+    {[...Array(3)].map((_, i) => (
+      <div key={i} className="w-12 h-3 border border-white/30 rounded-[100%] relative overflow-hidden">
+        <div className="absolute inset-0 bg-white/5 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
+        <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+      </div>
+    ))}
+  </div>
+);
+
+const TerminalAnimation = () => (
+  <div className="relative w-16 h-12 border border-white/30 bg-black/50 p-1 flex flex-col gap-1 overflow-hidden">
+    <div className="w-full h-[1px] bg-white/20" />
+    <div className="font-mono text-[6px] text-white/70 leading-none">
+      {">"} INIT_SEQ<br/>
+      {">"} LOADING...<br/>
+      <span className="animate-pulse">{">"} _</span>
+    </div>
+  </div>
+);
+
+const ApiAnimation = () => (
+  <div className="relative w-16 h-16 flex items-center justify-center">
+    <div className="absolute w-12 h-12 border border-white/30 rounded-full animate-spin-slow-reverse" />
+    <div className="absolute w-8 h-8 border border-white/50 rounded-full animate-spin-slow" />
+    <div className="w-2 h-2 bg-white rounded-full" />
+    {[...Array(4)].map((_, i) => (
+      <div 
+        key={i} 
+        className="absolute w-1 h-8 bg-gradient-to-b from-white/30 to-transparent"
+        style={{ transform: `rotate(${i * 90}deg) translateY(-12px)` }} 
+      />
+    ))}
+  </div>
+);
+
+const EcosystemAnimation = () => (
+  <div className="relative w-16 h-16">
+    <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 p-2">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="border border-white/10 relative overflow-hidden">
+           <div className="absolute inset-0 bg-white/5 animate-pulse" style={{ animationDelay: `${i * 0.3}s` }} />
+        </div>
+      ))}
+    </div>
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="w-20 h-[1px] bg-white/10 rotate-45" />
+      <div className="w-20 h-[1px] bg-white/10 -rotate-45" />
+    </div>
+  </div>
+);
+
+const getAnimation = (type: string) => {
+  switch (type) {
+    case 'heart': return <HeartAnimation />;
+    case 'database': return <DatabaseAnimation />;
+    case 'terminal': return <TerminalAnimation />;
+    case 'api': return <ApiAnimation />;
+    case 'ecosystem': return <EcosystemAnimation />;
+    default: return <div className="w-12 h-12 border border-white/20" />;
+  }
+};
+
 export const Roadmap = () => {
   return (
-    <section className="py-32 relative overflow-hidden" id="roadmap">
-      {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-900/10 blur-[100px] rounded-full pointer-events-none" />
+    <section className="py-32 relative bg-[#050505] overflow-hidden" id="roadmap">
+      {/* Background Grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:24px_24px]" />
 
       <div className="container mx-auto px-6 relative z-10">
-        <div className="mb-24 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-mono text-slate-400 backdrop-blur-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            TIMELINE
-          </div>
-          
-          <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-            Development Roadmap
+        <div className="mb-24 flex flex-col items-start border-l-2 border-white/10 pl-8">
+          <div className="text-xs font-mono text-neutral-500 mb-2 uppercase tracking-widest">Strategic Vision</div>
+          <h2 className="text-4xl md:text-6xl font-bold text-white mb-4">
+            Development<br />Roadmap
           </h2>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto font-light leading-relaxed">
-            Our path to redefining retail trading infrastructure.
+          <p className="text-neutral-400 max-w-xl text-sm leading-relaxed">
+            Executing a phased rollout of high-performance infrastructure. 
+            From metric expansion to institutional-grade execution core.
           </p>
         </div>
 
-        <div className="max-w-5xl mx-auto">
-          <div className="relative">
-            {/* Center Line */}
-            <div className="absolute left-[20px] md:left-1/2 md:-ml-[1px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-blue-500/50 to-transparent" />
-
-            <div className="space-y-16">
-              {milestones.map((item, idx) => (
-                <div key={idx} className="relative group">
-                  
-                  {/* Timeline Dot */}
-                  <div className={`absolute left-[16px] md:left-1/2 md:-ml-[5px] top-8 w-[10px] h-[10px] rounded-full bg-[#050505] border-2 border-blue-500 z-20 group-hover:scale-150 transition-transform duration-500 ${item.glow}`} />
-                  
-                  <div className={`flex flex-col md:flex-row gap-8 md:gap-24 ${idx % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
-                    
-                    {/* Content Card */}
-                    <div className="flex-1 ml-12 md:ml-0">
-                      <div className={`
-                        relative glass-card p-8 rounded-2xl transition-all duration-500
-                        hover:bg-white/10 hover:border-white/20 hover:scale-[1.02]
-                        group-hover:shadow-[0_0_30px_rgba(0,0,0,0.5)]
-                        ${idx % 2 === 0 ? 'md:text-left' : 'md:text-left'}
-                      `}>
-                        {/* Glow Effect on Hover */}
-                        <div className={`absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
-
-                        <div className="relative z-10">
-                          <div className="flex items-center gap-3 mb-4">
-                            <span className={`font-mono text-sm px-3 py-1 rounded-full bg-white/5 border border-white/10 ${item.color}`}>
-                              {item.quarter}
-                            </span>
-                            <item.icon className={`w-5 h-5 ${item.color}`} />
-                          </div>
-                          
-                          <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-glow transition-all">
-                            {item.title}
-                          </h3>
-                          
-                          <p className="text-slate-400 mb-6 text-sm leading-relaxed">
-                            {item.description}
-                          </p>
-
-                          <ul className="space-y-3">
-                            {item.details.map((detail, dIdx) => (
-                              <li key={dIdx} className="flex items-start gap-3 text-sm text-slate-500 group-hover:text-slate-400 transition-colors">
-                                <span className={`mt-1.5 w-1.5 h-1.5 rounded-full ${item.color.replace('text-', 'bg-')}`} />
-                                {detail}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Spacer */}
-                    <div className="hidden md:block flex-1" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {milestones.map((item, idx) => (
+            <div 
+              key={idx} 
+              className="group relative bg-white/[0.02] border border-white/5 p-8 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300 flex flex-col justify-between min-h-[300px]"
+            >
+              {/* Connector Line (Design Element) */}
+              <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-white/10 opacity-50" />
+              
+              <div>
+                <div className="flex justify-between items-start mb-8">
+                  <div className="font-mono text-xs text-neutral-500 border border-white/10 px-2 py-1">
+                    {item.quarter}
+                  </div>
+                  {/* Custom Animation Container */}
+                  <div className="opacity-70 group-hover:opacity-100 transition-opacity">
+                    {getAnimation(item.type)}
                   </div>
                 </div>
-              ))}
+
+                <h3 className="text-xl font-bold text-white mb-3 tracking-tight">
+                  {item.title}
+                </h3>
+                
+                <p className="text-neutral-500 text-sm leading-relaxed mb-6">
+                  {item.description}
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-6 border-t border-white/5">
+                {item.details.map((detail, dIdx) => (
+                  <div key={dIdx} className="flex items-center gap-2 text-xs font-mono text-neutral-400">
+                    <div className="w-1 h-1 bg-white/30" />
+                    {detail}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </section>

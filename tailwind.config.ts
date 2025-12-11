@@ -144,6 +144,11 @@ export default {
           from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "data-stream": {
+          "0%": { transform: "translateY(0) scaleY(0)", opacity: "0" },
+          "50%": { transform: "translateY(100vh) scaleY(1)", opacity: "1" },
+          "100%": { transform: "translateY(200vh) scaleY(0)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)",
@@ -151,6 +156,7 @@ export default {
         blob: "blob 7s infinite",
         shimmer: "shimmer 2s linear infinite",
         "fade-in": "fade-in 0.5s ease-out forwards",
+        "data-stream": "data-stream 5s linear infinite",
       },
     },
   },

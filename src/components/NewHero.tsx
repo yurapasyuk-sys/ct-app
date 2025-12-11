@@ -1,11 +1,13 @@
 import { ArrowRight, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { TechnicalGrid } from './TechnicalGrid';
+import { DataStream } from './DataStream';
 
 export const NewHero = () => {
   return (
     <section className="relative min-h-[95vh] flex items-center bg-[#050505] overflow-hidden border-b border-white/5">
       <TechnicalGrid />
+      <DataStream />
       
       {/* Decorative flow lines (abstract) - localized to keep it strict */}
       <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-white/5 rounded-full blur-[150px] opacity-10 pointer-events-none mix-blend-screen" />
