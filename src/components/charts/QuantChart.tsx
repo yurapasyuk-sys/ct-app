@@ -106,6 +106,11 @@ export const QuantChart: React.FC<QuantChartProps> = ({
     offset: number;
   } | null>(null);
 
+  // Resize states for panel separator
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStartY, setResizeStartY] = useState(0);
+  const [resizeStartRatio, setResizeStartRatio] = useState(0);
+
   // Configuration
   const baseCandleWidth = 5;
   const gapRatio = 0.4;
