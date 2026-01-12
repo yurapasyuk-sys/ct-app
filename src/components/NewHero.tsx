@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { TechnicalGrid } from "./TechnicalGrid";
 import { DataStream } from "./DataStream";
 import { Hero3D } from "./Hero3D";
+import ltSpaceLogo from "../assets/Cryptomannn Academy Avatar Black (2).png";
+import ctLogo from "../assets/logo228123.jpg";
 
 export const NewHero = () => {
   return (
@@ -85,7 +87,11 @@ export const NewHero = () => {
                 className="group relative px-10 py-5 bg-white text-black font-bold text-lg tracking-widest transition-all hover:bg-neutral-200 hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]"
               >
                 <div className="relative flex items-center gap-4">
-                  <Terminal className="w-6 h-6" />
+                  <img
+                    src={ltSpaceLogo}
+                    alt="LT Space"
+                    className="w-8 h-8 rounded-full"
+                  />
                   <span>LT SPACE</span>
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -97,7 +103,11 @@ export const NewHero = () => {
                   className="group px-6 py-3 bg-transparent border border-white/20 hover:bg-white/5 text-white/80 font-bold tracking-wider transition-all text-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <Terminal className="w-4 h-4" />
+                    <img
+                      src={ctLogo}
+                      alt="CT Terminal"
+                      className="w-5 h-5 rounded-full"
+                    />
                     <span>CT TERMINAL</span>
                   </div>
                 </Link>
@@ -107,7 +117,11 @@ export const NewHero = () => {
                   className="group px-6 py-3 bg-transparent border border-white/20 hover:bg-white/5 text-white/80 font-bold tracking-wider transition-all text-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <Activity className="w-4 h-4" />
+                    <img
+                      src={ctLogo}
+                      alt="CT Screener"
+                      className="w-5 h-5 rounded-full"
+                    />
                     <span>CT SCREENER</span>
                   </div>
                 </Link>
