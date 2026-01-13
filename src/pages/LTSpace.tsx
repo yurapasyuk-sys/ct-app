@@ -36,6 +36,7 @@ const sankeyData = {
     { name: "SOL-Stablecoin", fill: "#6366f1" },
     { name: "Stablecoin Swaps", fill: "#22c55e" },
     { name: "Tokenized Assets", fill: "#eab308" },
+    { name: "DBC", fill: "#8b5cf6" },
   ],
   links: [
     { source: 0, target: 2, value: 227.65 },
@@ -57,6 +58,9 @@ const sankeyData = {
     { source: 1, target: 8, value: 15024.9 },
     { source: 1, target: 10, value: 26.17 },
     { source: 1, target: 11, value: 57.84 },
+    { source: 12, target: 6, value: 150000 },
+    { source: 12, target: 8, value: 40000 },
+    { source: 12, target: 5, value: 5000 },
   ],
 };
 
@@ -946,10 +950,10 @@ const LTSpace = () => {
                           opacity={0.9}
                         />
                         <text
-                          x={isSource ? x + width + 6 : x - 6}
+                          x={isSource ? x - 6 : x + width + 6}
                           y={y + height / 2}
                           dy={4}
-                          textAnchor={isSource ? "start" : "end"}
+                          textAnchor={isSource ? "end" : "start"}
                           fontSize={10}
                           fontFamily="monospace"
                           fontWeight="bold"
@@ -967,7 +971,7 @@ const LTSpace = () => {
                   link={<SankeyLink />}
                   nodePadding={10}
                   nodeWidth={20}
-                  margin={{ left: 20, right: 120, top: 20, bottom: 20 }}
+                  margin={{ left: 100, right: 150, top: 20, bottom: 20 }}
                 >
                   <Tooltip
                     contentStyle={{
