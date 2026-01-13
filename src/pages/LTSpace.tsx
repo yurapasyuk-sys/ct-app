@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { ArrowLeft, Terminal, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
+import ltSpaceLogo from "../assets/calogo.png";
 
 interface CombinedChartData {
   date: string;
@@ -193,7 +194,11 @@ const LTSpace = () => {
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[100px]" />
 
         <div className="z-10 flex flex-col items-center gap-6">
-          <Terminal className="w-12 h-12 animate-pulse text-neutral-400" />
+          <img
+            src={ltSpaceLogo}
+            alt="LT Space"
+            className="w-48 h-48 animate-pulse rounded-full opacity-90"
+          />
           <div className="flex flex-col items-center gap-2">
             <div className="text-2xl font-mono tracking-widest font-bold">
               INITIALIZING LT SPACE
