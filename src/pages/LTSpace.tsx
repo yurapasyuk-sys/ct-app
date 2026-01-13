@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -437,7 +439,29 @@ const LTSpace = () => {
 
           <div className="h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={fdmcFeesData}>
+              <AreaChart data={fdmcFeesData}>
+                <defs>
+                  <linearGradient
+                    id="colorMetFdmcFees"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient
+                    id="colorRayFdmcFees"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#f472b6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f472b6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="date"
                   axisLine={false}
@@ -460,7 +484,6 @@ const LTSpace = () => {
                   }}
                 />
                 <Tooltip
-                  cursor={{ fill: "white", opacity: 0.05 }}
                   contentStyle={{
                     backgroundColor: "#000",
                     borderColor: "#333",
@@ -476,26 +499,30 @@ const LTSpace = () => {
                 <Legend
                   verticalAlign="top"
                   height={36}
-                  iconType="square"
+                  iconType="circle"
                   formatter={(value) => (
                     <span className="text-neutral-400 font-mono text-sm ml-2">
                       {value}
                     </span>
                   )}
                 />
-                <Bar
+                <Area
+                  type="monotone"
                   name="Meteora"
                   dataKey="met"
-                  fill="#38bdf8" // Light Blue
-                  radius={[2, 2, 0, 0]}
+                  stroke="#38bdf8"
+                  fillOpacity={1}
+                  fill="url(#colorMetFdmcFees)"
                 />
-                <Bar
+                <Area
+                  type="monotone"
                   name="Raydium"
                   dataKey="ray"
-                  fill="#f472b6" // Pink
-                  radius={[2, 2, 0, 0]}
+                  stroke="#f472b6"
+                  fillOpacity={1}
+                  fill="url(#colorRayFdmcFees)"
                 />
-              </BarChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -513,7 +540,29 @@ const LTSpace = () => {
 
           <div className="h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={fdmcRevenueData}>
+              <AreaChart data={fdmcRevenueData}>
+                <defs>
+                  <linearGradient
+                    id="colorMetFdmcRev"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#2dd4bf" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#2dd4bf" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient
+                    id="colorRayFdmcRev"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#fb7185" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#fb7185" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="date"
                   axisLine={false}
@@ -536,7 +585,6 @@ const LTSpace = () => {
                   }}
                 />
                 <Tooltip
-                  cursor={{ fill: "white", opacity: 0.05 }}
                   contentStyle={{
                     backgroundColor: "#000",
                     borderColor: "#333",
@@ -552,26 +600,30 @@ const LTSpace = () => {
                 <Legend
                   verticalAlign="top"
                   height={36}
-                  iconType="square"
+                  iconType="circle"
                   formatter={(value) => (
                     <span className="text-neutral-400 font-mono text-sm ml-2">
                       {value}
                     </span>
                   )}
                 />
-                <Bar
+                <Area
+                  type="monotone"
                   name="Meteora"
                   dataKey="met"
-                  fill="#2dd4bf" // Teal
-                  radius={[2, 2, 0, 0]}
+                  stroke="#2dd4bf"
+                  fillOpacity={1}
+                  fill="url(#colorMetFdmcRev)"
                 />
-                <Bar
+                <Area
+                  type="monotone"
                   name="Raydium"
                   dataKey="ray"
-                  fill="#fb7185" // Rose
-                  radius={[2, 2, 0, 0]}
+                  stroke="#fb7185"
+                  fillOpacity={1}
+                  fill="url(#colorRayFdmcRev)"
                 />
-              </BarChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
