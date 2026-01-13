@@ -921,6 +921,8 @@ const LTSpace = () => {
             </div>
           </div>
 
+          {/* Bottom Grid: Sankey & CEX */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Sankey Chart */}
           <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
             <div className="flex items-center justify-between mb-6">
@@ -1005,31 +1007,18 @@ const LTSpace = () => {
           </div>
 
           {/* CEX Holdings Chart */}
-          <div
-            style={{
-              backgroundColor: "#111",
-              padding: "20px",
-              borderRadius: "12px",
-              border: "1px solid #333",
-              marginBottom: "20px",
-              height: "400px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "20px",
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: "16px", color: "#ccc" }}>
+          <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
                 MET HELD ON CEXs
               </h3>
-              <div style={{ color: "#666", fontSize: "12px" }}>
-                Source: Blockworks Research
-              </div>
+              <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                DAILY TIMEFRAME
+              </span>
             </div>
-            <ResponsiveContainer width="100%" height="100%">
+
+            <div className="h-[600px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={visibleCexHoldings}>
                 <defs>
                   <linearGradient id="colorBybit" x1="0" y1="0" x2="0" y2="1">
@@ -1132,6 +1121,7 @@ const LTSpace = () => {
                 />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
           </div>
         </div>
       </div>
