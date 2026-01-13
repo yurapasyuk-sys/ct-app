@@ -24,18 +24,18 @@ interface CombinedChartData {
 
 const sankeyData = {
   nodes: [
-    { name: "DAMM" },
-    { name: "DLMM" },
-    { name: "AI Agents" },
-    { name: "Bitcoin" },
-    { name: "Composite Tokens" },
-    { name: "LST Swaps" },
-    { name: "Memes" },
-    { name: "Other" },
-    { name: "Project Tokens" },
-    { name: "SOL-Stablecoin" },
-    { name: "Stablecoin Swaps" },
-    { name: "Tokenized Assets" },
+    { name: "DAMM", fill: "#737373" },
+    { name: "DLMM", fill: "#737373" },
+    { name: "AI Agents", fill: "#ec4899" },
+    { name: "Bitcoin", fill: "#f59e0b" },
+    { name: "Composite Tokens", fill: "#14b8a6" },
+    { name: "LST Swaps", fill: "#3b82f6" },
+    { name: "Memes", fill: "#a855f7" },
+    { name: "Other", fill: "#9ca3af" },
+    { name: "Project Tokens", fill: "#ef4444" },
+    { name: "SOL-Stablecoin", fill: "#6366f1" },
+    { name: "Stablecoin Swaps", fill: "#22c55e" },
+    { name: "Tokenized Assets", fill: "#eab308" },
   ],
   links: [
     { source: 0, target: 2, value: 227.65 },
@@ -58,6 +58,29 @@ const sankeyData = {
     { source: 1, target: 10, value: 26.17 },
     { source: 1, target: 11, value: 57.84 },
   ],
+};
+
+const SankeyLink = (props: any) => {
+  const { sourceX, targetX, sourceY, targetY, linkWidth, payload } = props;
+  const color = payload.target.fill || "#525252";
+
+  const path = `
+    M${sourceX},${sourceY}
+    C${sourceX + (targetX - sourceX) / 2},${sourceY}
+     ${sourceX + (targetX - sourceX) / 2},${targetY}
+     ${targetX},${targetY}
+  `;
+
+  return (
+    <path
+      d={path}
+      stroke={color}
+      strokeWidth={Math.max(1, linkWidth)}
+      fill="none"
+      opacity={0.4}
+      style={{ transition: "all 0.3s" }}
+    />
+  );
 };
 
 const LTSpace = () => {
@@ -898,15 +921,27 @@ const LTSpace = () => {
               <style>{`
                 .recharts-sankey-node text {
                   fill: #fff !important;
-                  font-size: 12px;
+                  font-size: 10px;
                   font-family: monospace;
+                  font-weight: bold;
                 }
               `}</style>
               <ResponsiveContainer width="100%" height="100%">
                 <Sankey
                   data={sankeyData}
-                  node={{ stroke: "none", fill: "#525252" }}
-                  link={{ stroke: "#a855f7", strokeOpacity: 0.3 }}
+                  node={({ x, y, width, height, index, payload, fill }) => {
+                    return (
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        fill={fill}
+                        opacity={0.9}
+                      />
+                    );
+                  }}
+                  link={<SankeyLink />}
                   nodePadding={50}
                   margin={{ left: 20, right: 20, top: 20, bottom: 20 }}
                 >
