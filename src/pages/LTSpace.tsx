@@ -480,6 +480,20 @@ const LTSpace = () => {
         const tvlCsv = getValue(results[0]) as string | null;
         const revenueCsv = getValue(results[1]) as string | null;
         const buybackCsv = getValue(results[2]) as string | null;
+
+        // Log which requests succeeded/failed
+        console.log("[ETHFI] API results:", {
+          tvl: tvlCsv ? "OK" : "FAILED",
+          revenue: revenueCsv ? "OK" : "FAILED",
+          buyback: buybackCsv ? "OK" : "FAILED",
+          staked: getValue(results[3]) ? "OK" : "FAILED",
+          activeLoans: getValue(results[4]) ? "OK" : "FAILED",
+          lrtTvl: getValue(results[5]) ? "OK" : "FAILED",
+          lstTvl: getValue(results[6]) ? "OK" : "FAILED",
+          cashSpend: getValue(results[7]) ? "OK" : "FAILED",
+          cashBorrow: getValue(results[8]) ? "OK" : "FAILED",
+          liquidVaults: getValue(results[9]) ? "OK" : "FAILED",
+        });
         const stakedCsv = getValue(results[3]) as string | null;
         const activeLoansJson = getValue(results[4]) as any | null;
         const lrtTvlJson = getValue(results[5]) as any | null;
@@ -535,7 +549,16 @@ const LTSpace = () => {
         let revenueParsed: EthfiRevenueData[] = [];
         if (revenueCsv) {
           try {
+            console.log("[ETHFI] Revenue CSV length:", revenueCsv.length);
             const revenueRaw = parseCSV(revenueCsv);
+            console.log("[ETHFI] Revenue parsed rows:", revenueRaw.length);
+            if (revenueRaw.length > 0) {
+              console.log(
+                "[ETHFI] Revenue first row keys:",
+                Object.keys(revenueRaw[0]),
+              );
+              console.log("[ETHFI] Revenue first row:", revenueRaw[0]);
+            }
             const revenueByDate: Record<string, EthfiRevenueData> = {};
             revenueRaw.forEach((row) => {
               const dateKey = new Date(row.day).toISOString().split("T")[0];
@@ -565,6 +588,11 @@ const LTSpace = () => {
             revenueParsed = Object.entries(revenueByDate)
               .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
               .map(([, data]) => data);
+            console.log(
+              "[ETHFI] Revenue final parsed:",
+              revenueParsed.length,
+              "entries",
+            );
             setEthfiRevenueData(revenueParsed);
           } catch (e) {
             console.warn("[ETHFI] Failed to parse Revenue data:", e);
