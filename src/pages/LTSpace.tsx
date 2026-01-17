@@ -62,6 +62,13 @@ interface EthfiStakedData {
   percStaked: number;
 }
 
+interface EthfiMarketShareData {
+  date: string;
+  totalTvl: number;
+  ethfiTvl: number;
+  ethfiShare: number;
+}
+
 const sankeyData = {
   nodes: [
     { name: "DAMM", fill: "#737373" },
@@ -163,6 +170,12 @@ const LTSpace = () => {
     EthfiRevenueGrowthData[]
   >([]);
   const [ethfiStakedData, setEthfiStakedData] = useState<EthfiStakedData[]>([]);
+  const [ethfiLrtMarketShare, setEthfiLrtMarketShare] = useState<
+    EthfiMarketShareData[]
+  >([]);
+  const [ethfiLstMarketShare, setEthfiLstMarketShare] = useState<
+    EthfiMarketShareData[]
+  >([]);
   const [ethfiLoading, setEthfiLoading] = useState(false);
   const [ethfiError, setEthfiError] = useState<string | null>(null);
   const [fdmcRevenueData, setFdmcRevenueData] = useState<CombinedChartData[]>(
@@ -361,40 +374,79 @@ const LTSpace = () => {
         const API_BASE = "https://api.borkiss.trade/v1/query";
 
         // Fetch all datasets in parallel
-        const [tvlRes, revenueRes, buybackRes, stakedRes, activeLoansRes] =
-          await Promise.all([
-            fetch(`${API_BASE}/3961816/results/csv`),
-            fetch(`${API_BASE}/5490119/results/csv`),
-            fetch(`${API_BASE}/5135676/results/csv`),
-            fetch(`${API_BASE}/4283053/results/csv`),
-            fetch("https://api.tokenterminal.com/trpc/metrics.postTimeseries", {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-                authorization: "Bearer c0e5035a-64f6-4d2c-b5f6-ac1d1cb3da2f",
-                "x-tt-terminal-jwt":
-                  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcm9udEVuZCI6InRlcm1pbmFsIGRhc2hib2FyZCIsImlhdCI6MTc2ODYxMDE3NCwiZXhwIjoxNzY5ODE5Nzc0fQ.lLTq3tyur3JRZiU8otKw4uD6BvO39M8tTg_-_BLkBXg",
-              },
-              body: JSON.stringify({
-                data_ids: ["etherfi"],
-                metric_ids: ["active_loans"],
-                interval: "1095d",
-                groupBy: "chain",
-                includeSelf: false,
-                include_products_in_project_breakdown: false,
-                bridged: false,
-              }),
-            }),
-          ]);
+        // Calculate date range for Artemis API (90 days)
+        const endDate = new Date();
+        const startDateObj = new Date();
+        startDateObj.setDate(startDateObj.getDate() - 90);
+        const formatArtemisDate = (d: Date) => d.toISOString().split("T")[0];
 
-        const [tvlCsv, revenueCsv, buybackCsv, stakedCsv, activeLoansJson] =
-          await Promise.all([
-            tvlRes.text(),
-            revenueRes.text(),
-            buybackRes.text(),
-            stakedRes.text(),
-            activeLoansRes.json(),
-          ]);
+        const artemisHeaders = {
+          accept: "application/json, text/plain, */*",
+          authorization: "_QUAsXmDQbfx12dNLKAlYhkrY4wbQBa71zfoPvWoJ05B",
+          origin: "https://app.artemisanalytics.com",
+          referer: "https://app.artemisanalytics.com/",
+          "x-art-webtoken":
+            "eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3Njg2NDk2MzksImV4cCI6MTc2ODczNjAzOX0.EgWcfY9aYnFfzm9DXlaJL247a2-oo0aTYZh5TAkSCPg",
+        };
+
+        const [
+          tvlRes,
+          revenueRes,
+          buybackRes,
+          stakedRes,
+          activeLoansRes,
+          lrtTvlRes,
+          lstTvlRes,
+        ] = await Promise.all([
+          fetch(`${API_BASE}/3961816/results/csv`),
+          fetch(`${API_BASE}/5490119/results/csv`),
+          fetch(`${API_BASE}/5135676/results/csv`),
+          fetch(`${API_BASE}/4283053/results/csv`),
+          fetch("https://api.tokenterminal.com/trpc/metrics.postTimeseries", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: "Bearer c0e5035a-64f6-4d2c-b5f6-ac1d1cb3da2f",
+              "x-tt-terminal-jwt":
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcm9udEVuZCI6InRlcm1pbmFsIGRhc2hib2FyZCIsImlhdCI6MTc2ODYxMDE3NCwiZXhwIjoxNzY5ODE5Nzc0fQ.lLTq3tyur3JRZiU8otKw4uD6BvO39M8tTg_-_BLkBXg",
+            },
+            body: JSON.stringify({
+              data_ids: ["etherfi"],
+              metric_ids: ["active_loans"],
+              interval: "1095d",
+              groupBy: "chain",
+              includeSelf: false,
+              include_products_in_project_breakdown: false,
+              bridged: false,
+            }),
+          }),
+          fetch(
+            `https://data-svc.artemisxyz.com/v2/data/LRT_TVL?symbols=bedrock,egp,ethfi,kep,puffer,rez,layer,swell&startDate=${formatArtemisDate(startDateObj)}&endDate=${formatArtemisDate(endDate)}`,
+            { headers: artemisHeaders },
+          ),
+          fetch(
+            `https://data-svc.artemisxyz.com/v2/data/LST_TVL?symbols=bnb,eq-coin,fxs,jto,kntq,ldo,mnt,mnde,rpl,sd,strd,swell&startDate=${formatArtemisDate(startDateObj)}&endDate=${formatArtemisDate(endDate)}`,
+            { headers: artemisHeaders },
+          ),
+        ]);
+
+        const [
+          tvlCsv,
+          revenueCsv,
+          buybackCsv,
+          stakedCsv,
+          activeLoansJson,
+          lrtTvlJson,
+          lstTvlJson,
+        ] = await Promise.all([
+          tvlRes.text(),
+          revenueRes.text(),
+          buybackRes.text(),
+          stakedRes.text(),
+          activeLoansRes.json(),
+          lrtTvlRes.json(),
+          lstTvlRes.json(),
+        ]);
 
         // Parse TVL data (Chart 1)
         const tvlRaw = parseCSV(tvlCsv);
@@ -538,6 +590,80 @@ const LTSpace = () => {
           });
         }
         setEthfiRevenueGrowthData(revenueGrowthParsed);
+
+        // Parse LRT TVL data for Chart 4 (Restaking Market Share)
+        // Build a map of ETHFI TVL by date from our TVL data
+        const ethfiTvlByDate: Record<string, number> = {};
+        tvlParsed.forEach((row) => {
+          ethfiTvlByDate[row.date] = row.tvlUsd;
+        });
+
+        if (lrtTvlJson && Array.isArray(lrtTvlJson)) {
+          // Group by date and sum all protocol TVLs
+          const lrtByDate: Record<string, number> = {};
+          lrtTvlJson.forEach((row: { date: string; val: number }) => {
+            const dateStr = new Date(row.date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "2-digit",
+            });
+            if (!lrtByDate[dateStr]) {
+              lrtByDate[dateStr] = 0;
+            }
+            lrtByDate[dateStr] += row.val || 0;
+          });
+
+          const lrtMarketShareParsed: EthfiMarketShareData[] = Object.entries(
+            lrtByDate,
+          )
+            .map(([date, totalTvl]) => {
+              const ethfiTvl = ethfiTvlByDate[date] || 0;
+              return {
+                date,
+                totalTvl,
+                ethfiTvl,
+                ethfiShare: totalTvl > 0 ? (ethfiTvl / totalTvl) * 100 : 0,
+              };
+            })
+            .sort(
+              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+            );
+          setEthfiLrtMarketShare(lrtMarketShareParsed);
+        }
+
+        // Parse LST TVL data for Chart 5 (Liquid Staking Market Share)
+        if (lstTvlJson && Array.isArray(lstTvlJson)) {
+          // Group by date and sum all protocol TVLs
+          const lstByDate: Record<string, number> = {};
+          lstTvlJson.forEach((row: { date: string; val: number }) => {
+            const dateStr = new Date(row.date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "2-digit",
+            });
+            if (!lstByDate[dateStr]) {
+              lstByDate[dateStr] = 0;
+            }
+            lstByDate[dateStr] += row.val || 0;
+          });
+
+          const lstMarketShareParsed: EthfiMarketShareData[] = Object.entries(
+            lstByDate,
+          )
+            .map(([date, totalTvl]) => {
+              const ethfiTvl = ethfiTvlByDate[date] || 0;
+              return {
+                date,
+                totalTvl,
+                ethfiTvl,
+                ethfiShare: totalTvl > 0 ? (ethfiTvl / totalTvl) * 100 : 0,
+              };
+            })
+            .sort(
+              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+            );
+          setEthfiLstMarketShare(lstMarketShareParsed);
+        }
       } catch (err) {
         console.error("Error fetching ETHFI data:", err);
         setEthfiError("Failed to load ETHFI data");
@@ -1914,6 +2040,202 @@ const LTSpace = () => {
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+
+              {/* Chart 4: ETHFI Market Share of Total Restaking TVL */}
+              <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    ETHFI MARKET SHARE OF RESTAKING TVL
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                    DAILY • LRT
+                  </span>
+                </div>
+
+                <div className="h-[400px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ethfiLrtMarketShare}>
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        dy={10}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        tickFormatter={(value) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            notation: "compact",
+                            maximumFractionDigits: 1,
+                          }).format(value)}`
+                        }
+                      />
+                      <Tooltip
+                        cursor={{ fill: "white", opacity: 0.05 }}
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          borderColor: "#333",
+                          color: "#fff",
+                        }}
+                        itemStyle={{ color: "#fff" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "ETHFI Share %") {
+                            return `${value.toFixed(2)}%`;
+                          }
+                          return `$${Intl.NumberFormat("en-US", {
+                            maximumFractionDigits: 0,
+                          }).format(value)}`;
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        iconType="square"
+                        formatter={(value) => (
+                          <span className="text-neutral-400 font-mono text-sm ml-2">
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Bar
+                        dataKey="totalTvl"
+                        name="Total LRT TVL"
+                        fill="#525252"
+                        radius={[2, 2, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="ethfiTvl"
+                        name="ETHFI TVL"
+                        fill="#a855f7"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {ethfiLrtMarketShare.length > 0 && (
+                  <div className="mt-4 text-center">
+                    <span className="text-sm font-mono text-neutral-400">
+                      Current ETHFI Share:{" "}
+                      <span className="text-a855f7 font-bold">
+                        {ethfiLrtMarketShare[
+                          ethfiLrtMarketShare.length - 1
+                        ]?.ethfiShare.toFixed(2)}
+                        %
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chart 5: ETHFI Market Share of Total Liquid Staking TVL */}
+              <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    ETHFI MARKET SHARE OF LIQUID STAKING TVL
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                    DAILY • LST
+                  </span>
+                </div>
+
+                <div className="h-[400px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ethfiLstMarketShare}>
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        dy={10}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        tickFormatter={(value) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            notation: "compact",
+                            maximumFractionDigits: 1,
+                          }).format(value)}`
+                        }
+                      />
+                      <Tooltip
+                        cursor={{ fill: "white", opacity: 0.05 }}
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          borderColor: "#333",
+                          color: "#fff",
+                        }}
+                        itemStyle={{ color: "#fff" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "ETHFI Share %") {
+                            return `${value.toFixed(2)}%`;
+                          }
+                          return `$${Intl.NumberFormat("en-US", {
+                            maximumFractionDigits: 0,
+                          }).format(value)}`;
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        iconType="square"
+                        formatter={(value) => (
+                          <span className="text-neutral-400 font-mono text-sm ml-2">
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Bar
+                        dataKey="totalTvl"
+                        name="Total LST TVL"
+                        fill="#525252"
+                        radius={[2, 2, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="ethfiTvl"
+                        name="ETHFI TVL"
+                        fill="#22c55e"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {ethfiLstMarketShare.length > 0 && (
+                  <div className="mt-4 text-center">
+                    <span className="text-sm font-mono text-neutral-400">
+                      Current ETHFI Share:{" "}
+                      <span className="text-green-500 font-bold">
+                        {ethfiLstMarketShare[
+                          ethfiLstMarketShare.length - 1
+                        ]?.ethfiShare.toFixed(2)}
+                        %
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Chart 6: Active Loans - Area Chart */}
