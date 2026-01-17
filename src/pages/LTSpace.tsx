@@ -1658,7 +1658,7 @@ const LTSpace = () => {
                       <Bar
                         dataKey="Staking"
                         stackId="revenue"
-                        fill="#000000"
+                        fill="#525252"
                         radius={[0, 0, 0, 0]}
                       />
                       <Bar
@@ -1784,7 +1784,7 @@ const LTSpace = () => {
                         type="monotone"
                         dataKey="cumulative"
                         name="Cum. ETHFI Bought"
-                        stroke="#000000"
+                        stroke="#ffffff"
                         strokeWidth={2}
                         dot={false}
                       />
