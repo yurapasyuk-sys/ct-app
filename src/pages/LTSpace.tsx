@@ -598,20 +598,36 @@ const LTSpace = () => {
           ethfiTvlByDate[row.date] = row.tvlUsd;
         });
 
-        if (lrtTvlJson && Array.isArray(lrtTvlJson)) {
+        // Artemis API format: { series: [{ asset, data: [[timestamp, value], ...] }, ...] }
+        if (
+          lrtTvlJson &&
+          lrtTvlJson.series &&
+          Array.isArray(lrtTvlJson.series)
+        ) {
           // Group by date and sum all protocol TVLs
           const lrtByDate: Record<string, number> = {};
-          lrtTvlJson.forEach((row: { date: string; val: number }) => {
-            const dateStr = new Date(row.date).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "2-digit",
-            });
-            if (!lrtByDate[dateStr]) {
-              lrtByDate[dateStr] = 0;
-            }
-            lrtByDate[dateStr] += row.val || 0;
-          });
+
+          lrtTvlJson.series.forEach(
+            (protocol: { asset: string; data: number[][] | string }) => {
+              // Skip if data is not available (string error message)
+              if (!Array.isArray(protocol.data)) return;
+
+              protocol.data.forEach(([timestamp, value]: [number, number]) => {
+                const dateStr = new Date(timestamp).toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "2-digit",
+                  },
+                );
+                if (!lrtByDate[dateStr]) {
+                  lrtByDate[dateStr] = 0;
+                }
+                lrtByDate[dateStr] += value || 0;
+              });
+            },
+          );
 
           const lrtMarketShareParsed: EthfiMarketShareData[] = Object.entries(
             lrtByDate,
@@ -632,20 +648,35 @@ const LTSpace = () => {
         }
 
         // Parse LST TVL data for Chart 5 (Liquid Staking Market Share)
-        if (lstTvlJson && Array.isArray(lstTvlJson)) {
+        if (
+          lstTvlJson &&
+          lstTvlJson.series &&
+          Array.isArray(lstTvlJson.series)
+        ) {
           // Group by date and sum all protocol TVLs
           const lstByDate: Record<string, number> = {};
-          lstTvlJson.forEach((row: { date: string; val: number }) => {
-            const dateStr = new Date(row.date).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "2-digit",
-            });
-            if (!lstByDate[dateStr]) {
-              lstByDate[dateStr] = 0;
-            }
-            lstByDate[dateStr] += row.val || 0;
-          });
+
+          lstTvlJson.series.forEach(
+            (protocol: { asset: string; data: number[][] | string }) => {
+              // Skip if data is not available (string error message)
+              if (!Array.isArray(protocol.data)) return;
+
+              protocol.data.forEach(([timestamp, value]: [number, number]) => {
+                const dateStr = new Date(timestamp).toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    year: "2-digit",
+                  },
+                );
+                if (!lstByDate[dateStr]) {
+                  lstByDate[dateStr] = 0;
+                }
+                lstByDate[dateStr] += value || 0;
+              });
+            },
+          );
 
           const lstMarketShareParsed: EthfiMarketShareData[] = Object.entries(
             lstByDate,
