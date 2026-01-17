@@ -13,6 +13,8 @@ import {
   Sankey,
   ComposedChart,
   Line,
+  PieChart,
+  Pie,
 } from "recharts";
 import { ArrowLeft, Terminal, Activity, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -67,6 +69,23 @@ interface EthfiMarketShareData {
   totalTvl: number;
   ethfiTvl: number;
   ethfiShare: number;
+}
+
+interface EthfiCashVolumeData {
+  date: string;
+  volume: number;
+}
+
+interface EthfiLiquidVaultsTvlData {
+  date: string;
+  [key: string]: number | string;
+}
+
+interface EthfiRevenueDistributionData {
+  name: string;
+  value: number;
+  percentage: number;
+  fill: string;
 }
 
 const sankeyData = {
@@ -175,6 +194,18 @@ const LTSpace = () => {
   >([]);
   const [ethfiLstMarketShare, setEthfiLstMarketShare] = useState<
     EthfiMarketShareData[]
+  >([]);
+  const [ethfiCashSpendVolume, setEthfiCashSpendVolume] = useState<
+    EthfiCashVolumeData[]
+  >([]);
+  const [ethfiCashBorrowVolume, setEthfiCashBorrowVolume] = useState<
+    EthfiCashVolumeData[]
+  >([]);
+  const [ethfiLiquidVaultsTvl, setEthfiLiquidVaultsTvl] = useState<
+    EthfiLiquidVaultsTvlData[]
+  >([]);
+  const [ethfiRevenueDistribution, setEthfiRevenueDistribution] = useState<
+    EthfiRevenueDistributionData[]
   >([]);
   const [ethfiLoading, setEthfiLoading] = useState(false);
   const [ethfiError, setEthfiError] = useState<string | null>(null);
@@ -397,6 +428,9 @@ const LTSpace = () => {
           activeLoansRes,
           lrtTvlRes,
           lstTvlRes,
+          cashSpendRes,
+          cashBorrowRes,
+          liquidVaultsRes,
         ] = await Promise.all([
           fetch(`${API_BASE}/3961816/results/csv`),
           fetch(`${API_BASE}/5490119/results/csv`),
@@ -428,6 +462,9 @@ const LTSpace = () => {
             `https://data-svc.artemisxyz.com/v2/data/LST_TVL?symbols=bnb,eq-coin,fxs,jto,kntq,ldo,mnt,mnde,rpl,sd,strd,swell&startDate=${formatArtemisDate(startDateObj)}&endDate=${formatArtemisDate(endDate)}`,
             { headers: artemisHeaders },
           ),
+          fetch(`${API_BASE}/4455397/results/csv`),
+          fetch(`${API_BASE}/4533826/results/csv`),
+          fetch(`${API_BASE}/4656856/results/csv`),
         ]);
 
         const [
@@ -438,6 +475,9 @@ const LTSpace = () => {
           activeLoansJson,
           lrtTvlJson,
           lstTvlJson,
+          cashSpendCsv,
+          cashBorrowCsv,
+          liquidVaultsCsv,
         ] = await Promise.all([
           tvlRes.text(),
           revenueRes.text(),
@@ -446,6 +486,9 @@ const LTSpace = () => {
           activeLoansRes.json(),
           lrtTvlRes.json(),
           lstTvlRes.json(),
+          cashSpendRes.text(),
+          cashBorrowRes.text(),
+          liquidVaultsRes.text(),
         ]);
 
         // Parse TVL data (Chart 1)
@@ -694,6 +737,138 @@ const LTSpace = () => {
               (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
             );
           setEthfiLstMarketShare(lstMarketShareParsed);
+        }
+
+        // Parse Cash Spend Volume data (last 90 days)
+        const cashSpendRaw = parseCSV(cashSpendCsv);
+        const cashSpendParsed: EthfiCashVolumeData[] = cashSpendRaw
+          .map((row) => ({
+            date: new Date(row.day).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "2-digit",
+            }),
+            rawDate: new Date(row.day).getTime(),
+            volume: parseFloat(row.spend_usd) || 0,
+          }))
+          .sort((a, b) => a.rawDate - b.rawDate)
+          .slice(-90)
+          .map(
+            ({
+              rawDate,
+              ...rest
+            }: {
+              rawDate: number;
+              date: string;
+              volume: number;
+            }) => rest,
+          );
+        setEthfiCashSpendVolume(cashSpendParsed);
+
+        // Parse Cash Borrow Volume data (last 90 days)
+        const cashBorrowRaw = parseCSV(cashBorrowCsv);
+        const cashBorrowParsed: EthfiCashVolumeData[] = cashBorrowRaw
+          .map((row) => ({
+            date: new Date(row.day).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "2-digit",
+            }),
+            rawDate: new Date(row.day).getTime(),
+            volume: parseFloat(row.spend_usd) || 0,
+          }))
+          .sort((a, b) => a.rawDate - b.rawDate)
+          .slice(-90)
+          .map(
+            ({
+              rawDate,
+              ...rest
+            }: {
+              rawDate: number;
+              date: string;
+              volume: number;
+            }) => rest,
+          );
+        setEthfiCashBorrowVolume(cashBorrowParsed);
+
+        // Parse Liquid Vaults TVL data - Stacked Area by vault type
+        const liquidVaultsRaw = parseCSV(liquidVaultsCsv);
+        const vaultsByDate: Record<string, Record<string, number>> = {};
+        const vaultNames = new Set<string>();
+
+        liquidVaultsRaw.forEach((row) => {
+          const dateStr = new Date(row.day).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "2-digit",
+          });
+          const vaultName = row.enriched_symbol || row.symbol;
+          const tvl = parseFloat(row.tvl_usd) || 0;
+
+          vaultNames.add(vaultName);
+
+          if (!vaultsByDate[dateStr]) {
+            vaultsByDate[dateStr] = { rawDate: new Date(row.day).getTime() };
+          }
+          vaultsByDate[dateStr][vaultName] = tvl;
+        });
+
+        const liquidVaultsParsed: EthfiLiquidVaultsTvlData[] = Object.entries(
+          vaultsByDate,
+        )
+          .map(([date, vaults]) => ({
+            date,
+            rawDate: vaults.rawDate as number,
+            ...Object.fromEntries(
+              Array.from(vaultNames).map((name) => [name, vaults[name] || 0]),
+            ),
+          }))
+          .sort((a, b) => (a.rawDate as number) - (b.rawDate as number))
+          .slice(-90)
+          .map(({ rawDate, ...rest }) => rest as EthfiLiquidVaultsTvlData);
+        setEthfiLiquidVaultsTvl(liquidVaultsParsed);
+
+        // Parse Revenue Distribution (last week from revenue data)
+        // Find the latest week and calculate totals by source
+        const revenueColors: Record<string, string> = {
+          "Liquid Vaults": "#22c55e",
+          Staking: "#6366f1",
+          Withdrawals: "#f59e0b",
+          "ether.fi Cash": "#a855f7",
+          "ether.fi Cash Borrows": "#ef4444",
+        };
+
+        // Get the latest week's data
+        const sortedRevenue = [...revenueParsed].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
+        const latestWeek = sortedRevenue[0];
+
+        if (latestWeek) {
+          const sources = [
+            { name: "Liquid Vaults", value: latestWeek["Liquid Vaults"] },
+            { name: "Staking", value: latestWeek.Staking },
+            { name: "Withdrawals", value: latestWeek.Withdrawals },
+            { name: "ether.fi Cash", value: latestWeek["ether.fi Cash"] },
+            {
+              name: "ether.fi Cash Borrows",
+              value: latestWeek["ether.fi Cash Borrows"],
+            },
+          ];
+
+          const total = sources.reduce((sum, s) => sum + s.value, 0);
+
+          const distributionParsed: EthfiRevenueDistributionData[] = sources
+            .filter((s) => s.value > 0)
+            .map((s) => ({
+              name: s.name,
+              value: s.value,
+              percentage: total > 0 ? (s.value / total) * 100 : 0,
+              fill: revenueColors[s.name] || "#525252",
+            }))
+            .sort((a, b) => b.value - a.value);
+
+          setEthfiRevenueDistribution(distributionParsed);
         }
       } catch (err) {
         console.error("Error fetching ETHFI data:", err);
@@ -2573,6 +2748,390 @@ const LTSpace = () => {
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+
+              {/* Chart: Cash Spend Volume */}
+              <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    CASH: SPEND VOLUME
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                    DAILY • LAST 90D
+                  </span>
+                </div>
+
+                <div className="h-[400px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ethfiCashSpendVolume}>
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        dy={10}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        tickFormatter={(value) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            notation: "compact",
+                            maximumFractionDigits: 1,
+                          }).format(value)}`
+                        }
+                      />
+                      <Tooltip
+                        cursor={{ fill: "white", opacity: 0.05 }}
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          borderColor: "#333",
+                          color: "#fff",
+                        }}
+                        itemStyle={{ color: "#fff" }}
+                        formatter={(value: number) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            maximumFractionDigits: 0,
+                          }).format(value)}`
+                        }
+                      />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        iconType="square"
+                        formatter={(value) => (
+                          <span className="text-neutral-400 font-mono text-sm ml-2">
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Bar
+                        dataKey="volume"
+                        name="Daily Spend"
+                        fill="#a855f7"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart: Cash Borrow Volume */}
+              <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    CASH: BORROW VOLUME
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                    DAILY • LAST 90D
+                  </span>
+                </div>
+
+                <div className="h-[400px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ethfiCashBorrowVolume}>
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        dy={10}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        tickFormatter={(value) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            notation: "compact",
+                            maximumFractionDigits: 1,
+                          }).format(value)}`
+                        }
+                      />
+                      <Tooltip
+                        cursor={{ fill: "white", opacity: 0.05 }}
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          borderColor: "#333",
+                          color: "#fff",
+                        }}
+                        itemStyle={{ color: "#fff" }}
+                        formatter={(value: number) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            maximumFractionDigits: 0,
+                          }).format(value)}`
+                        }
+                      />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        iconType="square"
+                        formatter={(value) => (
+                          <span className="text-neutral-400 font-mono text-sm ml-2">
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Bar
+                        dataKey="volume"
+                        name="Daily Borrow"
+                        fill="#6366f1"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart: Liquid Vaults TVL - Stacked Area */}
+              <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    LIQUID VAULTS TVL
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                    DAILY • LAST 90D
+                  </span>
+                </div>
+
+                <div className="h-[400px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={ethfiLiquidVaultsTvl}>
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        dy={10}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#525252",
+                          fontSize: 10,
+                          fontFamily: "monospace",
+                        }}
+                        tickFormatter={(value) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            notation: "compact",
+                            maximumFractionDigits: 1,
+                          }).format(value)}`
+                        }
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          borderColor: "#333",
+                          color: "#fff",
+                        }}
+                        itemStyle={{ color: "#fff" }}
+                        formatter={(value: number) =>
+                          `$${Intl.NumberFormat("en-US", {
+                            maximumFractionDigits: 0,
+                          }).format(value)}`
+                        }
+                      />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        formatter={(value) => (
+                          <span className="text-neutral-400 font-mono text-xs ml-1">
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (ETH Vault)"
+                        stackId="1"
+                        stroke="#3b82f6"
+                        fill="#3b82f6"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (USD Vault)"
+                        stackId="1"
+                        stroke="#14b8a6"
+                        fill="#14b8a6"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (BTC Vault)"
+                        stackId="1"
+                        stroke="#f59e0b"
+                        fill="#f59e0b"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (Katana ETH Vault)"
+                        stackId="1"
+                        stroke="#525252"
+                        fill="#525252"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (Bera ETH Vault)"
+                        stackId="1"
+                        stroke="#22c55e"
+                        fill="#22c55e"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (Bera BTC Vault)"
+                        stackId="1"
+                        stroke="#ec4899"
+                        fill="#ec4899"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="UltraYield Stablecoin Vault"
+                        stackId="1"
+                        stroke="#eab308"
+                        fill="#eab308"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Elixir Stable Vault"
+                        stackId="1"
+                        stroke="#6366f1"
+                        fill="#6366f1"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Usual Stable Vault"
+                        stackId="1"
+                        stroke="#a855f7"
+                        fill="#a855f7"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (Move ETH Vault)"
+                        stackId="1"
+                        stroke="#0ea5e9"
+                        fill="#0ea5e9"
+                        fillOpacity={0.8}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Liquid (Reserve Vault)"
+                        stackId="1"
+                        stroke="#ef4444"
+                        fill="#ef4444"
+                        fillOpacity={0.8}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Chart: Revenue Distribution by Source (Last Week) */}
+              <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-lg backdrop-blur-sm relative group hover:border-white/10 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                    REVENUE DISTRIBUTION BY SOURCE
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">
+                    LAST WEEK
+                  </span>
+                </div>
+
+                <div className="h-[400px] w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={ethfiRevenueDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={140}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percentage }) =>
+                          `${name}: ${percentage.toFixed(1)}%`
+                        }
+                        labelLine={{ stroke: "#525252" }}
+                      >
+                        {ethfiRevenueDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          borderColor: "#333",
+                          color: "#fff",
+                        }}
+                        formatter={(value: number, name: string) => [
+                          `$${Intl.NumberFormat("en-US", {
+                            maximumFractionDigits: 0,
+                          }).format(value)}`,
+                          name,
+                        ]}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        formatter={(value) => (
+                          <span className="text-neutral-400 font-mono text-sm ml-2">
+                            {value}
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                {ethfiRevenueDistribution.length > 0 && (
+                  <div className="mt-4 text-center">
+                    <span className="text-sm font-mono text-neutral-400">
+                      Total Weekly Revenue:{" "}
+                      <span className="text-white font-bold">
+                        $
+                        {Intl.NumberFormat("en-US", {
+                          maximumFractionDigits: 0,
+                        }).format(
+                          ethfiRevenueDistribution.reduce(
+                            (sum, s) => sum + s.value,
+                            0,
+                          ),
+                        )}
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             </>
           )}
