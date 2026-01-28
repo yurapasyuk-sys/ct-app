@@ -237,7 +237,7 @@ const LTSpace = () => {
           origin: "https://app.artemisanalytics.com",
           referer: "https://app.artemisanalytics.com/",
           "x-art-webtoken":
-            "eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3Njk0MzkyNTAsImV4cCI6MTc2OTUyNTY1MH0.YSKkOHktGkTqs5dPAsXvP3n9umGqy3b4UdnbE5fzYyM",
+            "eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3Njk2Mjc3NjIsImV4cCI6MTc2OTcxNDE2Mn0.t3oVW5XJ7y-fJAbqtq0mBYVAUEVnMIPBRyk5diXUJwM",
         };
 
         const fetchEndpoint = async (metric: string, symbol: string) => {
@@ -417,7 +417,7 @@ const LTSpace = () => {
           origin: "https://app.artemisanalytics.com",
           referer: "https://app.artemisanalytics.com/",
           "x-art-webtoken":
-            "eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3Njk0MzkyNTAsImV4cCI6MTc2OTUyNTY1MH0.YSKkOHktGkTqs5dPAsXvP3n9umGqy3b4UdnbE5fzYyM",
+            "eyJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3Njk2Mjc3NjIsImV4cCI6MTc2OTcxNDE2Mn0.t3oVW5XJ7y-fJAbqtq0mBYVAUEVnMIPBRyk5diXUJwM",
         };
 
         // Use Promise.allSettled to prevent one failing API from crashing the whole dashboard
