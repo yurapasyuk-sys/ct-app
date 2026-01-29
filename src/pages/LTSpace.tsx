@@ -16,10 +16,19 @@ import {
   PieChart,
   Pie,
 } from "recharts";
-import { ArrowLeft, Terminal, Activity, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Terminal,
+  Activity,
+  Loader2,
+  Lock,
+  LogIn,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import ltSpaceLogo from "../assets/calogo.png";
 import cexHoldingsData from "../assets/cex_holdings.json";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 
 interface CombinedChartData {
   date: string;
@@ -169,6 +178,7 @@ const parseCSV = (csv: string): Record<string, string>[] => {
 };
 
 const LTSpace = () => {
+  const { user, profile, loading: authLoading, signInWithGoogle } = useAuth();
   const [activeTab, setActiveTab] = useState<"met-ray" | "ethfi">("met-ray");
   const [feesData, setFeesData] = useState<CombinedChartData[]>([]);
   const [revenueData, setRevenueData] = useState<CombinedChartData[]>([]);
@@ -220,6 +230,10 @@ const LTSpace = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<30 | 60 | 90>(90);
+
+  // Access Control - Mandatory Login Wall for LT Space
+  // Check tier2 column: 'livet' = access granted, 'none' or anything else = access denied
+  const hasLTSpaceAccess = profile?.tier2 === "livet";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1070,6 +1084,111 @@ const LTSpace = () => {
     }));
   }, [timeframe]);
 
+  // Auth loading state
+  if (authLoading) {
+    return (
+      <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center text-white relative overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[100px]" />
+        <div className="z-10 flex flex-col items-center gap-6">
+          <Loader2 className="w-12 h-12 animate-spin text-neutral-400" />
+          <div className="text-sm font-mono text-neutral-500">
+            VERIFYING ACCESS...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mandatory Login Wall - User must be logged in
+  if (!user) {
+    return (
+      <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center text-white relative overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] bg-purple-900/10 rounded-full blur-[100px]" />
+
+        <div className="z-10 flex flex-col items-center gap-8 max-w-md text-center px-6">
+          <img
+            src={ltSpaceLogo}
+            alt="LT Space"
+            className="w-32 h-32 rounded-full opacity-90"
+          />
+
+          <div className="w-20 h-20 rounded-full bg-neutral-900 flex items-center justify-center border border-neutral-800">
+            <Lock className="w-10 h-10 text-neutral-400" />
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="text-2xl font-mono font-bold tracking-tight">
+              ACCESS RESTRICTED
+            </h2>
+            <p className="text-neutral-500 text-sm font-mono">
+              LT Space is available exclusively for{" "}
+              <span className="text-white font-bold">LiveTrading Members</span>.
+              <br />
+              Please log in to verify your access.
+            </p>
+          </div>
+
+          <Button
+            onClick={() => signInWithGoogle()}
+            size="lg"
+            className="gap-2 bg-white text-black hover:bg-neutral-200 font-mono"
+          >
+            <LogIn className="w-4 h-4" />
+            Login with Google
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Access Denied - User is logged in but tier2 is not 'livet'
+  if (!hasLTSpaceAccess) {
+    return (
+      <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center text-white relative overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-red-900/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] bg-neutral-900/20 rounded-full blur-[100px]" />
+
+        <div className="z-10 flex flex-col items-center gap-8 max-w-lg text-center px-6">
+          <img
+            src={ltSpaceLogo}
+            alt="LT Space"
+            className="w-32 h-32 rounded-full opacity-50 grayscale"
+          />
+
+          <div className="w-20 h-20 rounded-full bg-red-950/50 flex items-center justify-center border border-red-900/50">
+            <Lock className="w-10 h-10 text-red-500" />
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="text-2xl font-mono font-bold tracking-tight text-red-400">
+              ACCESS DENIED
+            </h2>
+            <div className="bg-neutral-900/80 border border-neutral-800 rounded-lg p-6 space-y-3">
+              <p className="text-lg font-mono text-white">
+                LiveTrading Member Access Only!
+              </p>
+              <p className="text-neutral-500 text-sm font-mono">
+                Your account does not have access to LT Space.
+                <br />
+                This dashboard is exclusively for LiveTrading members.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-neutral-500 hover:text-white transition-colors text-sm font-mono group mt-4"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            RETURN TO BASE
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Data loading state (user has access, loading dashboard data)
   if (loading) {
     return (
       <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center text-white relative overflow-hidden">

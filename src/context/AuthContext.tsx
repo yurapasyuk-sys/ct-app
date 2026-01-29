@@ -1,13 +1,15 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Session, User, RealtimeChannel } from '@supabase/supabase-js';
-import { useToast } from '@/components/ui/use-toast';
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Session, User, RealtimeChannel } from "@supabase/supabase-js";
+import { useToast } from "@/components/ui/use-toast";
 
-export type UserTier = 'pro' | 'ultra';
+export type UserTier = "pro" | "ultra";
+export type LTSpaceTier = "livet" | "none";
 
 interface UserProfile {
   id: string;
   tier: UserTier;
+  tier2?: LTSpaceTier | string;
 }
 
 interface AuthContextType {
@@ -37,24 +39,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchProfile = async (userId: string) => {
     try {
-      console.log('Fetching profile for:', userId);
+      console.log("Fetching profile for:", userId);
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
-      
+
       if (error) {
-        console.error('Error fetching profile:', error);
+        console.error("Error fetching profile:", error);
         // Fallback to default pro profile if not found
-        setProfile({ id: userId, tier: 'pro' });
+        setProfile({ id: userId, tier: "pro", tier2: "none" });
       } else {
-        console.log('Profile fetched:', data);
+        console.log("Profile fetched:", data);
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error in fetchProfile:', error);
-      setProfile({ id: userId, tier: 'pro' });
+      console.error("Error in fetchProfile:", error);
+      setProfile({ id: userId, tier: "pro", tier2: "none" });
     }
   };
 
@@ -67,22 +69,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
-        
+
         // Subscribe to realtime changes for this user's profile
         profileSubscription = supabase
-          .channel('public:profiles')
+          .channel("public:profiles")
           .on(
-            'postgres_changes',
+            "postgres_changes",
             {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'profiles',
+              event: "UPDATE",
+              schema: "public",
+              table: "profiles",
               filter: `id=eq.${session.user.id}`,
             },
             (payload) => {
-              console.log('Profile updated realtime:', payload.new);
+              console.log("Profile updated realtime:", payload.new);
               setProfile(payload.new as UserProfile);
-            }
+            },
           )
           .subscribe();
       } else {
@@ -97,7 +99,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       // Clean up old subscription if user changes
       if (profileSubscription) {
         supabase.removeChannel(profileSubscription);
@@ -106,22 +108,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (session?.user) {
         fetchProfile(session.user.id);
-        
+
         // Subscribe to realtime changes
         profileSubscription = supabase
-          .channel('public:profiles')
+          .channel("public:profiles")
           .on(
-            'postgres_changes',
+            "postgres_changes",
             {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'profiles',
+              event: "UPDATE",
+              schema: "public",
+              table: "profiles",
               filter: `id=eq.${session.user.id}`,
             },
             (payload) => {
-              console.log('Profile updated realtime:', payload.new);
+              console.log("Profile updated realtime:", payload.new);
               setProfile(payload.new as UserProfile);
-            }
+            },
           )
           .subscribe();
       } else {
@@ -139,7 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signInWithGoogle = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: `${window.location.origin}/dashboard`,
         },
@@ -173,7 +175,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider
+      value={{ session, user, profile, loading, signInWithGoogle, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
