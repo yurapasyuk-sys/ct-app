@@ -24,6 +24,8 @@ import {
   Lock,
   LogIn,
   RefreshCw,
+  Monitor,
+  Smartphone,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ltSpaceLogo from "../assets/calogo.png";
@@ -187,6 +189,22 @@ const LTSpace = () => {
     signOut,
     refetchProfile,
   } = useAuth();
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  const [dismissedMobileWarning, setDismissedMobileWarning] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile =
+        window.innerWidth < 768 ||
+        /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
   const [activeTab, setActiveTab] = useState<"met-ray" | "ethfi">("met-ray");
   const [feesData, setFeesData] = useState<CombinedChartData[]>([]);
   const [revenueData, setRevenueData] = useState<CombinedChartData[]>([]);
@@ -1105,6 +1123,93 @@ const LTSpace = () => {
       }),
     }));
   }, [timeframe]);
+
+  // Mobile Warning Screen
+  if (isMobile && !dismissedMobileWarning) {
+    return (
+      <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center text-white relative overflow-hidden px-6">
+        {/* Animated background gradients */}
+        <div className="absolute top-[-20%] left-[-10%] w-[400px] h-[400px] bg-blue-900/20 rounded-full blur-[100px] animate-pulse" />
+        <div
+          className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-purple-900/20 rounded-full blur-[100px] animate-pulse"
+          style={{ animationDelay: "1s" }}
+        />
+
+        <div className="z-10 flex flex-col items-center gap-8 max-w-sm text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {/* Logo */}
+          <img
+            src={ltSpaceLogo}
+            alt="LT Space"
+            className="w-24 h-24 rounded-full opacity-90 animate-in zoom-in duration-500"
+          />
+
+          {/* Animated device icons */}
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <Smartphone
+                className="w-12 h-12 text-neutral-600 animate-in fade-in duration-500"
+                style={{ animationDelay: "200ms" }}
+              />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+                <span className="text-[8px] font-bold">✕</span>
+              </div>
+            </div>
+
+            <div
+              className="flex flex-col items-center gap-1 animate-in fade-in duration-500"
+              style={{ animationDelay: "400ms" }}
+            >
+              <div className="w-8 h-[2px] bg-gradient-to-r from-neutral-700 via-neutral-500 to-neutral-700" />
+              <div className="w-6 h-[2px] bg-gradient-to-r from-neutral-700 via-neutral-500 to-neutral-700" />
+              <div className="w-8 h-[2px] bg-gradient-to-r from-neutral-700 via-neutral-500 to-neutral-700" />
+            </div>
+
+            <div className="relative">
+              <Monitor
+                className="w-14 h-14 text-white animate-in fade-in duration-500"
+                style={{ animationDelay: "600ms" }}
+              />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">
+                <span className="text-[8px] font-bold">✓</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Message */}
+          <div
+            className="space-y-3 animate-in fade-in duration-500"
+            style={{ animationDelay: "800ms" }}
+          >
+            <h2 className="text-xl font-mono font-bold tracking-tight bg-gradient-to-r from-white via-neutral-300 to-white bg-clip-text text-transparent">
+              For the Best Experience
+            </h2>
+            <p className="text-neutral-400 text-sm font-mono leading-relaxed">
+              LT Space is optimized for desktop viewing.
+              <br />
+              <span className="text-white">Please switch to PC</span> for full
+              functionality.
+            </p>
+          </div>
+
+          {/* Decorative line */}
+          <div
+            className="w-32 h-[1px] bg-gradient-to-r from-transparent via-neutral-600 to-transparent animate-in fade-in duration-500"
+            style={{ animationDelay: "1000ms" }}
+          />
+
+          {/* Continue anyway button */}
+          <Button
+            onClick={() => setDismissedMobileWarning(true)}
+            variant="ghost"
+            className="text-neutral-500 hover:text-white hover:bg-neutral-900 font-mono text-xs animate-in fade-in duration-500 transition-all"
+            style={{ animationDelay: "1200ms" }}
+          >
+            Continue Anyway →
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Auth loading state
   if (authLoading) {
