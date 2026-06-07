@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useKlines } from './useKlines';
 import { getRecommendedThreshold } from '@/lib/tension';
+import type { Kline } from '@/lib/binance';
+import type { TensionDataPoint } from '@/lib/tension';
 
 export interface PulseAlert {
   id: string;
@@ -39,7 +41,7 @@ export const usePulseAlerts = (symbol: string = 'BTCUSDT') => {
   const alerts = useMemo(() => {
     const allAlerts: PulseAlert[] = [];
 
-    const processTimeframe = (tension: any[], klines: any[], interval: string) => {
+    const processTimeframe = (tension: TensionDataPoint[], klines: Kline[], interval: string) => {
       const threshold = getRecommendedThreshold(interval);
       if (!tension.length || !klines.length) return;
 

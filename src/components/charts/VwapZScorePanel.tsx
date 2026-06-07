@@ -3,32 +3,10 @@ import { useVwapZScore } from '@/hooks/useVwapZScore';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, Maximize2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { QuantChart, type Overlay } from '@/components/charts/QuantChart';
 import { cn } from '@/lib/utils';
 import { ShareChartDialog } from '@/components/charts/ShareChartDialog';
-
-const Sparkline = ({ data, color }: { data: number[], color: string }) => {
-  if (data.length < 2) return null;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const width = 100;
-  const height = 40;
-  
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((d - min) / range) * height;
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <div className="w-full h-10 opacity-50">
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible">
-        <polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-};
+import { BklitLinePanel } from '@/components/charts-kit';
+import { downsampleNamedLineSeries, toNamedLineSeries } from '@/lib/data-handlers';
 
 export const VwapZScorePanel = () => {
   const [symbol] = useState('BTCUSDT');
@@ -50,12 +28,6 @@ export const VwapZScorePanel = () => {
     return data[data.length - 1][key];
   };
 
-  const getSparklineData = (key: 'z365' | 'z180' | 'z90' | 'z30') => {
-    if (!data || data.length === 0) return [];
-    // Get last 30 points
-    return data.slice(-30).map(d => d[key] as number);
-  };
-
   const getStatus = (value: number) => {
     if (value > 2) return { label: 'Overbought', color: 'text-z-expensive', bg: 'bg-z-expensive/10', border: 'border-z-expensive/20', icon: TrendingUp };
     if (value < -2) return { label: 'Oversold', color: 'text-z-cheap', bg: 'bg-z-cheap/10', border: 'border-z-cheap/20', icon: TrendingDown };
@@ -64,39 +36,25 @@ export const VwapZScorePanel = () => {
     return { label: 'Neutral', color: 'text-muted-foreground', bg: 'bg-secondary/50', border: 'border-border/40', icon: Minus };
   };
 
-  // Prepare combined data for QuantChart
   const chartData = useMemo(() => {
-    return data.map(d => ({
-      timestamp: d.timestamp,
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close,
-      z365: d.z365,
-      z180: d.z180,
-      z90: d.z90,
-      z30: d.z30,
-    }));
+    return downsampleNamedLineSeries(
+      toNamedLineSeries(data, (point) => point.timestamp, {
+        z365: (point) => point.z365,
+        z180: (point) => point.z180,
+        z90: (point) => point.z90,
+        z30: (point) => point.z30,
+      }),
+      900
+    );
   }, [data]);
 
-  const overlays = useMemo<Overlay[]>(() => {
-    if (!selectedPeriod) return [];
-    return [{
-      id: `Z-Score ${selectedPeriod}`,
-      label: `Z-Score (${selectedPeriod}d)`,
-      type: 'z-score',
-      dataKey: `z${selectedPeriod}`,
-      color: '#94a3b8', // Base color, overridden by z-score logic
-      domain: [-4, 4]
-    }];
-  }, [selectedPeriod]);
+  const selectedSeriesKey = selectedPeriod ? (`z${selectedPeriod}` as const) : null;
 
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-full">
         {periods.map((period) => {
           const value = getLastValue(period.dataKey);
-          const sparkData = getSparklineData(period.dataKey);
           const status = getStatus(value);
           const StatusIcon = status.icon;
 
@@ -139,10 +97,20 @@ export const VwapZScorePanel = () => {
               </div>
               
               <div className="w-full h-16 mt-2 px-0 relative">
-                 {/* Gradient Fade for Sparkline */}
                  <div className={cn("absolute inset-0 bg-gradient-to-t from-background/10 to-transparent z-0")} />
-                 <div className="px-4">
-                    <Sparkline data={sparkData} color={value > 0 ? '#ff4500' : '#00e396'} />
+                 <div className="relative h-full px-2 opacity-65">
+                    <BklitLinePanel
+                      compact
+                      data={chartData.slice(-30)}
+                      series={[
+                        {
+                          key: period.dataKey,
+                          label: period.label,
+                          color: value > 0 ? '#ff4500' : '#00e396',
+                          width: 2,
+                        },
+                      ]}
+                    />
                  </div>
               </div>
             </Card>
@@ -169,13 +137,20 @@ export const VwapZScorePanel = () => {
           
           <div className="flex-1 overflow-hidden p-4 bg-card/30">
             <div ref={chartRef} className="w-full h-full border border-border/20 rounded-lg overflow-hidden bg-background">
-               <QuantChart 
-                 data={chartData} 
-                 overlays={overlays}
-                 height="100%" 
-                 className="w-full h-full"
-                 mainSeriesName="Price"
-               />
+               {selectedSeriesKey ? (
+                 <BklitLinePanel
+                   data={chartData}
+                   loading={isLoading}
+                   series={[
+                     {
+                       key: selectedSeriesKey,
+                       label: periods.find(p => p.id === selectedPeriod)?.label ?? 'Z-Score',
+                       color: '#38bdf8',
+                     },
+                   ]}
+                   yFormatter={(value) => `${value.toFixed(2)}σ`}
+                 />
+               ) : null}
             </div>
           </div>
         </DialogContent>

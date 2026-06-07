@@ -1,33 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Bell, RotateCw, Activity, TrendingUp, Globe, FlaskConical } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, RotateCw, Activity, TrendingUp } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { UnifiedChartPanel } from '@/components/charts/UnifiedChartPanel';
 import { VwapZScorePanel } from '@/components/charts/VwapZScorePanel';
-import { MacroCorrelations } from '@/components/macro/MacroCorrelations';
-import { CrossPairAnalyzer } from '@/components/labs/CrossPairAnalyzer';
 import { MarketPulseAlerts } from '@/components/MarketPulseAlerts';
-import { CenturionLoader } from '@/components/CenturionLoader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const MobileDashboard = () => {
-  const [showLoading, setShowLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pulse' | 'vwap' | 'macro' | 'labs'>('pulse');
+  const [activeTab, setActiveTab] = useState<'pulse' | 'vwap'>('pulse');
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleLoadingComplete = () => {
-    setShowLoading(false);
-  };
-
-  // Failsafe: ensure loader is removed after max 5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (showLoading) {
-        setShowLoading(false);
-      }
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [showLoading]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -39,11 +21,6 @@ const MobileDashboard = () => {
 
   return (
     <div className="h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden supports-[height:100dvh]:h-[100dvh] min-h-screen">
-      {/* Loading Overlay */}
-      {showLoading && (
-        <CenturionLoader onComplete={handleLoadingComplete} />
-      )}
-
       {/* Top Header */}
       <header className="h-14 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md flex items-center justify-between px-4 shrink-0 z-40">
         <div className="flex flex-col">
@@ -85,17 +62,6 @@ const MobileDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'macro' && (
-            <div className="w-full pb-4 overflow-y-auto">
-              <MacroCorrelations />
-            </div>
-          )}
-
-          {activeTab === 'labs' && (
-            <div className="w-full pb-4 overflow-y-auto">
-              <CrossPairAnalyzer />
-            </div>
-          )}
         </div>
       </main>
 
@@ -121,28 +87,6 @@ const MobileDashboard = () => {
         >
           <TrendingUp className="h-5 w-5" />
           <span className="text-[10px] font-medium">VWAP</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('macro')}
-          className={cn(
-            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-            activeTab === 'macro' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
-          )}
-        >
-          <Globe className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Macro</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('labs')}
-          className={cn(
-            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-            activeTab === 'labs' ? "text-primary" : "text-zinc-500 hover:text-zinc-300"
-          )}
-        >
-          <FlaskConical className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Labs</span>
         </button>
 
         <button

@@ -16,5 +16,10 @@
     "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
+  },
+  "registries": {
+    "@efferd": "https://efferd.com/r/{style}/{name}.json",
+    "@bklit": "https://ui.bklit.com/r/{name}.json",
+    "@ncdai": "https://chanhdai.com/r/{name}.json"
   }
 }

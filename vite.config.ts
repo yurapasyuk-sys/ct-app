@@ -14,9 +14,18 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           // Separate vendor chunks
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-          'chart-vendor': ['lightweight-charts', 'recharts'],
+          'react-vendor': ['react', 'react-dom'],
+          'chart-vendor': [
+            '@visx/curve',
+            '@visx/event',
+            '@visx/grid',
+            '@visx/responsive',
+            '@visx/scale',
+            '@visx/shape',
+            'd3-array',
+            'd3-shape',
+            'motion',
+          ],
           'ui-vendor': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',
@@ -45,7 +54,6 @@ export default defineConfig(({ mode }) => ({
   },
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom'],
-    exclude: ['@react-three/fiber', '@react-three/drei'],
+    include: ['react', 'react-dom', '@visx/responsive', '@visx/scale', 'motion'],
   },
 }));

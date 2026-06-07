@@ -1,10 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Share2, Copy, Check, Download, Terminal } from 'lucide-react';
+import { Share2, Copy, Check, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { useAuth } from '@/context/AuthContext';
-import { cn } from '@/lib/utils';
 
 interface ShareChartDialogProps {
   targetRef: React.RefObject<HTMLElement>;
@@ -25,15 +23,13 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({
   timeframe,
   indicator
 }) => {
-  const { user, profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const isUltra = profile?.tier === 'ultra';
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Anonymous';
+  const displayName = 'Codex Operator';
 
   const generatePreview = async () => {
     if (!targetRef.current) return;
@@ -162,32 +158,7 @@ export const ShareChartDialog: React.FC<ShareChartDialogProps> = ({
                   <h1 className="text-lg font-bold tracking-tight text-white uppercase">
                     Centurion
                   </h1>
-                  {user ? (
-                    isUltra ? (
-                      <svg width="50" height="20" viewBox="0 0 80 32" className="inline-block">
-                        <defs>
-                          <linearGradient id="platinumGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#a1a1aa" />
-                            <stop offset="50%" stopColor="#f4f4f5" />
-                            <stop offset="100%" stopColor="#a1a1aa" />
-                          </linearGradient>
-                        </defs>
-                        <text 
-                          x="0" 
-                          y="24" 
-                          fontFamily="Inter, sans-serif" 
-                          fontWeight="bold" 
-                          fontSize="24" 
-                          fill="url(#platinumGradient)"
-                          style={{ textTransform: 'uppercase', letterSpacing: '-0.025em' }}
-                        >
-                          ULTRA
-                        </text>
-                      </svg>
-                    ) : (
-                      <span className="text-lg font-bold tracking-tight text-white uppercase">PRO</span>
-                    )
-                  ) : null}
+                  <span className="text-lg font-bold tracking-tight text-white uppercase">LOCAL</span>
                   <span className="text-xs text-zinc-500 uppercase tracking-widest self-center">Terminal</span>
                 </div>
 

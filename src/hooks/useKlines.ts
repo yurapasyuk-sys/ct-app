@@ -23,6 +23,7 @@ export interface UseKlinesParams {
   minRefreshMs?: number;
   dataSource?: DataSource;
   enabled?: boolean;
+  calculateTension?: boolean;
 }
 
 export interface UseKlinesResult {
@@ -92,6 +93,7 @@ export function useKlines({
   minRefreshMs = 15000,
   dataSource = 'spot',
   enabled = true,
+  calculateTension = true,
 }: UseKlinesParams): UseKlinesResult {
   const [klines, setKlines] = useState<Kline[]>([]);
   const [tensionData, setTensionData] = useState<TensionDataPoint[]>([]);
@@ -117,10 +119,13 @@ export function useKlines({
       setLastUpdated(new Date(cached.timestamp));
       setError(null);
 
-      // Calculate tension data
-      const period = getRecommendedPeriod(interval);
-      const tension = calculateTensionIndicators(cached.data, period);
-      setTensionData(tension);
+      if (calculateTension) {
+        const period = getRecommendedPeriod(interval);
+        const tension = calculateTensionIndicators(cached.data, period);
+        setTensionData(tension);
+      } else {
+        setTensionData([]);
+      }
 
       return;
     }
@@ -198,10 +203,13 @@ export function useKlines({
       setKlines(data);
       setLastUpdated(new Date());
 
-      // Calculate tension data
-      const period = getRecommendedPeriod(interval);
-      const tension = calculateTensionIndicators(data, period);
-      setTensionData(tension);
+      if (calculateTension) {
+        const period = getRecommendedPeriod(interval);
+        const tension = calculateTensionIndicators(data, period);
+        setTensionData(tension);
+      } else {
+        setTensionData([]);
+      }
 
       setError(null);
     } catch (err) {
@@ -219,7 +227,7 @@ export function useKlines({
     } finally {
       setIsLoading(false);
     }
-  }, [symbol, interval, lookbackDays, dataSource, minRefreshMs, cacheKey]);
+  }, [symbol, interval, lookbackDays, dataSource, minRefreshMs, cacheKey, calculateTension]);
 
   /**
    * Manual refetch

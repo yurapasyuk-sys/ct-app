@@ -34,6 +34,29 @@ export interface BinanceSymbol {
   status: string;
 }
 
+type BinanceKlineTuple = [
+  number,
+  string,
+  string,
+  string,
+  string,
+  string,
+  number,
+  string,
+  number,
+  string,
+  string,
+  ...unknown[],
+];
+
+interface BinanceExchangeInfoSymbol {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  status: string;
+  contractType: string;
+}
+
 interface RetryConfig {
   maxRetries: number;
   baseDelay: number;
@@ -71,7 +94,7 @@ function getBaseUrl(dataSource: DataSource): string {
 /**
  * Parse raw Binance kline response into typed Kline objects
  */
-function parseKlineResponse(raw: any[]): Kline[] {
+function parseKlineResponse(raw: BinanceKlineTuple[]): Kline[] {
   return raw.map((k) => ({
     openTime: k[0],
     open: parseFloat(k[1]),
@@ -217,9 +240,9 @@ export async function fetchFuturesSymbols(signal?: AbortSignal): Promise<Binance
     }
 
     // Filter only TRADING symbols
-    return data.symbols
-      .filter((s: any) => s.status === 'TRADING' && s.contractType === 'PERPETUAL')
-      .map((s: any) => ({
+    return (data.symbols as BinanceExchangeInfoSymbol[])
+      .filter((s) => s.status === 'TRADING' && s.contractType === 'PERPETUAL')
+      .map((s) => ({
         symbol: s.symbol,
         baseAsset: s.baseAsset,
         quoteAsset: s.quoteAsset,
@@ -370,4 +393,3 @@ export async function fetchKlinesMultiBatch(
     throw error;
   }
 }
-

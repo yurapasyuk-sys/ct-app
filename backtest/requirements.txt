@@ -1,7 +1,0 @@
-# Python packages for backtest
-pandas
-numpy
-yfinance
-requests
-beautifulsoup4
-fredapi
