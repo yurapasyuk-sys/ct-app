@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ActivityIcon, ChartCandlestickIcon, FileBarChartIcon } from "lucide-react";
+import { ActivityIcon, ChartCandlestickIcon, FileBarChartIcon, FlaskConicalIcon } from "lucide-react";
 
 export type SidebarNavItem = {
 	title: string;
@@ -31,6 +31,14 @@ export const navGroups: SidebarNavGroup[] = [
 				path: "#/backtest-reports",
 				icon: (
 					<FileBarChartIcon
+					/>
+				),
+			},
+			{
+				title: "Strategy Experiments",
+				path: "#/strategy-experiments",
+				icon: (
+					<FlaskConicalIcon
 					/>
 				),
 			},

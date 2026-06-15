@@ -1,0 +1,595 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import type { Kline } from "../src/lib/binance";
+
+type Direction = "long" | "short";
+type StrategyKind = "donchian" | "bb_atr";
+
+interface Signal {
+  key: string;
+  symbol: string;
+  strategyName: string;
+  strategyVersion: string;
+  direction: Direction;
+  signalTime: number;
+  entryTime: number;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number | null;
+  exitRule: string;
+  riskDistance: number;
+  riskDistancePips: number;
+  source: string;
+  reason: string;
+}
+
+interface SymbolConfig {
+  symbol: string;
+  yahooSymbol: string;
+  kind: StrategyKind;
+  strategyName: string;
+  strategyVersion: string;
+  entryLookback?: number;
+  exitLookback?: number;
+  bbPeriod?: number;
+  bandDeviation?: number;
+  atrPeriod: number;
+  atrMultiplier: number;
+  maxHoldBars?: number;
+  directionMode: "all" | "long_only" | "short_only";
+  exitTarget?: "mean" | "opposite_band";
+}
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const OUT_DIR = "logs";
+const STATE_PATH = `${OUT_DIR}/signal-monitor-state.json`;
+const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
+
+const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
+  EURUSD: {
+    symbol: "EURUSD",
+    yahooSymbol: "EURUSD=X",
+    kind: "donchian",
+    strategyName: "Research 2026 EURUSD Donchian 1H 80/10",
+    strategyVersion: "research.2026-ytd.in-sample.eurusd-donchian-1h-80-10-atr1.1",
+    entryLookback: 80,
+    exitLookback: 10,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    directionMode: "all",
+  },
+  GBPUSD: {
+    symbol: "GBPUSD",
+    yahooSymbol: "GBPUSD=X",
+    kind: "bb_atr",
+    strategyName: "Research 2026 GBPUSD BB/ATR Adaptive",
+    strategyVersion: "research.2026-ytd.in-sample.gbpusd-bb80-dev1_5-short-mean.1",
+    bbPeriod: 80,
+    bandDeviation: 1.5,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    maxHoldBars: 96,
+    directionMode: "short_only",
+    exitTarget: "mean",
+  },
+  USDJPY: {
+    symbol: "USDJPY",
+    yahooSymbol: "USDJPY=X",
+    kind: "bb_atr",
+    strategyName: "Research 2026 USDJPY BB/ATR Adaptive",
+    strategyVersion: "research.2026-ytd.in-sample.usdjpy-bb40-dev2-long-opposite.1",
+    bbPeriod: 40,
+    bandDeviation: 2,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    maxHoldBars: 96,
+    directionMode: "long_only",
+    exitTarget: "opposite_band",
+  },
+  GER40: {
+    symbol: "GER40",
+    yahooSymbol: "^GDAXI",
+    kind: "bb_atr",
+    strategyName: "Research 2026 GER40 BB/ATR Adaptive",
+    strategyVersion: "research.2026-ytd.in-sample.ger40-bb80-dev2-short-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 2,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    maxHoldBars: 96,
+    directionMode: "short_only",
+    exitTarget: "opposite_band",
+  },
+};
+
+function loadEnvFile(path: string) {
+  if (!existsSync(path)) return;
+
+  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator <= 0) continue;
+
+    const key = trimmed.slice(0, separator).trim();
+    const rawValue = trimmed.slice(separator + 1).trim();
+    const value = rawValue.replace(/^['"]|['"]$/g, "");
+    if (!process.env[key]) process.env[key] = value;
+  }
+}
+
+function loadEnv() {
+  loadEnvFile(".env");
+  loadEnvFile(".env.local");
+}
+
+function iso(timestamp: number) {
+  return new Date(timestamp).toISOString();
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function csvEscape(value: unknown) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function ensureJournal() {
+  mkdirSync(OUT_DIR, { recursive: true });
+  if (!existsSync(JOURNAL_PATH)) {
+    appendFileSync(
+      JOURNAL_PATH,
+      [
+        "logged_at",
+        "status",
+        "symbol",
+        "strategy",
+        "direction",
+        "signal_time",
+        "entry_time",
+        "entry_price",
+        "stop_loss",
+        "take_profit",
+        "exit_rule",
+        "risk_distance_pips",
+        "reason",
+      ].join(",") + "\n",
+      "utf8"
+    );
+  }
+}
+
+function appendJournal(status: string, signal: Signal) {
+  ensureJournal();
+  appendFileSync(
+    JOURNAL_PATH,
+    [
+      iso(Date.now()),
+      status,
+      signal.symbol,
+      signal.strategyName,
+      signal.direction,
+      iso(signal.signalTime),
+      iso(signal.entryTime),
+      signal.entryPrice,
+      signal.stopLoss,
+      signal.takeProfit ?? "",
+      signal.exitRule,
+      signal.riskDistancePips,
+      signal.reason,
+    ]
+      .map(csvEscape)
+      .join(",") + "\n",
+    "utf8"
+  );
+}
+
+function loadState() {
+  if (!existsSync(STATE_PATH)) return { sentKeys: [] as string[] };
+  try {
+    const parsed = JSON.parse(readFileSync(STATE_PATH, "utf8")) as { sentKeys?: string[] };
+    return { sentKeys: Array.isArray(parsed.sentKeys) ? parsed.sentKeys : [] };
+  } catch {
+    return { sentKeys: [] as string[] };
+  }
+}
+
+function saveState(state: { sentKeys: string[] }) {
+  mkdirSync(OUT_DIR, { recursive: true });
+  writeFileSync(STATE_PATH, JSON.stringify({ sentKeys: state.sentKeys.slice(-500) }, null, 2), "utf8");
+}
+
+function pipSize(symbol: string) {
+  if (symbol.includes("JPY")) return 0.01;
+  if (symbol === "GER40") return 1;
+  return 0.0001;
+}
+
+function formatPrice(symbol: string, value: number | null) {
+  if (value == null || !Number.isFinite(value)) return "dynamic";
+  if (symbol === "GER40") return value.toFixed(1);
+  return value.toFixed(symbol.includes("JPY") ? 3 : 5);
+}
+
+function htmlEscape(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function trueRange(current: Kline, previous: Kline) {
+  return Math.max(
+    current.high - current.low,
+    Math.abs(current.high - previous.close),
+    Math.abs(current.low - previous.close)
+  );
+}
+
+function atrAt(rows: Kline[], index: number, period: number) {
+  if (index - period < 0) return null;
+  let sum = 0;
+  for (let cursor = index - period + 1; cursor <= index; cursor += 1) {
+    sum += trueRange(rows[cursor], rows[cursor - 1]);
+  }
+  return sum / period;
+}
+
+function bandsAt(rows: Kline[], index: number, period: number, deviation: number) {
+  if (index - period + 1 < 0) return null;
+  const window = rows.slice(index - period + 1, index + 1);
+  const mean = window.reduce((sum, row) => sum + row.close, 0) / period;
+  const variance = window.reduce((sum, row) => sum + (row.close - mean) ** 2, 0) / period;
+  const sd = Math.sqrt(variance);
+  return { mean, upper: mean + deviation * sd, lower: mean - deviation * sd };
+}
+
+function highest(rows: Kline[], start: number, end: number) {
+  let value = -Infinity;
+  for (let index = start; index < end; index += 1) value = Math.max(value, rows[index].high);
+  return value;
+}
+
+function lowest(rows: Kline[], start: number, end: number) {
+  let value = Infinity;
+  for (let index = start; index < end; index += 1) value = Math.min(value, rows[index].low);
+  return value;
+}
+
+function directionAllowed(config: SymbolConfig, direction: Direction) {
+  if (config.directionMode === "long_only") return direction === "long";
+  if (config.directionMode === "short_only") return direction === "short";
+  return true;
+}
+
+function parseYahooChart(payload: unknown): Kline[] {
+  const root = payload as {
+    chart?: {
+      result?: Array<{
+        timestamp?: number[];
+        indicators?: {
+          quote?: Array<{
+            open?: Array<number | null>;
+            high?: Array<number | null>;
+            low?: Array<number | null>;
+            close?: Array<number | null>;
+            volume?: Array<number | null>;
+          }>;
+        };
+      }>;
+      error?: { code?: string; description?: string } | null;
+    };
+  };
+  const error = root.chart?.error;
+  if (error) throw new Error(error.description || error.code || "Yahoo chart error");
+  const result = root.chart?.result?.[0];
+  const timestamps = result?.timestamp ?? [];
+  const quote = result?.indicators?.quote?.[0];
+  if (!quote) return [];
+
+  return timestamps
+    .map((timestamp, index) => {
+      const open = quote.open?.[index];
+      const high = quote.high?.[index];
+      const low = quote.low?.[index];
+      const close = quote.close?.[index];
+      if (open == null || high == null || low == null || close == null) return null;
+      const openTime = timestamp * 1000;
+      return {
+        openTime,
+        open,
+        high,
+        low,
+        close,
+        volume: quote.volume?.[index] ?? 0,
+        closeTime: openTime + ONE_HOUR_MS - 1,
+        quoteVolume: 0,
+        trades: 0,
+        takerBuyBaseVolume: 0,
+        takerBuyQuoteVolume: 0,
+      } satisfies Kline;
+    })
+    .filter((row): row is Kline => row != null)
+    .sort((a, b) => a.openTime - b.openTime);
+}
+
+async function fetchYahoo1h(config: SymbolConfig) {
+  const endTime = Date.now() + 5 * 60 * 1000;
+  const startTime = endTime - 30 * 24 * ONE_HOUR_MS;
+  const url = new URL(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(config.yahooSymbol)}`
+  );
+  url.searchParams.set("interval", "60m");
+  url.searchParams.set("period1", Math.floor(startTime / 1000).toString());
+  url.searchParams.set("period2", Math.floor(endTime / 1000).toString());
+  url.searchParams.set("includePrePost", "true");
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Yahoo chart error for ${config.symbol}: ${response.status} ${response.statusText}`);
+  }
+  return parseYahooChart(await response.json());
+}
+
+function selectSignalAndEntryBars(rows: Kline[]) {
+  const now = Date.now();
+  const closedRows = rows.filter((row) => row.openTime + ONE_HOUR_MS <= now - 30_000);
+  const signal = closedRows[closedRows.length - 1];
+  if (!signal) return null;
+  const signalIndex = rows.findIndex((row) => row.openTime === signal.openTime);
+  const next = rows[signalIndex + 1];
+  if (next && next.openTime > signal.openTime) {
+    return { signalIndex, entryIndex: signalIndex + 1 };
+  }
+  return null;
+}
+
+function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
+  const selected = selectSignalAndEntryBars(rows);
+  if (!selected) return null;
+  const { signalIndex, entryIndex } = selected;
+  const entryLookback = config.entryLookback ?? 80;
+  const exitLookback = config.exitLookback ?? 10;
+  if (signalIndex - entryLookback < 0) return null;
+
+  const signal = rows[signalIndex];
+  const entryBar = rows[entryIndex];
+  const channelHigh = highest(rows, signalIndex - entryLookback, signalIndex);
+  const channelLow = lowest(rows, signalIndex - entryLookback, signalIndex);
+  const atr = atrAt(rows, signalIndex, config.atrPeriod);
+  if (atr == null || atr <= 0) return null;
+
+  const direction: Direction | null =
+    signal.close > channelHigh ? "long" : signal.close < channelLow ? "short" : null;
+  if (!direction || !directionAllowed(config, direction)) return null;
+
+  const entryPrice = entryBar.open;
+  const riskDistance = atr * config.atrMultiplier;
+  const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
+  const riskDistancePips = riskDistance / pipSize(config.symbol);
+  const key = [config.symbol, config.strategyVersion, direction, entryBar.openTime].join("|");
+
+  return {
+    key,
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyVersion: config.strategyVersion,
+    direction,
+    signalTime: signal.openTime,
+    entryTime: entryBar.openTime,
+    entryPrice,
+    stopLoss,
+    takeProfit: null,
+    exitRule: `${exitLookback}H Donchian channel exit, no fixed TP`,
+    riskDistance,
+    riskDistancePips,
+    source: `Yahoo ${config.yahooSymbol} 1H`,
+    reason:
+      direction === "long"
+        ? `1H close ${formatPrice(config.symbol, signal.close)} broke above Donchian(${entryLookback}) high ${formatPrice(config.symbol, channelHigh)}`
+        : `1H close ${formatPrice(config.symbol, signal.close)} broke below Donchian(${entryLookback}) low ${formatPrice(config.symbol, channelLow)}`,
+  } satisfies Signal;
+}
+
+function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
+  const selected = selectSignalAndEntryBars(rows);
+  if (!selected) return null;
+  const { signalIndex, entryIndex } = selected;
+  const bbPeriod = config.bbPeriod ?? 80;
+  const deviation = config.bandDeviation ?? 2;
+  const signal = rows[signalIndex];
+  const entryBar = rows[entryIndex];
+  const bands = bandsAt(rows, signalIndex, bbPeriod, deviation);
+  const atr = atrAt(rows, signalIndex, config.atrPeriod);
+  if (!bands || atr == null || atr <= 0) return null;
+
+  const direction: Direction | null =
+    signal.close < bands.lower ? "long" : signal.close > bands.upper ? "short" : null;
+  if (!direction || !directionAllowed(config, direction)) return null;
+
+  const entryPrice = entryBar.open;
+  const riskDistance = atr * config.atrMultiplier;
+  const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
+  const takeProfit =
+    config.exitTarget === "opposite_band"
+      ? direction === "long"
+        ? bands.upper
+        : bands.lower
+      : bands.mean;
+  if ((direction === "long" && takeProfit <= entryPrice) || (direction === "short" && takeProfit >= entryPrice)) {
+    return null;
+  }
+
+  const key = [config.symbol, config.strategyVersion, direction, entryBar.openTime].join("|");
+  return {
+    key,
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyVersion: config.strategyVersion,
+    direction,
+    signalTime: signal.openTime,
+    entryTime: entryBar.openTime,
+    entryPrice,
+    stopLoss,
+    takeProfit,
+    exitRule: `TP at ${config.exitTarget === "opposite_band" ? "opposite Bollinger band" : "Bollinger mean"}, time stop ${config.maxHoldBars ?? 96} bars`,
+    riskDistance,
+    riskDistancePips: riskDistance / pipSize(config.symbol),
+    source: `Yahoo ${config.yahooSymbol} 1H`,
+    reason:
+      direction === "long"
+        ? `1H close ${formatPrice(config.symbol, signal.close)} closed below BB(${bbPeriod}, ${deviation}) lower ${formatPrice(config.symbol, bands.lower)}`
+        : `1H close ${formatPrice(config.symbol, signal.close)} closed above BB(${bbPeriod}, ${deviation}) upper ${formatPrice(config.symbol, bands.upper)}`,
+  } satisfies Signal;
+}
+
+function detectSignal(config: SymbolConfig, rows: Kline[]) {
+  return config.kind === "donchian"
+    ? detectDonchianSignal(config, rows)
+    : detectBbAtrSignal(config, rows);
+}
+
+function signalMessage(signal: Signal) {
+  const tp = signal.takeProfit == null ? signal.exitRule : formatPrice(signal.symbol, signal.takeProfit);
+  return [
+    "<b>PAPER SIGNAL</b>",
+    `<b>${htmlEscape(signal.symbol)}</b> ${signal.direction.toUpperCase()}`,
+    `Strategy: ${htmlEscape(signal.strategyName)}`,
+    `Signal candle: ${iso(signal.signalTime)}`,
+    `Entry time: ${iso(signal.entryTime)}`,
+    `Entry: <code>${formatPrice(signal.symbol, signal.entryPrice)}</code>`,
+    `SL: <code>${formatPrice(signal.symbol, signal.stopLoss)}</code>`,
+    `TP / exit: <code>${htmlEscape(tp)}</code>`,
+    `Risk distance: ${signal.riskDistancePips.toFixed(1)} pips/points`,
+    `Reason: ${htmlEscape(signal.reason)}`,
+    `Source: ${htmlEscape(signal.source)}`,
+    "",
+    "Mode: paper signal only. No auto-trade.",
+  ].join("\n");
+}
+
+async function sendTelegram(message: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    throw new Error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID.");
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: message,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { description?: string } | null;
+    throw new Error(`Telegram sendMessage failed: ${response.status} ${payload?.description ?? response.statusText}`);
+  }
+}
+
+function configuredSymbols() {
+  const raw = process.env.SIGNAL_SYMBOLS ?? "EURUSD,GBPUSD,USDJPY,GER40";
+  return raw
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter((symbol) => symbol in SYMBOL_CONFIGS);
+}
+
+async function scanOnce({ forceTest = false } = {}) {
+  const state = loadState();
+  const symbols = configuredSymbols();
+  const maxAgeMinutes = Number(process.env.SIGNAL_MAX_SIGNAL_AGE_MINUTES ?? "90");
+  const dryRun = process.env.SIGNAL_DRY_RUN === "1" || process.env.SIGNAL_DRY_RUN === "true";
+
+  if (forceTest) {
+    const message = [
+      "<b>PAPER SIGNAL TEST</b>",
+      "Telegram delivery is configured.",
+      `Time: ${iso(Date.now())}`,
+      "No auto-trade.",
+    ].join("\n");
+    if (dryRun) {
+      console.log("[dry-run] Telegram test message:");
+      console.log(message.replace(/<[^>]+>/g, ""));
+    } else {
+      await sendTelegram(message);
+      console.log("Telegram test message sent.");
+    }
+    return;
+  }
+
+  for (const symbol of symbols) {
+    const config = SYMBOL_CONFIGS[symbol];
+    try {
+      const rows = await fetchYahoo1h(config);
+      const signal = detectSignal(config, rows);
+      if (!signal) {
+        console.log(`${iso(Date.now())} ${symbol}: no signal`);
+        continue;
+      }
+
+      const ageMinutes = (Date.now() - signal.entryTime) / 60_000;
+      if (ageMinutes > maxAgeMinutes) {
+        console.log(`${iso(Date.now())} ${symbol}: signal skipped as stale (${ageMinutes.toFixed(1)} min)`);
+        continue;
+      }
+
+      if (state.sentKeys.includes(signal.key)) {
+        console.log(`${iso(Date.now())} ${symbol}: duplicate signal already handled`);
+        continue;
+      }
+
+      const message = signalMessage(signal);
+      if (dryRun) {
+        console.log("[dry-run] Signal detected:");
+        console.log(message.replace(/<[^>]+>/g, ""));
+        appendJournal("dry_run", signal);
+      } else {
+        await sendTelegram(message);
+        appendJournal("sent", signal);
+        console.log(`${iso(Date.now())} ${symbol}: Telegram signal sent`);
+      }
+
+      state.sentKeys.push(signal.key);
+      saveState(state);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`${iso(Date.now())} ${symbol}: ${message}`);
+    }
+  }
+}
+
+async function main() {
+  loadEnv();
+  ensureJournal();
+
+  const args = new Set(process.argv.slice(2));
+  if (args.has("--test-telegram")) {
+    await scanOnce({ forceTest: true });
+    return;
+  }
+
+  if (args.has("--once")) {
+    await scanOnce();
+    return;
+  }
+
+  const pollMs = Math.max(60_000, Number(process.env.SIGNAL_POLL_MS ?? "300000"));
+  console.log(`Starting live signal monitor. Poll: ${pollMs}ms. Symbols: ${configuredSymbols().join(", ")}`);
+  for (;;) {
+    await scanOnce();
+    await sleep(pollMs);
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

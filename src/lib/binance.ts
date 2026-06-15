@@ -16,7 +16,7 @@ export interface Kline {
   takerBuyQuoteVolume: number;
 }
 
-export type DataSource = 'spot' | 'futures';
+export type DataSource = 'spot' | 'futures' | 'okx-swap' | 'yahoo-fx';
 
 export interface FetchKlinesParams {
   symbol: string;
@@ -57,6 +57,45 @@ interface BinanceExchangeInfoSymbol {
   contractType: string;
 }
 
+type OkxCandleTuple = [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+];
+
+interface OkxCandlesResponse {
+  code: string;
+  msg: string;
+  data: OkxCandleTuple[];
+}
+
+interface YahooChartResponse {
+  chart?: {
+    result?: Array<{
+      timestamp?: number[];
+      indicators?: {
+        quote?: Array<{
+          open?: Array<number | null>;
+          high?: Array<number | null>;
+          low?: Array<number | null>;
+          close?: Array<number | null>;
+          volume?: Array<number | null>;
+        }>;
+      };
+    }>;
+    error?: {
+      code?: string;
+      description?: string;
+    } | null;
+  };
+}
+
 interface RetryConfig {
   maxRetries: number;
   baseDelay: number;
@@ -68,6 +107,8 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   baseDelay: 500,
   maxDelay: 4000,
 };
+
+const YAHOO_ONE_MINUTE_CHUNK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Calculate exponential backoff delay with jitter
@@ -86,9 +127,256 @@ function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
  * Get base URL for Binance API based on data source
  */
 function getBaseUrl(dataSource: DataSource): string {
+  if (dataSource === 'okx-swap') {
+    return 'https://www.okx.com/api/v5';
+  }
+
+  if (dataSource === 'yahoo-fx') {
+    return typeof window === 'undefined'
+      ? 'https://query1.finance.yahoo.com'
+      : '/api/yahoo-chart';
+  }
+
   return dataSource === 'futures'
     ? 'https://fapi.binance.com/fapi/v1'
     : 'https://api.binance.com/api/v3';
+}
+
+function getOkxInstrumentId(symbol: string) {
+  const normalized = symbol.replace('/', '').toUpperCase();
+
+  if (!normalized.endsWith('USDT')) {
+    return `${normalized}-SWAP`;
+  }
+
+  return `${normalized.replace('USDT', '')}-USDT-SWAP`;
+}
+
+function getOkxBar(interval: string) {
+  if (interval.endsWith('h')) {
+    return `${interval.slice(0, -1)}H`;
+  }
+
+  return interval;
+}
+
+function getYahooSymbol(symbol: string) {
+  const normalized = symbol.replace(/[/_-]/g, '').toUpperCase();
+
+  return normalized.endsWith('=X') ? normalized : `${normalized}=X`;
+}
+
+function getYahooInterval(interval: string) {
+  if (interval === '1h') return '60m';
+
+  return interval;
+}
+
+function parseYahooChartResponse(payload: YahooChartResponse, interval: string): Kline[] {
+  const error = payload.chart?.error;
+  if (error) {
+    throw new Error(error.description || error.code || 'Yahoo Finance chart error');
+  }
+
+  const result = payload.chart?.result?.[0];
+  const timestamps = result?.timestamp ?? [];
+  const quote = result?.indicators?.quote?.[0];
+  if (!quote || !timestamps.length) {
+    return [];
+  }
+
+  const intervalMs = getIntervalMs(interval);
+  const klines: Kline[] = [];
+
+  for (let index = 0; index < timestamps.length; index++) {
+    const open = quote.open?.[index];
+    const high = quote.high?.[index];
+    const low = quote.low?.[index];
+    const close = quote.close?.[index];
+
+    if (open == null || high == null || low == null || close == null) {
+      continue;
+    }
+
+    const openTime = timestamps[index] * 1000;
+    const volume = quote.volume?.[index] ?? 0;
+    klines.push({
+      openTime,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      closeTime: openTime + intervalMs - 1,
+      quoteVolume: 0,
+      trades: 0,
+      takerBuyBaseVolume: 0,
+      takerBuyQuoteVolume: 0,
+    });
+  }
+
+  return klines.sort((a, b) => a.openTime - b.openTime);
+}
+
+async function fetchYahooFxKlines(
+  params: FetchKlinesParams,
+  signal?: AbortSignal
+): Promise<Kline[]> {
+  const { symbol, interval, startTime, endTime = Date.now(), limit = 1000 } = params;
+  const intervalMs = getIntervalMs(interval);
+  const fallbackStartTime = endTime - Math.ceil(limit * intervalMs * 3);
+  const period1 = Math.floor((startTime ?? fallbackStartTime) / 1000);
+  const period2 = Math.floor(endTime / 1000);
+  const url = new URL(
+    `${getBaseUrl('yahoo-fx')}/v8/finance/chart/${encodeURIComponent(getYahooSymbol(symbol))}`,
+    typeof window === 'undefined' ? undefined : window.location.origin
+  );
+
+  url.searchParams.set('interval', getYahooInterval(interval));
+  url.searchParams.set('period1', period1.toString());
+  url.searchParams.set('period2', period2.toString());
+  url.searchParams.set('includePrePost', 'true');
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < DEFAULT_RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      const response = await fetch(url.toString(), { signal });
+
+      if (response.status === 429 || response.status >= 500) {
+        const delay = calculateBackoffDelay(attempt, DEFAULT_RETRY_CONFIG);
+        console.warn(
+          `[Yahoo FX] ${response.status} error on attempt ${attempt + 1}/${
+            DEFAULT_RETRY_CONFIG.maxRetries
+          }. Retrying in ${delay.toFixed(0)}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as YahooChartResponse | null;
+        const chartError = errorPayload?.chart?.error;
+        const message = chartError?.description || chartError?.code || response.statusText;
+
+        throw new Error(`Yahoo FX API error: ${response.status} ${message}`);
+      }
+
+      const payload = (await response.json()) as YahooChartResponse;
+      return parseYahooChartResponse(payload, interval).slice(-limit);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (lastError.name === 'AbortError') {
+        throw lastError;
+      }
+
+      if (attempt === DEFAULT_RETRY_CONFIG.maxRetries - 1) {
+        break;
+      }
+
+      const delay = calculateBackoffDelay(attempt, DEFAULT_RETRY_CONFIG);
+      console.warn(
+        `[Yahoo FX] Error on attempt ${attempt + 1}/${
+          DEFAULT_RETRY_CONFIG.maxRetries
+        }: ${lastError.message}. Retrying in ${delay.toFixed(0)}ms...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch klines from Yahoo FX');
+}
+
+function parseOkxCandleResponse(raw: OkxCandleTuple[], interval: string): Kline[] {
+  const intervalMs = getIntervalMs(interval);
+
+  return raw
+    .filter((candle) => candle[8] === '1')
+    .map((candle) => {
+      const openTime = Number(candle[0]);
+      return {
+        openTime,
+        open: parseFloat(candle[1]),
+        high: parseFloat(candle[2]),
+        low: parseFloat(candle[3]),
+        close: parseFloat(candle[4]),
+        volume: parseFloat(candle[5]),
+        closeTime: openTime + intervalMs - 1,
+        quoteVolume: parseFloat(candle[7]),
+        trades: 0,
+        takerBuyBaseVolume: 0,
+        takerBuyQuoteVolume: 0,
+      };
+    })
+    .sort((a, b) => a.openTime - b.openTime);
+}
+
+async function fetchOkxKlines(
+  params: FetchKlinesParams,
+  signal?: AbortSignal
+): Promise<Kline[]> {
+  const { symbol, interval, endTime, limit = 100 } = params;
+  const url = new URL(`${getBaseUrl('okx-swap')}/market/history-candles`);
+
+  url.searchParams.set('instId', getOkxInstrumentId(symbol));
+  url.searchParams.set('bar', getOkxBar(interval));
+  url.searchParams.set('limit', Math.min(limit, 300).toString());
+  if (endTime) url.searchParams.set('after', endTime.toString());
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < DEFAULT_RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      const response = await fetch(url.toString(), { signal });
+
+      if (response.status === 429 || response.status >= 500) {
+        const retryAfter = Number(response.headers.get('Retry-After'));
+        const delay = Number.isFinite(retryAfter)
+          ? retryAfter * 1000
+          : calculateBackoffDelay(attempt, DEFAULT_RETRY_CONFIG);
+        console.warn(
+          `[OKX] ${response.status} error on attempt ${attempt + 1}/${
+            DEFAULT_RETRY_CONFIG.maxRetries
+          }. Retrying in ${delay.toFixed(0)}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`OKX API error: ${response.status} ${response.statusText}`);
+      }
+
+      const payload = (await response.json()) as OkxCandlesResponse;
+
+      if (payload.code !== '0' || !Array.isArray(payload.data)) {
+        throw new Error(payload.msg || 'Invalid response format from OKX API');
+      }
+
+      return parseOkxCandleResponse(payload.data, interval);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (lastError.name === 'AbortError') {
+        throw lastError;
+      }
+
+      if (attempt === DEFAULT_RETRY_CONFIG.maxRetries - 1) {
+        break;
+      }
+
+      const delay = calculateBackoffDelay(attempt, DEFAULT_RETRY_CONFIG);
+      console.warn(
+        `[OKX] Error on attempt ${attempt + 1}/${
+          DEFAULT_RETRY_CONFIG.maxRetries
+        }: ${lastError.message}. Retrying in ${delay.toFixed(0)}ms...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch klines from OKX');
 }
 
 /**
@@ -125,6 +413,14 @@ export async function fetchKlines(
     limit = 1000,
     dataSource = 'spot',
   } = params;
+
+  if (dataSource === 'okx-swap') {
+    return fetchOkxKlines(params, signal);
+  }
+
+  if (dataSource === 'yahoo-fx') {
+    return fetchYahooFxKlines(params, signal);
+  }
 
   const baseUrl = getBaseUrl(dataSource);
   const url = new URL(`${baseUrl}/klines`);
@@ -332,6 +628,116 @@ export async function fetchKlinesMultiBatch(
   signal?: AbortSignal
 ): Promise<Kline[]> {
   const { symbol, interval, dataSource = 'spot' } = params;
+
+  if (dataSource === 'okx-swap') {
+    const batchSize = 300;
+    const allKlines: Kline[] = [];
+    const seenTimestamps = new Set<number>();
+    let cursor: number | undefined = params.endTime;
+    let iterations = 0;
+    const maxIterations = Math.ceil(totalCandles / batchSize) + 20;
+
+    console.log(`[fetchKlinesMultiBatch] Fetching ${totalCandles} OKX candles sequentially`);
+
+    while (allKlines.length < totalCandles && iterations < maxIterations) {
+      const batch = await fetchOkxKlines(
+        {
+          symbol,
+          interval,
+          endTime: cursor,
+          limit: batchSize,
+          dataSource,
+        },
+        signal
+      );
+
+      if (batch.length === 0) {
+        break;
+      }
+
+      const previousCursor = cursor;
+
+      for (const kline of batch) {
+        if (!seenTimestamps.has(kline.openTime)) {
+          seenTimestamps.add(kline.openTime);
+          allKlines.push(kline);
+        }
+      }
+
+      const oldest = batch[0];
+      cursor = oldest.openTime;
+      iterations += 1;
+
+      await new Promise((resolve) => setTimeout(resolve, 140));
+
+      if (previousCursor === cursor) {
+        break;
+      }
+    }
+
+    const sorted = allKlines.sort((a, b) => a.openTime - b.openTime).slice(-totalCandles);
+    console.log(`[fetchKlinesMultiBatch] Total fetched from OKX: ${sorted.length} candles`);
+    return sorted;
+  }
+
+  if (dataSource === 'yahoo-fx') {
+    const intervalMs = getIntervalMs(interval);
+    const endTime = params.endTime ?? Date.now();
+    const startTime = params.startTime ?? endTime - Math.ceil(totalCandles * intervalMs);
+    const needsChunking =
+      interval === '1m' && endTime - startTime > YAHOO_ONE_MINUTE_CHUNK_MS;
+
+    if (needsChunking) {
+      const allKlines: Kline[] = [];
+      const seenTimestamps = new Set<number>();
+      let cursor = startTime;
+
+      while (cursor < endTime) {
+        const chunkEnd = Math.min(cursor + YAHOO_ONE_MINUTE_CHUNK_MS, endTime);
+        const chunkLimit = Math.ceil((chunkEnd - cursor) / intervalMs) + 10;
+        const chunk = await fetchYahooFxKlines(
+          {
+            symbol,
+            interval,
+            startTime: cursor,
+            endTime: chunkEnd,
+            limit: chunkLimit,
+            dataSource,
+          },
+          signal
+        );
+
+        for (const kline of chunk) {
+          if (!seenTimestamps.has(kline.openTime)) {
+            seenTimestamps.add(kline.openTime);
+            allKlines.push(kline);
+          }
+        }
+
+        cursor = chunkEnd + intervalMs;
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+
+      const sorted = allKlines.sort((a, b) => a.openTime - b.openTime).slice(-totalCandles);
+      console.log(`[fetchKlinesMultiBatch] Total fetched from Yahoo FX: ${sorted.length} candles`);
+      return sorted;
+    }
+
+    const klines = await fetchYahooFxKlines(
+      {
+        symbol,
+        interval,
+        startTime,
+        endTime,
+        limit: totalCandles,
+        dataSource,
+      },
+      signal
+    );
+
+    console.log(`[fetchKlinesMultiBatch] Total fetched from Yahoo FX: ${klines.length} candles`);
+    return klines;
+  }
   
   const batchSize = 1000;
   const batchesNeeded = Math.ceil(totalCandles / batchSize);

@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { AppShell } from "@/components/app-shell";
 import Dashboard from "./pages/Dashboard";
 import BacktestReports from "./pages/BacktestReports";
+import StrategyExperiments from "./pages/StrategyExperiments";
 import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient();
@@ -30,7 +31,13 @@ const App = () => {
           <Toaster />
           <Sonner />
           <AppShell activePath={activePath}>
-            {activePath === "#/backtest-reports" ? <BacktestReports /> : <Dashboard />}
+            {activePath === "#/backtest-reports" ? (
+              <BacktestReports />
+            ) : activePath === "#/strategy-experiments" ? (
+              <StrategyExperiments />
+            ) : (
+              <Dashboard />
+            )}
           </AppShell>
         </TooltipProvider>
       </ThemeProvider>

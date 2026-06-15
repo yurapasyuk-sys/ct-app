@@ -13,9 +13,9 @@ export function AppShell({
 		<div className="overflow-hidden">
 			<SidebarProvider className="relative h-svh">
 				<AppSidebar activePath={activePath} />
-				<SidebarInset className="md:peer-data-[variant=inset]:ml-0">
+				<SidebarInset className="min-w-0 overflow-hidden md:peer-data-[variant=inset]:ml-0">
 					<AppHeader activePath={activePath} />
-					<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-6">
+					<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto p-4 md:p-6">
 						{children}
 					</div>
 				</SidebarInset>
