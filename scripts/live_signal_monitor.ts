@@ -43,6 +43,7 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 const OUT_DIR = "logs";
 const STATE_PATH = `${OUT_DIR}/signal-monitor-state.json`;
 const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
+const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 
 const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
   EURUSD: {
@@ -318,19 +319,65 @@ function parseYahooChart(payload: unknown): Kline[] {
 async function fetchYahoo1h(config: SymbolConfig) {
   const endTime = Date.now() + 5 * 60 * 1000;
   const startTime = endTime - 30 * 24 * ONE_HOUR_MS;
-  const url = new URL(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(config.yahooSymbol)}`
-  );
-  url.searchParams.set("interval", "60m");
-  url.searchParams.set("period1", Math.floor(startTime / 1000).toString());
-  url.searchParams.set("period2", Math.floor(endTime / 1000).toString());
-  url.searchParams.set("includePrePost", "true");
+  let lastError: Error | null = null;
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Yahoo chart error for ${config.symbol}: ${response.status} ${response.statusText}`);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const host = YAHOO_HOSTS[attempt % YAHOO_HOSTS.length];
+    const url = new URL(
+      `https://${host}/v8/finance/chart/${encodeURIComponent(config.yahooSymbol)}`
+    );
+    url.searchParams.set("interval", "60m");
+    url.searchParams.set("period1", Math.floor(startTime / 1000).toString());
+    url.searchParams.set("period2", Math.floor(endTime / 1000).toString());
+    url.searchParams.set("includePrePost", "true");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "accept": "application/json,text/plain,*/*",
+          "accept-language": "en-US,en;q=0.9",
+          "cache-control": "no-cache",
+          "pragma": "no-cache",
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(
+          `Yahoo chart error ${response.status} ${response.statusText}${body ? `: ${body.slice(0, 180)}` : ""}`
+        );
+      }
+
+      const rows = parseYahooChart(await response.json());
+      if (!rows.length) {
+        throw new Error("Yahoo chart returned no OHLC rows");
+      }
+
+      return rows;
+    } catch (error) {
+      clearTimeout(timeout);
+      const cause =
+        error instanceof Error && "cause" in error && error.cause
+          ? ` cause=${String(error.cause)}`
+          : "";
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(
+        `${iso(Date.now())} ${config.symbol}: Yahoo fetch attempt ${attempt + 1}/4 via ${host} failed: ${
+          lastError.message
+        }${cause}`
+      );
+      await sleep(1_000 * (attempt + 1));
+    }
   }
-  return parseYahooChart(await response.json());
+
+  throw lastError ?? new Error(`Yahoo chart fetch failed for ${config.symbol}`);
 }
 
 function selectSignalAndEntryBars(rows: Kline[]) {
