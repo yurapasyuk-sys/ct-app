@@ -1,4 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { lookup } from "node:dns";
+import { get as httpsGet } from "node:https";
 import type { Kline } from "../src/lib/binance";
 
 type Direction = "long" | "short";
@@ -316,6 +318,60 @@ function parseYahooChart(payload: unknown): Kline[] {
     .sort((a, b) => a.openTime - b.openTime);
 }
 
+function getJsonWithIpv4(url: URL, timeoutMs = 20_000) {
+  return new Promise<unknown>((resolve, reject) => {
+    const request = httpsGet(
+      url,
+      {
+        headers: {
+          "accept": "application/json,text/plain,*/*",
+          "accept-language": "en-US,en;q=0.9",
+          "cache-control": "no-cache",
+          "pragma": "no-cache",
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+        },
+        lookup: (hostname, options, callback) => {
+          lookup(hostname, { ...options, family: 4 }, callback);
+        },
+        timeout: timeoutMs,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+
+        response.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        response.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf8");
+
+          if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+            reject(
+              new Error(
+                `Yahoo chart error ${response.statusCode ?? "unknown"} ${response.statusMessage ?? ""}${
+                  body ? `: ${body.slice(0, 180)}` : ""
+                }`
+              )
+            );
+            return;
+          }
+
+          try {
+            resolve(JSON.parse(body));
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        });
+      }
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error(`Yahoo request timed out after ${timeoutMs}ms`));
+    });
+    request.on("error", reject);
+  });
+}
+
 async function fetchYahoo1h(config: SymbolConfig) {
   const endTime = Date.now() + 5 * 60 * 1000;
   const startTime = endTime - 30 * 24 * ONE_HOUR_MS;
@@ -331,38 +387,14 @@ async function fetchYahoo1h(config: SymbolConfig) {
     url.searchParams.set("period2", Math.floor(endTime / 1000).toString());
     url.searchParams.set("includePrePost", "true");
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20_000);
-
     try {
-      const response = await fetch(url, {
-        headers: {
-          "accept": "application/json,text/plain,*/*",
-          "accept-language": "en-US,en;q=0.9",
-          "cache-control": "no-cache",
-          "pragma": "no-cache",
-          "user-agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
-        },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new Error(
-          `Yahoo chart error ${response.status} ${response.statusText}${body ? `: ${body.slice(0, 180)}` : ""}`
-        );
-      }
-
-      const rows = parseYahooChart(await response.json());
+      const rows = parseYahooChart(await getJsonWithIpv4(url));
       if (!rows.length) {
         throw new Error("Yahoo chart returned no OHLC rows");
       }
 
       return rows;
     } catch (error) {
-      clearTimeout(timeout);
       const cause =
         error instanceof Error && "cause" in error && error.cause
           ? ` cause=${String(error.cause)}`
