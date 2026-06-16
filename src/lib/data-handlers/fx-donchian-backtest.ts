@@ -26,6 +26,7 @@ interface FxDonchianBacktestConfig extends NativeBacktestConfig {
 
 interface OpenPosition {
   direction: NativeBacktestDirection;
+  setupTime: number;
   entryTime: number;
   entryPrice: number;
   stopLoss: number;
@@ -133,7 +134,7 @@ function finalizeTrade({
     r_multiple: position.riskAmount > 0 ? profit / position.riskAmount : 0,
     quantity: position.quantity,
     risk_amount: position.riskAmount,
-    setup_time: position.entryTime,
+    setup_time: position.setupTime,
     fvg_low: position.entryChannelLow,
     fvg_high: position.entryChannelHigh,
     fvg_formed_time: position.entryTime,
@@ -279,6 +280,7 @@ export function runFxDonchianBacktest({
 
     position = {
       direction,
+      setupTime: signal.openTime,
       entryTime: current.openTime,
       entryPrice,
       stopLoss,

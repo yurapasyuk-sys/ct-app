@@ -48,7 +48,7 @@ export function ExpandableResultCard({
   return (
     <Card
       className={cn(
-        "min-w-0 rounded-lg",
+        "min-w-0 shrink-0 rounded-lg",
         expanded
           ? "fixed inset-4 z-50 flex max-h-[calc(100vh-2rem)] min-w-0 flex-col overflow-hidden bg-background shadow-2xl"
           : "overflow-hidden",
@@ -69,10 +69,10 @@ export function ExpandableResultCard({
             type="button"
             className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground"
             onClick={() => setExpanded((value) => !value)}
-            title={expanded ? "Close expanded view" : "Expand result window"}
+            title={expanded ? "Закрити розгорнутий вигляд" : "Розгорнути вікно результату"}
           >
             {expanded ? <Minimize2Icon className="size-4" /> : <Maximize2Icon className="size-4" />}
-            <span>{expanded ? "Close" : "Expand"}</span>
+            <span>{expanded ? "Закрити" : "Розгорнути"}</span>
           </button>
         </div>
       </CardHeader>

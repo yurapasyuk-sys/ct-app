@@ -574,7 +574,7 @@ function discoverFiles() {
       symbol: file.split("_")[0].toUpperCase(),
       path: `${DATA_DIR}/${file}`,
     }))
-    .filter((item) => ["EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(item.symbol));
+    .filter((item) => ["AUDUSD", "EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(item.symbol));
 }
 
 function compactSummary(summary: Summary) {
@@ -693,7 +693,7 @@ function main() {
   const candidates = all
     .filter((summary) => summary.trades >= 10)
     .sort((a, b) => b.score - a.score);
-  const byAsset = ["EURUSD", "GBPUSD", "USDJPY", "GER40"].map((symbol) => {
+  const byAsset = ["AUDUSD", "EURUSD", "GBPUSD", "USDJPY", "GER40"].map((symbol) => {
     const rows = candidates.filter((summary) => summary.symbol === symbol);
     const best = rows[0];
     if (best) bestTrades[symbol] = best.tradesList;

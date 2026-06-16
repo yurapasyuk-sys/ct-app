@@ -65,6 +65,8 @@ export type NativeBacktestSetupVariant =
   | "london_sweep_fvg"
   | "universal_bb_atr_mean_reversion"
   | "universal_bb_atr_target15"
+  | "audusd_bb_atr_long_reversion_2026"
+  | "ger40_bb_atr_short_reversion_2026"
   | "research_2026_bb_atr_adaptive"
   | "ict_experiment_v3_adx_regime_filter"
   | "order_flow_proxy_1_5r"

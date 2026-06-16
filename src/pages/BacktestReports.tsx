@@ -4,7 +4,7 @@ import { AlertCircleIcon, CheckCircle2Icon, PlayIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BklitTradeReviewPanel } from "@/components/charts-kit/BklitTradeReviewPanel";
+import { BklitTradeReviewPanel, ResearchTradeReviewPanel } from "@/components/charts-kit/BklitTradeReviewPanel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ExpandableResultCard } from "@/components/ui/expandable-result-card";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,8 @@ type BacktestStrategy =
   | "order_flow_proxy_1_5r_prev_day_short_mr10"
   | "universal_bb_atr_mean_reversion"
   | "universal_bb_atr_target15"
+  | "audusd_bb_atr_long_reversion_2026"
+  | "ger40_bb_atr_short_reversion_2026"
   | "research_2026_adaptive_pack"
   | "fx_donchian"
   | "fx_london_sweep";
@@ -104,6 +106,7 @@ const MARKET_CONFIG = {
 const ONE_MINUTE_MS = 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const WORKSPACE_FOREX_CSV: Partial<Record<string, string>> = {
+  AUDUSD: "/data/forex/AUDUSD_1m_2023-06-15_2026-06-15.csv",
   EURUSD: "/data/forex/EURUSD_1m_2024-01-01_2026-06-12.csv",
   GBPUSD: "/data/forex/GBPUSD_1m_2025-01-01_2026-06-13.csv",
   USDJPY: "/data/forex/USDJPY_1m_2025-01-01_2026-06-13.csv",
@@ -133,6 +136,8 @@ const STRATEGY_OPTIONS = [
   { label: "Order Flow Proxy 1.5R PD Short MR10", value: "order_flow_proxy_1_5r_prev_day_short_mr10" },
   { label: "Universal BB ATR Mean Reversion", value: "universal_bb_atr_mean_reversion" },
   { label: "Universal BB ATR Target 15", value: "universal_bb_atr_target15" },
+  { label: "AUDUSD BB/ATR Long Reversion 2026", value: "audusd_bb_atr_long_reversion_2026" },
+  { label: "GER40 BB/ATR Short Reversion 2026", value: "ger40_bb_atr_short_reversion_2026" },
   { label: "Research 2026 Adaptive Pack", value: "research_2026_adaptive_pack" },
   { label: "FX Donchian Trend", value: "fx_donchian" },
   { label: "London Sweep + FVG", value: "fx_london_sweep" },
@@ -232,6 +237,8 @@ function initialStrategy(): BacktestStrategy {
     value === "order_flow_proxy_1_5r_prev_day_short_mr10" ||
     value === "universal_bb_atr_mean_reversion" ||
     value === "universal_bb_atr_target15" ||
+    value === "audusd_bb_atr_long_reversion_2026" ||
+    value === "ger40_bb_atr_short_reversion_2026" ||
     value === "research_2026_adaptive_pack" ||
     value === "fx_donchian" ||
     value === "fx_london_sweep"
@@ -425,6 +432,17 @@ function formatTime(value: number | null) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatUkrainianTime(value: number | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("uk-UA", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -781,6 +799,32 @@ function londonTradeCells(trade: NativeBacktestTrade, formatPrice: (value: numbe
   ];
 }
 
+function researchTradeCells(trade: NativeBacktestTrade, formatPrice: (value: number) => string) {
+  return [
+    trade.direction,
+    trade.setup_variant,
+    formatTime(trade.setup_time),
+    formatTime(trade.entry_time),
+    formatPrice(trade.entry_price),
+    formatPrice(trade.stop_loss),
+    Number.isFinite(trade.take_profit) ? formatPrice(trade.take_profit) : "-",
+    formatTime(trade.exit_time),
+    formatPrice(trade.exit_price),
+    trade.result_status,
+    formatCurrency(trade.profit),
+    `${formatNumber(trade.r_multiple, 2)}R`,
+    formatPrice(trade.atr_value ?? Number.NaN),
+    formatPrice(trade.entry_channel_high ?? Number.NaN),
+    formatPrice(trade.entry_channel_low ?? Number.NaN),
+    Number.isFinite(trade.exit_channel_high ?? Number.NaN)
+      ? formatPrice(trade.exit_channel_high ?? Number.NaN)
+      : "-",
+    Number.isFinite(trade.exit_channel_low ?? Number.NaN)
+      ? formatPrice(trade.exit_channel_low ?? Number.NaN)
+      : "-",
+  ];
+}
+
 function tradeHeadersForStrategy(strategy: BacktestStrategy) {
   if (strategy === "fx_donchian") {
     return [
@@ -834,6 +878,32 @@ function tradeHeadersForStrategy(strategy: BacktestStrategy) {
     ];
   }
 
+  if (
+    strategy === "research_2026_adaptive_pack" ||
+    strategy === "audusd_bb_atr_long_reversion_2026" ||
+    strategy === "ger40_bb_atr_short_reversion_2026"
+  ) {
+    return [
+      "direction",
+      "setup_variant",
+      "setup_time",
+      "entry_time",
+      "entry_price",
+      "stop_loss",
+      "target",
+      "exit_time",
+      "exit_price",
+      "result_status",
+      "profit",
+      "r_multiple",
+      "atr_14",
+      "setup_upper",
+      "setup_lower",
+      "exit_high",
+      "exit_low",
+    ];
+  }
+
   return [
     "direction",
     "setup_variant",
@@ -872,6 +942,13 @@ function tradeCellsForStrategy(
 ) {
   if (strategy === "fx_donchian") return donchianTradeCells(trade, formatPrice);
   if (strategy === "fx_london_sweep") return londonTradeCells(trade, formatPrice);
+  if (
+    strategy === "research_2026_adaptive_pack" ||
+    strategy === "audusd_bb_atr_long_reversion_2026" ||
+    strategy === "ger40_bb_atr_short_reversion_2026"
+  ) {
+    return researchTradeCells(trade, formatPrice);
+  }
 
   return tradeCells(trade, formatPrice);
 }
@@ -927,6 +1004,8 @@ export default function BacktestReports() {
       (strategy === "fx_donchian" ||
         strategy === "fx_london_sweep" ||
         strategy === "ict_improved_v3" ||
+        strategy === "audusd_bb_atr_long_reversion_2026" ||
+        strategy === "ger40_bb_atr_short_reversion_2026" ||
         strategy === "research_2026_adaptive_pack") &&
       market !== "forex"
     ) {
@@ -935,6 +1014,12 @@ export default function BacktestReports() {
 
     if (!selectedMarket.symbols.includes(symbol)) {
       setSymbol(selectedMarket.symbols[0]);
+    }
+    if (strategy === "audusd_bb_atr_long_reversion_2026" && symbol !== "AUDUSD") {
+      setSymbol("AUDUSD");
+    }
+    if (strategy === "ger40_bb_atr_short_reversion_2026" && symbol !== "GER40") {
+      setSymbol("GER40");
     }
 
     if (!availableLookbacks.some((option) => option.value === lookbackDays)) {
@@ -1173,23 +1258,136 @@ export default function BacktestReports() {
         return;
       }
 
-      if (strategy === "research_2026_adaptive_pack") {
-        if (!["EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(symbol)) {
-          throw new Error("Research 2026 Adaptive Pack is currently available for EURUSD, GBPUSD, USDJPY, and GER40.");
+      if (strategy === "audusd_bb_atr_long_reversion_2026") {
+        if (symbol !== "AUDUSD") {
+          throw new Error("AUDUSD BB/ATR Long Reversion 2026 is currently enabled only for AUDUSD.");
         }
 
-        const researchDataStartTime = runStartTime - 180 * ONE_DAY_MS;
+        const dataStartTime = runStartTime - 180 * ONE_DAY_MS;
         const klines1h = useLocalCsv
-          ? getLocalCsvKlinesForRange(localCsvKlines1m, "1h", researchDataStartTime, runEndTime)
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "1h", dataStartTime, runEndTime)
           : await fetchKlinesMultiBatch(
               {
                 symbol,
                 interval: "1h",
+                startTime: dataStartTime,
+                endTime: runEndTime,
+                dataSource: selectedMarket.dataSource,
+              },
+              candlesForRange(dataStartTime, runEndTime, "1h"),
+              abortController.signal
+            );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h: klines1h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 100,
+            bandDeviation: 1.75,
+            atrPeriod: 14,
+            atrMultiplier: 0.75,
+            maxHoldBars: 24,
+            directionMode: "long_only",
+            emaPeriod: 200,
+            emaFilter: "countertrend",
+            exitTarget: "opposite_band",
+            setupVariant: "audusd_bb_atr_long_reversion_2026",
+            strategyName: "AUDUSD BB/ATR Long Reversion 2026",
+            strategyVersion: "research.2026-ytd.audusd-bb100-dev1_75-atr0_75-hold24-long-countertrend-opposite-1h.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "ger40_bb_atr_short_reversion_2026") {
+        if (symbol !== "GER40") {
+          throw new Error("GER40 BB/ATR Short Reversion 2026 is currently enabled only for GER40.");
+        }
+
+        const dataStartTime = runStartTime - 180 * ONE_DAY_MS;
+        const klines1h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "1h", dataStartTime, runEndTime)
+          : await fetchKlinesMultiBatch(
+              {
+                symbol,
+                interval: "1h",
+                startTime: dataStartTime,
+                endTime: runEndTime,
+                dataSource: selectedMarket.dataSource,
+              },
+              candlesForRange(dataStartTime, runEndTime, "1h"),
+              abortController.signal
+            );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h: klines1h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 80,
+            bandDeviation: 2.25,
+            atrPeriod: 14,
+            atrMultiplier: 1.25,
+            maxHoldBars: 72,
+            directionMode: "short_only",
+            emaPeriod: 200,
+            emaFilter: "none",
+            exitTarget: "opposite_band",
+            setupVariant: "ger40_bb_atr_short_reversion_2026",
+            strategyName: "GER40 BB/ATR Short Reversion 2026",
+            strategyVersion: "research.2026-ytd.ger40-bb80-dev2_25-atr1_25-hold72-short-opposite-1h.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "research_2026_adaptive_pack") {
+        if (!["AUDUSD", "EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(symbol)) {
+          throw new Error(
+            "Research 2026 Adaptive Pack is currently available for AUDUSD, EURUSD, GBPUSD, USDJPY, and GER40."
+          );
+        }
+
+        const researchDataStartTime = runStartTime - 180 * ONE_DAY_MS;
+        const researchTimeframe = symbol === "AUDUSD" ? "4h" : "1h";
+        const klines1h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, researchTimeframe, researchDataStartTime, runEndTime)
+          : await fetchKlinesMultiBatch(
+              {
+                symbol,
+                interval: researchTimeframe,
                 startTime: researchDataStartTime,
                 endTime: runEndTime,
                 dataSource: selectedMarket.dataSource,
               },
-              candlesForRange(researchDataStartTime, runEndTime, "1h"),
+              candlesForRange(researchDataStartTime, runEndTime, researchTimeframe),
               abortController.signal
             );
 
@@ -1226,6 +1424,16 @@ export default function BacktestReports() {
         }
 
         const adaptiveParams = {
+          AUDUSD: {
+            bbPeriod: 20,
+            bandDeviation: 2,
+            atrMultiplier: 2,
+            maxHoldBars: 6,
+            directionMode: "long_only" as const,
+            emaFilter: "none" as const,
+            exitTarget: "opposite_band" as const,
+            strategyVersion: "research.2026-ytd.audusd-bb20-dev2-long-opposite-4h.1",
+          },
           GBPUSD: {
             bbPeriod: 80,
             bandDeviation: 1.5,
@@ -1256,7 +1464,7 @@ export default function BacktestReports() {
             exitTarget: "opposite_band" as const,
             strategyVersion: "research.2026-ytd.in-sample.ger40-bb80-dev2-short-opposite.1",
           },
-        }[symbol as "GBPUSD" | "USDJPY" | "GER40"];
+        }[symbol as "AUDUSD" | "GBPUSD" | "USDJPY" | "GER40"];
 
         const nextReport = runUniversalBbAtrBacktest({
           klines4h: klines1h,
@@ -1563,6 +1771,10 @@ export default function BacktestReports() {
             ? "1% / 4H BB40 2σ / ATR14 SL x3 / mean exit"
           : strategy === "universal_bb_atr_target15"
             ? "2% / 4H BB80 1.5σ / long-only below EMA200 / ATR14 SL x1"
+          : strategy === "audusd_bb_atr_long_reversion_2026"
+            ? "1% / AUDUSD 1H BB100 dev1.75 / long-only / ATR14 SL x0.75"
+          : strategy === "ger40_bb_atr_short_reversion_2026"
+            ? "1% / GER40 1H BB80 dev2.25 / short-only / ATR14 SL x1.25"
           : strategy === "research_2026_adaptive_pack"
             ? "1% / in-sample 2026 adaptive research pack"
           : strategy === "ict_improved_v2"
@@ -2007,6 +2219,42 @@ export default function BacktestReports() {
               klines5m={klines5m}
               trade={selectedTrade}
             />
+        </ExpandableResultCard>
+      ) : null}
+
+      {report &&
+      (strategy === "research_2026_adaptive_pack" ||
+        strategy === "audusd_bb_atr_long_reversion_2026" ||
+        strategy === "ger40_bb_atr_short_reversion_2026") ? (
+        <ExpandableResultCard
+          title="Огляд угоди Research"
+          expandedContentClassName="flex flex-col"
+          actions={
+            report.trades.length ? (
+              <Select
+                value={String(selectedTradeIndex)}
+                onValueChange={(value) => setSelectedTradeIndex(Number(value))}
+              >
+                <SelectTrigger className="w-full lg:w-[300px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {report.trades.map((trade, index) => (
+                    <SelectItem key={`${trade.entry_time}-${index}`} value={String(index)}>
+                      #{index + 1} {trade.direction === "long" ? "лонг" : "шорт"} {formatUkrainianTime(trade.entry_time)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null
+          }
+        >
+          <ResearchTradeReviewPanel
+            formatPrice={formatSelectedPrice}
+            klines={klines1h}
+            symbol={symbol}
+            trade={selectedTrade}
+          />
         </ExpandableResultCard>
       ) : null}
 

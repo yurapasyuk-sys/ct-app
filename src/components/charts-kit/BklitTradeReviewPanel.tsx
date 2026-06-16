@@ -20,6 +20,14 @@ interface BklitTradeReviewPanelProps {
   className?: string;
 }
 
+interface ResearchTradeReviewPanelProps {
+  klines: Kline[];
+  symbol: string;
+  trade: NativeBacktestTrade | null;
+  formatPrice?: (value: number) => string;
+  className?: string;
+}
+
 interface Marker {
   timestamp: number;
   label: string;
@@ -43,6 +51,7 @@ interface Zone {
 
 const HOUR_MS = 60 * 60 * 1000;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const FOUR_HOURS_MS = 4 * HOUR_MS;
 
 function getWindow(
   data: MarketOhlcPoint[],
@@ -77,6 +86,74 @@ function previousPoint(data: MarketOhlcPoint[], timestamp: number) {
   }
 
   return null;
+}
+
+function formatReviewTime(timestamp: number | null | undefined) {
+  if (!timestamp) return "-";
+
+  return new Intl.DateTimeFormat("uk-UA", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(timestamp);
+}
+
+function finiteLevel(price: number | null | undefined) {
+  return typeof price === "number" && Number.isFinite(price);
+}
+
+function researchPipSize(symbol: string) {
+  if (symbol.includes("JPY")) return 0.01;
+  if (symbol === "GER40") return 1;
+
+  return 0.0001;
+}
+
+function formatRiskDistance(symbol: string, trade: NativeBacktestTrade) {
+  const distance = Math.abs(trade.entry_price - trade.stop_loss) / researchPipSize(symbol);
+  const unit = symbol === "GER40" ? "пунктів" : "піпсів";
+
+  return `${distance.toFixed(symbol === "GER40" ? 1 : 1)} ${unit}`;
+}
+
+function formatDirection(direction: NativeBacktestTrade["direction"]) {
+  return direction === "long" ? "лонг" : "шорт";
+}
+
+function researchProfileDescription(symbol: string, trade: NativeBacktestTrade) {
+  if (trade.setup_variant === "research_2026_donchian_1h_80_10") {
+    return "Пробійна модель Donchian: вхід після закритої 1H свічки, яка пробила канал останніх 80 закритих 1H свічок. Вихід без фіксованого TP: позиція тримається, доки не з'явиться протилежний сигнал по 10-свічковому каналу або не спрацює стоп-лос.";
+  }
+  if (trade.setup_variant === "audusd_bb_atr_long_reversion_2026") {
+    return "Модель AUDUSD BB/ATR Long Reversion 2026: 1H, Bollinger 100 з відхиленням 1.75, тільки long. Логіка така: якщо AUDUSD закрив 1H свічку нижче нижньої смуги Bollinger і при цьому знаходиться нижче EMA200, ринок вважається перепроданим у контртрендовій зоні. Вхід у long виконується на відкритті наступної 1H свічки. Stop Loss ставиться на 0.75 * ATR(14) нижче entry, ціль - верхня смуга Bollinger з моменту сигналу, максимум утримання - 24 години. Це mean reversion модель: вона шукає повернення ціни від нижнього екстремуму, а не пробій за трендом.";
+  }
+  if (trade.setup_variant === "ger40_bb_atr_short_reversion_2026") {
+    return "Модель GER40 BB/ATR Short Reversion 2026: 1H, Bollinger 80 з відхиленням 2.25, тільки short. Логіка така: якщо GER40 закрив 1H свічку вище верхньої смуги Bollinger, ринок вважається перегрітим після різкого імпульсу вгору. Вхід у short виконується на відкритті наступної 1H свічки. Stop Loss ставиться на 1.25 * ATR(14) вище entry, ціль - нижня смуга Bollinger з моменту сигналу, максимум утримання - 72 години. Це mean reversion модель, тобто вона заробляє не на продовженні тренду, а на поверненні ціни з екстремуму.";
+  }
+
+  const profiles: Record<string, string> = {
+    AUDUSD:
+      "BB/ATR модель для AUDUSD: 4H, Bollinger 20 з відхиленням 2, тільки лонг, стоп-лос = 2 * ATR(14), планова ціль - протилежна смуга Bollinger, максимум утримання 6 свічок.",
+    GBPUSD:
+      "BB/ATR модель для GBPUSD: 1H, Bollinger 80 з відхиленням 1.5, тільки шорт, стоп-лос = 1 * ATR(14), планова ціль - середня лінія Bollinger, максимум утримання 96 свічок.",
+    USDJPY:
+      "BB/ATR модель для USDJPY: 1H, Bollinger 40 з відхиленням 2, тільки лонг, стоп-лос = 1 * ATR(14), планова ціль - протилежна смуга Bollinger, максимум утримання 96 свічок.",
+    GER40:
+      "BB/ATR модель для GER40: 1H, Bollinger 80 з відхиленням 2, тільки шорт, стоп-лос = 1 * ATR(14), планова ціль - протилежна смуга Bollinger, максимум утримання 96 свічок.",
+  };
+
+  return profiles[symbol] ?? "BB/ATR модель: вхід після закритої свічки за межами смуги Bollinger, стоп-лос рахується через ATR(14), вихід по цілі, стопу або правилу максимального утримання.";
+}
+
+function resultStatusUk(status: NativeBacktestTrade["result_status"]) {
+  if (status === "take_profit") return "ціль досягнута";
+  if (status === "stop_loss") return "стоп-лос";
+  if (status === "breakeven") return "беззбиток";
+  if (status === "open_at_end") return "закрито в кінці тесту";
+  if (status === "channel_exit") return "вихід за правилом каналу/часу";
+
+  return status;
 }
 
 function TradeReviewOverlay({
@@ -426,6 +503,238 @@ export function BklitTradeReviewPanel({
           levels={fiveMinuteLevels}
           markers={fiveMinuteMarkers}
           zones={fiveMinuteZones}
+          formatPrice={formatPrice}
+        />
+      </section>
+    </div>
+  );
+}
+
+function getResearchReviewWindow(data: MarketOhlcPoint[], trade: NativeBacktestTrade | null, symbol: string) {
+  if (!trade) return data.slice(-140);
+
+  const barMs = symbol === "AUDUSD" ? FOUR_HOURS_MS : HOUR_MS;
+  return getWindow(data, trade.entry_time - 28 * barMs, trade.exit_time + 10 * barMs, 160);
+}
+
+function researchSetupKind(trade: NativeBacktestTrade | null) {
+  if (!trade) return "Research";
+  if (trade.setup_variant === "research_2026_donchian_1h_80_10") return "Пробій Donchian";
+  if (trade.setup_variant === "audusd_bb_atr_long_reversion_2026") return "AUDUSD BB/ATR лонг-реверсія";
+  if (trade.setup_variant === "ger40_bb_atr_short_reversion_2026") return "GER40 BB/ATR шорт-реверсія";
+
+  return "Адаптивна BB/ATR модель";
+}
+
+function researchTimeframe(symbol: string, trade: NativeBacktestTrade | null) {
+  if (trade?.setup_variant === "research_2026_donchian_1h_80_10") return "1H";
+  if (symbol === "AUDUSD") return "4H";
+
+  return "1H";
+}
+
+function researchLogicRows({
+  signal,
+  symbol,
+  trade,
+  formatPrice,
+}: {
+  signal: MarketOhlcPoint | null;
+  symbol: string;
+  trade: NativeBacktestTrade | null;
+  formatPrice: (value: number) => string;
+}) {
+  if (!trade) return [];
+
+  const timeframe = researchTimeframe(symbol, trade);
+  const direction = formatDirection(trade.direction);
+  const signalClose = signal ? formatPrice(Number(signal.close)) : "-";
+  const signalOpen = signal ? formatPrice(Number(signal.open)) : "-";
+  const signalHigh = signal ? formatPrice(Number(signal.high)) : "-";
+  const signalLow = signal ? formatPrice(Number(signal.low)) : "-";
+  const entryChannelHigh = finiteLevel(trade.entry_channel_high)
+    ? formatPrice(trade.entry_channel_high)
+    : "-";
+  const entryChannelLow = finiteLevel(trade.entry_channel_low)
+    ? formatPrice(trade.entry_channel_low)
+    : "-";
+  const atr = finiteLevel(trade.atr_value) ? formatPrice(trade.atr_value) : "-";
+  const target = finiteLevel(trade.take_profit) ? formatPrice(trade.take_profit) : "фіксованої цілі немає";
+  const exitHigh = finiteLevel(trade.exit_channel_high) ? formatPrice(trade.exit_channel_high) : "-";
+  const exitLow = finiteLevel(trade.exit_channel_low) ? formatPrice(trade.exit_channel_low) : "-";
+  const riskDistance = formatRiskDistance(symbol, trade);
+  const signalTime = formatReviewTime(signal?.timestamp);
+  const entryTime = formatReviewTime(trade.entry_time);
+  const exitTime = formatReviewTime(trade.exit_time);
+  const result = `${resultStatusUk(trade.result_status)}: вихід ${formatPrice(trade.exit_price)} (${exitTime}), результат ${trade.r_multiple.toFixed(2)}R`;
+
+  if (trade.setup_variant === "research_2026_donchian_1h_80_10") {
+    const trigger =
+      trade.direction === "long"
+      ? `закрита ${timeframe} свічка має ціну закриття ${signalClose}, тобто закрилась вище верхньої межі Donchian ${entryChannelHigh}`
+      : `закрита ${timeframe} свічка має ціну закриття ${signalClose}, тобто закрилась нижче нижньої межі Donchian ${entryChannelLow}`;
+    const exitRule =
+      trade.direction === "long"
+        ? `для лонгу вихід по трендовому правилу виникає, якщо закрита свічка опускається нижче нижньої межі виходу ${exitLow}; також позиція закривається, якщо ціна торкається стоп-лосу`
+        : `для шорту вихід по трендовому правилу виникає, якщо закрита свічка піднімається вище верхньої межі виходу ${exitHigh}; також позиція закривається, якщо ціна торкається стоп-лосу`;
+
+    return [
+      ["Модель", researchProfileDescription(symbol, trade)],
+      ["Напрям", `Угода дозволена в напрямку: ${direction}. Сигнал сформувався на закритій ${timeframe} свічці ${signalTime}.`],
+      ["Сигнальна свічка", `Параметри свічки: відкриття ${signalOpen}, максимум ${signalHigh}, мінімум ${signalLow}, закриття ${signalClose}. ${trigger}.`],
+      ["Канал входу", `Верхня межа каналу: ${entryChannelHigh}. Нижня межа каналу: ${entryChannelLow}. Канал рахується тільки по повністю закритих попередніх свічках, без підглядання в майбутні дані.`],
+      ["Вхід", `Вхід не на закритті сигнальної свічки, а на відкритті наступної ${timeframe} свічки: ${formatPrice(trade.entry_price)} (${entryTime}). Це прибирає підглядання в майбутні дані.`],
+      ["Стоп-лос", `Стоп-лос поставлений через ATR: ${formatPrice(trade.stop_loss)}. ATR(14) на момент сигналу: ${atr}. Дистанція ризику: ${riskDistance}.`],
+      ["Take Profit", "Фіксованого TP немає. Це trend-following угода: прибуток не обмежується наперед, позиція тримається до exit-сигналу або SL."],
+      ["Логіка виходу", exitRule],
+      ["Результат", result],
+    ];
+  }
+
+  const trigger =
+    trade.direction === "long"
+      ? `закрита ${timeframe} свічка має ціну закриття ${signalClose}, тобто закрилась нижче нижньої смуги Bollinger ${entryChannelLow}`
+      : `закрита ${timeframe} свічка має ціну закриття ${signalClose}, тобто закрилась вище верхньої смуги Bollinger ${entryChannelHigh}`;
+  const targetRule =
+    trade.direction === "long"
+      ? `для лонгу планова ціль зверху: ${target}`
+      : `для шорту планова ціль знизу: ${target}`;
+
+  return [
+    ["Модель", researchProfileDescription(symbol, trade)],
+    ["Напрям", `Угода дозволена в напрямку: ${direction}. Сигнал сформувався на закритій ${timeframe} свічці ${signalTime}.`],
+    ["Сигнальна свічка", `Параметри свічки: відкриття ${signalOpen}, максимум ${signalHigh}, мінімум ${signalLow}, закриття ${signalClose}. ${trigger}.`],
+    ["Зона сетапу", `Верхня смуга Bollinger: ${entryChannelHigh}. Нижня смуга Bollinger: ${entryChannelLow}. Сигнал рахується тільки після закриття свічки, тому майбутні дані не використовуються.`],
+    ["Вхід", `Вхід виконаний на відкритті наступної ${timeframe} свічки: ${formatPrice(trade.entry_price)} (${entryTime}). Це не вхід заднім числом на сигнальному закритті.`],
+    ["Стоп-лос", `Стоп-лос = ціна входу +/- ATR-множник: ${formatPrice(trade.stop_loss)}. ATR(14) на момент сигналу: ${atr}. Дистанція ризику: ${riskDistance}.`],
+    ["Ціль", `${targetRule}. Якщо ціль не досягнута, угода може вийти по стоп-лосу або правилу максимального утримання.`],
+    ["Логіка виходу", "Позиція закривається при торканні стоп-лосу, при досягненні планової цілі або при завершенні максимального часу утримання для цього профілю."],
+    ["Результат", result],
+  ];
+}
+
+export function ResearchTradeReviewPanel({
+  klines,
+  symbol,
+  trade,
+  formatPrice = compactPrice,
+  className,
+}: ResearchTradeReviewPanelProps) {
+  const series = useMemo(() => toMarketOhlcSeries(klines), [klines]);
+  const data = useMemo(() => getResearchReviewWindow(series, trade, symbol), [series, symbol, trade]);
+  const signal = useMemo(() => (trade ? previousPoint(series, trade.entry_time) : null), [series, trade]);
+  const timeframe = researchTimeframe(symbol, trade);
+
+  const levels = useMemo<Level[]>(() => {
+    if (!trade) return [];
+    const nextLevels: Level[] = [
+      { price: trade.entry_price, label: "Вхід", color: "var(--chart-2)" },
+      { price: trade.stop_loss, label: "Стоп", color: "var(--chart-5)" },
+    ];
+
+    if (finiteLevel(trade.take_profit)) {
+      nextLevels.push({ price: trade.take_profit, label: "Ціль", color: "var(--chart-1)" });
+    }
+    if (finiteLevel(trade.entry_channel_high)) {
+      nextLevels.push({ price: trade.entry_channel_high, label: "Верх", color: "var(--chart-4)" });
+    }
+    if (finiteLevel(trade.entry_channel_low)) {
+      nextLevels.push({ price: trade.entry_channel_low, label: "Низ", color: "var(--chart-4)" });
+    }
+    if (
+      finiteLevel(trade.exit_channel_high) &&
+      Math.abs((trade.exit_channel_high ?? 0) - (trade.entry_channel_high ?? Number.NaN)) > 1e-12
+    ) {
+      nextLevels.push({ price: trade.exit_channel_high, label: "Вихід верх", color: "var(--chart-3)" });
+    }
+    if (
+      finiteLevel(trade.exit_channel_low) &&
+      Math.abs((trade.exit_channel_low ?? 0) - (trade.entry_channel_low ?? Number.NaN)) > 1e-12
+    ) {
+      nextLevels.push({ price: trade.exit_channel_low, label: "Вихід низ", color: "var(--chart-3)" });
+    }
+
+    return nextLevels;
+  }, [trade]);
+
+  const markers = useMemo<Marker[]>(() => {
+    if (!trade) return [];
+
+    return [
+      ...(signal ? [{ timestamp: signal.timestamp, label: "Сигнал закриття", color: "var(--chart-4)" }] : []),
+      { timestamp: trade.entry_time, label: "Вхід відкриття", color: "var(--chart-2)" },
+      { timestamp: trade.exit_time, label: "Вихід", color: "var(--chart-5)" },
+    ];
+  }, [signal, trade]);
+
+  const zones = useMemo<Zone[]>(() => {
+    if (!trade || !finiteLevel(trade.entry_channel_high) || !finiteLevel(trade.entry_channel_low)) return [];
+
+    return [
+      {
+        startTime: signal?.timestamp ?? trade.entry_time,
+        endTime: Math.max(trade.exit_time, trade.entry_time),
+        low: trade.entry_channel_low ?? trade.entry_price,
+        high: trade.entry_channel_high ?? trade.entry_price,
+        label: trade.setup_variant === "research_2026_donchian_1h_80_10" ? "Канал входу" : "Зона Bollinger",
+        color: "var(--chart-4)",
+      },
+    ];
+  }, [signal, trade]);
+
+  const logicRows = useMemo(
+    () => researchLogicRows({ signal, symbol, trade, formatPrice }),
+    [formatPrice, signal, symbol, trade]
+  );
+
+  return (
+    <div className={cn("grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]", className)}>
+      <section className="min-w-0 rounded-lg border border-border/60 bg-background p-4">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold">{researchSetupKind(trade)}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {symbol} / {timeframe} / пояснення конкретної угоди
+            </p>
+          </div>
+          {trade ? (
+            <span className="rounded-md border border-border px-2 py-1 text-xs uppercase text-muted-foreground">
+              {formatDirection(trade.direction)}
+            </span>
+          ) : null}
+        </div>
+
+        {logicRows.length ? (
+          <dl className="space-y-3">
+            {logicRows.map(([label, value]) => (
+              <div key={label} className="grid gap-1">
+                <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
+                <dd className="text-sm leading-relaxed">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">
+            Обери угоду для перегляду.
+          </div>
+        )}
+      </section>
+
+      <section className="min-w-0">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold">{timeframe} сетап / вхід / стоп / ціль</h3>
+          {trade ? (
+            <span className="font-mono text-xs uppercase text-muted-foreground">
+              {formatReviewTime(trade.entry_time)}
+            </span>
+          ) : null}
+        </div>
+        <ReviewChart
+          data={data}
+          emptyLabel={`Немає ${timeframe} свічок`}
+          levels={levels}
+          markers={markers}
+          zones={zones}
           formatPrice={formatPrice}
         />
       </section>

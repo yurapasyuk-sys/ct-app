@@ -43,7 +43,7 @@ function discoverFiles() {
       symbol: file.split("_")[0].toUpperCase(),
       path: `${DATA_DIR}/${file}`,
     }))
-    .filter((item) => ["EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(item.symbol))
+    .filter((item) => ["AUDUSD", "EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(item.symbol))
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
 
@@ -147,7 +147,7 @@ function independentAudit(report: NativeBacktestReport, symbol: string) {
 function runAdaptive(symbol: string, rows1m: Kline[], endTime: number) {
   const warmupStart = START - 180 * ONE_DAY_MS;
   const warmRows = rows1m.filter((row) => row.openTime >= warmupStart && row.openTime < endTime);
-  const rows1h = aggregateKlines(warmRows, "1h");
+  const strategyRows = aggregateKlines(warmRows, symbol === "AUDUSD" ? "4h" : "1h");
   const baseConfig = {
     symbol,
     requestedExchange: "FOREX",
@@ -163,7 +163,7 @@ function runAdaptive(symbol: string, rows1m: Kline[], endTime: number) {
 
   if (symbol === "EURUSD") {
     return runFxDonchianBacktest({
-      klines4h: rows1h,
+      klines4h: strategyRows,
       config: {
         ...baseConfig,
         entryLookback: 80,
@@ -179,6 +179,16 @@ function runAdaptive(symbol: string, rows1m: Kline[], endTime: number) {
   }
 
   const adaptiveParams = {
+    AUDUSD: {
+      bbPeriod: 20,
+      bandDeviation: 2,
+      atrMultiplier: 2,
+      maxHoldBars: 6,
+      directionMode: "long_only" as const,
+      emaFilter: "none" as const,
+      exitTarget: "opposite_band" as const,
+      strategyVersion: "research.2026-ytd.audusd-bb20-dev2-long-opposite-4h.1",
+    },
     GBPUSD: {
       bbPeriod: 80,
       bandDeviation: 1.5,
@@ -209,10 +219,10 @@ function runAdaptive(symbol: string, rows1m: Kline[], endTime: number) {
       exitTarget: "opposite_band" as const,
       strategyVersion: "research.2026-ytd.in-sample.ger40-bb80-dev2-short-opposite.1",
     },
-  }[symbol as "GBPUSD" | "USDJPY" | "GER40"];
+  }[symbol as "AUDUSD" | "GBPUSD" | "USDJPY" | "GER40"];
 
   return runUniversalBbAtrBacktest({
-    klines4h: rows1h,
+    klines4h: strategyRows,
     config: {
       ...baseConfig,
       bbPeriod: adaptiveParams.bbPeriod,

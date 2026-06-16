@@ -38,6 +38,8 @@ interface SymbolConfig {
   atrMultiplier: number;
   maxHoldBars?: number;
   directionMode: "all" | "long_only" | "short_only";
+  emaPeriod?: number;
+  emaFilter?: "none" | "trend" | "countertrend";
   exitTarget?: "mean" | "opposite_band";
 }
 
@@ -48,6 +50,22 @@ const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 
 const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
+  AUDUSD: {
+    symbol: "AUDUSD",
+    yahooSymbol: "AUDUSD=X",
+    kind: "bb_atr",
+    strategyName: "AUDUSD BB/ATR Long Reversion 2026",
+    strategyVersion: "research.2026-ytd.audusd-bb100-dev1_75-atr0_75-hold24-long-countertrend-opposite-1h.1",
+    bbPeriod: 100,
+    bandDeviation: 1.75,
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    maxHoldBars: 24,
+    directionMode: "long_only",
+    emaPeriod: 200,
+    emaFilter: "countertrend",
+    exitTarget: "opposite_band",
+  },
   EURUSD: {
     symbol: "EURUSD",
     yahooSymbol: "EURUSD=X",
@@ -92,14 +110,15 @@ const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
     symbol: "GER40",
     yahooSymbol: "^GDAXI",
     kind: "bb_atr",
-    strategyName: "Research 2026 GER40 BB/ATR Adaptive",
-    strategyVersion: "research.2026-ytd.in-sample.ger40-bb80-dev2-short-opposite.1",
+    strategyName: "GER40 BB/ATR Short Reversion 2026",
+    strategyVersion: "research.2026-ytd.ger40-bb80-dev2_25-atr1_25-hold72-short-opposite-1h.1",
     bbPeriod: 80,
-    bandDeviation: 2,
+    bandDeviation: 2.25,
     atrPeriod: 14,
-    atrMultiplier: 1,
-    maxHoldBars: 96,
+    atrMultiplier: 1.25,
+    maxHoldBars: 72,
     directionMode: "short_only",
+    emaFilter: "none",
     exitTarget: "opposite_band",
   },
 };
@@ -249,6 +268,18 @@ function bandsAt(rows: Kline[], index: number, period: number, deviation: number
   return { mean, upper: mean + deviation * sd, lower: mean - deviation * sd };
 }
 
+function emaAt(rows: Kline[], index: number, period: number) {
+  if (period <= 0 || index - period + 1 < 0) return null;
+
+  const multiplier = 2 / (period + 1);
+  let ema = rows.slice(0, period).reduce((sum, row) => sum + row.close, 0) / period;
+  for (let cursor = period; cursor <= index; cursor += 1) {
+    ema = (rows[cursor].close - ema) * multiplier + ema;
+  }
+
+  return ema;
+}
+
 function highest(rows: Kline[], start: number, end: number) {
   let value = -Infinity;
   for (let index = start; index < end; index += 1) value = Math.max(value, rows[index].high);
@@ -265,6 +296,18 @@ function directionAllowed(config: SymbolConfig, direction: Direction) {
   if (config.directionMode === "long_only") return direction === "long";
   if (config.directionMode === "short_only") return direction === "short";
   return true;
+}
+
+function emaFilterAllowed(config: SymbolConfig, direction: Direction, signalClose: number, ema: number | null) {
+  const filter = config.emaFilter ?? "none";
+  if (filter === "none") return true;
+  if (ema == null) return false;
+
+  if (filter === "trend") {
+    return direction === "long" ? signalClose > ema : signalClose < ema;
+  }
+
+  return direction === "long" ? signalClose < ema : signalClose > ema;
 }
 
 function parseYahooChart(payload: unknown): Kline[] {
@@ -374,7 +417,9 @@ function getJsonWithIpv4(url: URL, timeoutMs = 20_000) {
 
 async function fetchYahoo1h(config: SymbolConfig) {
   const endTime = Date.now() + 5 * 60 * 1000;
-  const startTime = endTime - 30 * 24 * ONE_HOUR_MS;
+  const warmupBars = Math.max(config.entryLookback ?? 0, config.bbPeriod ?? 0, config.emaPeriod ?? 0, 120);
+  const lookbackDays = Math.max(30, Math.ceil((warmupBars + 48) / 24));
+  const startTime = endTime - lookbackDays * 24 * ONE_HOUR_MS;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -482,11 +527,13 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
   const entryBar = rows[entryIndex];
   const bands = bandsAt(rows, signalIndex, bbPeriod, deviation);
   const atr = atrAt(rows, signalIndex, config.atrPeriod);
+  const ema = config.emaPeriod ? emaAt(rows, signalIndex, config.emaPeriod) : null;
   if (!bands || atr == null || atr <= 0) return null;
 
   const direction: Direction | null =
     signal.close < bands.lower ? "long" : signal.close > bands.upper ? "short" : null;
   if (!direction || !directionAllowed(config, direction)) return null;
+  if (!emaFilterAllowed(config, direction, signal.close, ema)) return null;
 
   const entryPrice = entryBar.open;
   const riskDistance = atr * config.atrMultiplier;
@@ -502,6 +549,11 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
   }
 
   const key = [config.symbol, config.strategyVersion, direction, entryBar.openTime].join("|");
+  const filterText =
+    config.emaFilter && config.emaFilter !== "none" && ema != null
+      ? `; EMA${config.emaPeriod} ${config.emaFilter} filter passed at ${formatPrice(config.symbol, ema)}`
+      : "";
+
   return {
     key,
     symbol: config.symbol,
@@ -519,8 +571,8 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
     source: `Yahoo ${config.yahooSymbol} 1H`,
     reason:
       direction === "long"
-        ? `1H close ${formatPrice(config.symbol, signal.close)} closed below BB(${bbPeriod}, ${deviation}) lower ${formatPrice(config.symbol, bands.lower)}`
-        : `1H close ${formatPrice(config.symbol, signal.close)} closed above BB(${bbPeriod}, ${deviation}) upper ${formatPrice(config.symbol, bands.upper)}`,
+        ? `1H close ${formatPrice(config.symbol, signal.close)} closed below BB(${bbPeriod}, ${deviation}) lower ${formatPrice(config.symbol, bands.lower)}${filterText}`
+        : `1H close ${formatPrice(config.symbol, signal.close)} closed above BB(${bbPeriod}, ${deviation}) upper ${formatPrice(config.symbol, bands.upper)}${filterText}`,
   } satisfies Signal;
 }
 
@@ -543,6 +595,7 @@ function signalMessage(signal: Signal) {
     `TP / exit: <code>${htmlEscape(tp)}</code>`,
     `Risk distance: ${signal.riskDistancePips.toFixed(1)} pips/points`,
     `Reason: ${htmlEscape(signal.reason)}`,
+    `Strategy version: ${htmlEscape(signal.strategyVersion)}`,
     `Source: ${htmlEscape(signal.source)}`,
     "",
     "Mode: paper signal only. No auto-trade.",
@@ -574,7 +627,7 @@ async function sendTelegram(message: string) {
 }
 
 function configuredSymbols() {
-  const raw = process.env.SIGNAL_SYMBOLS ?? "EURUSD,GBPUSD,USDJPY,GER40";
+  const raw = process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40";
   return raw
     .split(",")
     .map((item) => item.trim().toUpperCase())
