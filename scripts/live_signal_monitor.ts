@@ -5,6 +5,7 @@ import type { Kline } from "../src/lib/binance";
 
 type Direction = "long" | "short";
 type StrategyKind = "donchian" | "bb_atr";
+type SignalTimeframe = "1h" | "4h";
 
 interface Signal {
   key: string;
@@ -25,8 +26,10 @@ interface Signal {
 }
 
 interface SymbolConfig {
+  profileId: string;
   symbol: string;
   yahooSymbol: string;
+  timeframe: SignalTimeframe;
   kind: StrategyKind;
   strategyName: string;
   strategyVersion: string;
@@ -44,15 +47,35 @@ interface SymbolConfig {
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
+const FOUR_HOURS_MS = 4 * ONE_HOUR_MS;
 const OUT_DIR = "logs";
 const STATE_PATH = `${OUT_DIR}/signal-monitor-state.json`;
 const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 
-const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
-  AUDUSD: {
+const SIGNAL_PROFILES: SymbolConfig[] = [
+  {
+    profileId: "research_pack_audusd_bb_atr_4h",
     symbol: "AUDUSD",
     yahooSymbol: "AUDUSD=X",
+    timeframe: "4h",
+    kind: "bb_atr",
+    strategyName: "Research 2026 AUDUSD BB/ATR Adaptive",
+    strategyVersion: "research.2026-ytd.audusd-bb20-dev2-long-opposite-4h.1",
+    bbPeriod: 20,
+    bandDeviation: 2,
+    atrPeriod: 14,
+    atrMultiplier: 2,
+    maxHoldBars: 6,
+    directionMode: "long_only",
+    emaFilter: "none",
+    exitTarget: "opposite_band",
+  },
+  {
+    profileId: "audusd_bb_atr_long_reversion_2026",
+    symbol: "AUDUSD",
+    yahooSymbol: "AUDUSD=X",
+    timeframe: "1h",
     kind: "bb_atr",
     strategyName: "AUDUSD BB/ATR Long Reversion 2026",
     strategyVersion: "research.2026-ytd.audusd-bb100-dev1_75-atr0_75-hold24-long-countertrend-opposite-1h.1",
@@ -66,9 +89,11 @@ const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
     emaFilter: "countertrend",
     exitTarget: "opposite_band",
   },
-  EURUSD: {
+  {
+    profileId: "research_pack_eurusd_donchian_1h",
     symbol: "EURUSD",
     yahooSymbol: "EURUSD=X",
+    timeframe: "1h",
     kind: "donchian",
     strategyName: "Research 2026 EURUSD Donchian 1H 80/10",
     strategyVersion: "research.2026-ytd.in-sample.eurusd-donchian-1h-80-10-atr1.1",
@@ -78,9 +103,11 @@ const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
     atrMultiplier: 1,
     directionMode: "all",
   },
-  GBPUSD: {
+  {
+    profileId: "research_pack_gbpusd_bb_atr_1h",
     symbol: "GBPUSD",
     yahooSymbol: "GBPUSD=X",
+    timeframe: "1h",
     kind: "bb_atr",
     strategyName: "Research 2026 GBPUSD BB/ATR Adaptive",
     strategyVersion: "research.2026-ytd.in-sample.gbpusd-bb80-dev1_5-short-mean.1",
@@ -92,9 +119,11 @@ const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
     directionMode: "short_only",
     exitTarget: "mean",
   },
-  USDJPY: {
+  {
+    profileId: "research_pack_usdjpy_bb_atr_1h",
     symbol: "USDJPY",
     yahooSymbol: "USDJPY=X",
+    timeframe: "1h",
     kind: "bb_atr",
     strategyName: "Research 2026 USDJPY BB/ATR Adaptive",
     strategyVersion: "research.2026-ytd.in-sample.usdjpy-bb40-dev2-long-opposite.1",
@@ -106,9 +135,28 @@ const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
     directionMode: "long_only",
     exitTarget: "opposite_band",
   },
-  GER40: {
+  {
+    profileId: "research_pack_ger40_bb_atr_1h",
     symbol: "GER40",
     yahooSymbol: "^GDAXI",
+    timeframe: "1h",
+    kind: "bb_atr",
+    strategyName: "Research 2026 GER40 BB/ATR Adaptive",
+    strategyVersion: "research.2026-ytd.in-sample.ger40-bb80-dev2-short-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 2,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    maxHoldBars: 96,
+    directionMode: "short_only",
+    emaFilter: "none",
+    exitTarget: "opposite_band",
+  },
+  {
+    profileId: "ger40_bb_atr_short_reversion_2026",
+    symbol: "GER40",
+    yahooSymbol: "^GDAXI",
+    timeframe: "1h",
     kind: "bb_atr",
     strategyName: "GER40 BB/ATR Short Reversion 2026",
     strategyVersion: "research.2026-ytd.ger40-bb80-dev2_25-atr1_25-hold72-short-opposite-1h.1",
@@ -121,7 +169,7 @@ const SYMBOL_CONFIGS: Record<string, SymbolConfig> = {
     emaFilter: "none",
     exitTarget: "opposite_band",
   },
-};
+];
 
 function loadEnvFile(path: string) {
   if (!existsSync(path)) return;
@@ -222,6 +270,14 @@ function saveState(state: { sentKeys: string[] }) {
   writeFileSync(STATE_PATH, JSON.stringify({ sentKeys: state.sentKeys.slice(-500) }, null, 2), "utf8");
 }
 
+function timeframeMs(timeframe: SignalTimeframe) {
+  return timeframe === "4h" ? FOUR_HOURS_MS : ONE_HOUR_MS;
+}
+
+function yahooInterval(timeframe: SignalTimeframe) {
+  return timeframe === "4h" ? "4h" : "60m";
+}
+
 function pipSize(symbol: string) {
   if (symbol.includes("JPY")) return 0.01;
   if (symbol === "GER40") return 1;
@@ -310,7 +366,7 @@ function emaFilterAllowed(config: SymbolConfig, direction: Direction, signalClos
   return direction === "long" ? signalClose < ema : signalClose > ema;
 }
 
-function parseYahooChart(payload: unknown): Kline[] {
+function parseYahooChart(payload: unknown, timeframe: SignalTimeframe): Kline[] {
   const root = payload as {
     chart?: {
       result?: Array<{
@@ -343,6 +399,7 @@ function parseYahooChart(payload: unknown): Kline[] {
       const close = quote.close?.[index];
       if (open == null || high == null || low == null || close == null) return null;
       const openTime = timestamp * 1000;
+      const barMs = timeframeMs(timeframe);
       return {
         openTime,
         open,
@@ -350,7 +407,7 @@ function parseYahooChart(payload: unknown): Kline[] {
         low,
         close,
         volume: quote.volume?.[index] ?? 0,
-        closeTime: openTime + ONE_HOUR_MS - 1,
+        closeTime: openTime + barMs - 1,
         quoteVolume: 0,
         trades: 0,
         takerBuyBaseVolume: 0,
@@ -415,10 +472,11 @@ function getJsonWithIpv4(url: URL, timeoutMs = 20_000) {
   });
 }
 
-async function fetchYahoo1h(config: SymbolConfig) {
+async function fetchYahooKlines(config: SymbolConfig) {
   const endTime = Date.now() + 5 * 60 * 1000;
   const warmupBars = Math.max(config.entryLookback ?? 0, config.bbPeriod ?? 0, config.emaPeriod ?? 0, 120);
-  const lookbackDays = Math.max(30, Math.ceil((warmupBars + 48) / 24));
+  const barsPerDay = config.timeframe === "4h" ? 6 : 24;
+  const lookbackDays = Math.max(30, Math.ceil((warmupBars + 48) / barsPerDay));
   const startTime = endTime - lookbackDays * 24 * ONE_HOUR_MS;
   let lastError: Error | null = null;
 
@@ -427,13 +485,13 @@ async function fetchYahoo1h(config: SymbolConfig) {
     const url = new URL(
       `https://${host}/v8/finance/chart/${encodeURIComponent(config.yahooSymbol)}`
     );
-    url.searchParams.set("interval", "60m");
+    url.searchParams.set("interval", yahooInterval(config.timeframe));
     url.searchParams.set("period1", Math.floor(startTime / 1000).toString());
     url.searchParams.set("period2", Math.floor(endTime / 1000).toString());
     url.searchParams.set("includePrePost", "true");
 
     try {
-      const rows = parseYahooChart(await getJsonWithIpv4(url));
+      const rows = parseYahooChart(await getJsonWithIpv4(url), config.timeframe);
       if (!rows.length) {
         throw new Error("Yahoo chart returned no OHLC rows");
       }
@@ -457,9 +515,10 @@ async function fetchYahoo1h(config: SymbolConfig) {
   throw lastError ?? new Error(`Yahoo chart fetch failed for ${config.symbol}`);
 }
 
-function selectSignalAndEntryBars(rows: Kline[]) {
+function selectSignalAndEntryBars(rows: Kline[], timeframe: SignalTimeframe) {
   const now = Date.now();
-  const closedRows = rows.filter((row) => row.openTime + ONE_HOUR_MS <= now - 30_000);
+  const barMs = timeframeMs(timeframe);
+  const closedRows = rows.filter((row) => row.openTime + barMs <= now - 30_000);
   const signal = closedRows[closedRows.length - 1];
   if (!signal) return null;
   const signalIndex = rows.findIndex((row) => row.openTime === signal.openTime);
@@ -471,7 +530,7 @@ function selectSignalAndEntryBars(rows: Kline[]) {
 }
 
 function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
-  const selected = selectSignalAndEntryBars(rows);
+  const selected = selectSignalAndEntryBars(rows, config.timeframe);
   if (!selected) return null;
   const { signalIndex, entryIndex } = selected;
   const entryLookback = config.entryLookback ?? 80;
@@ -493,7 +552,7 @@ function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
   const riskDistance = atr * config.atrMultiplier;
   const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
   const riskDistancePips = riskDistance / pipSize(config.symbol);
-  const key = [config.symbol, config.strategyVersion, direction, entryBar.openTime].join("|");
+  const key = [config.symbol, config.profileId, config.strategyVersion, direction, entryBar.openTime].join("|");
 
   return {
     key,
@@ -509,16 +568,16 @@ function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
     exitRule: `${exitLookback}H Donchian channel exit, no fixed TP`,
     riskDistance,
     riskDistancePips,
-    source: `Yahoo ${config.yahooSymbol} 1H`,
+    source: `Yahoo ${config.yahooSymbol} ${config.timeframe.toUpperCase()}`,
     reason:
       direction === "long"
-        ? `1H close ${formatPrice(config.symbol, signal.close)} broke above Donchian(${entryLookback}) high ${formatPrice(config.symbol, channelHigh)}`
-        : `1H close ${formatPrice(config.symbol, signal.close)} broke below Donchian(${entryLookback}) low ${formatPrice(config.symbol, channelLow)}`,
+        ? `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} broke above Donchian(${entryLookback}) high ${formatPrice(config.symbol, channelHigh)}`
+        : `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} broke below Donchian(${entryLookback}) low ${formatPrice(config.symbol, channelLow)}`,
   } satisfies Signal;
 }
 
 function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
-  const selected = selectSignalAndEntryBars(rows);
+  const selected = selectSignalAndEntryBars(rows, config.timeframe);
   if (!selected) return null;
   const { signalIndex, entryIndex } = selected;
   const bbPeriod = config.bbPeriod ?? 80;
@@ -548,7 +607,7 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
     return null;
   }
 
-  const key = [config.symbol, config.strategyVersion, direction, entryBar.openTime].join("|");
+  const key = [config.symbol, config.profileId, config.strategyVersion, direction, entryBar.openTime].join("|");
   const filterText =
     config.emaFilter && config.emaFilter !== "none" && ema != null
       ? `; EMA${config.emaPeriod} ${config.emaFilter} filter passed at ${formatPrice(config.symbol, ema)}`
@@ -568,11 +627,11 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
     exitRule: `TP at ${config.exitTarget === "opposite_band" ? "opposite Bollinger band" : "Bollinger mean"}, time stop ${config.maxHoldBars ?? 96} bars`,
     riskDistance,
     riskDistancePips: riskDistance / pipSize(config.symbol),
-    source: `Yahoo ${config.yahooSymbol} 1H`,
+    source: `Yahoo ${config.yahooSymbol} ${config.timeframe.toUpperCase()}`,
     reason:
       direction === "long"
-        ? `1H close ${formatPrice(config.symbol, signal.close)} closed below BB(${bbPeriod}, ${deviation}) lower ${formatPrice(config.symbol, bands.lower)}${filterText}`
-        : `1H close ${formatPrice(config.symbol, signal.close)} closed above BB(${bbPeriod}, ${deviation}) upper ${formatPrice(config.symbol, bands.upper)}${filterText}`,
+        ? `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} closed below BB(${bbPeriod}, ${deviation}) lower ${formatPrice(config.symbol, bands.lower)}${filterText}`
+        : `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} closed above BB(${bbPeriod}, ${deviation}) upper ${formatPrice(config.symbol, bands.upper)}${filterText}`,
   } satisfies Signal;
 }
 
@@ -628,10 +687,19 @@ async function sendTelegram(message: string) {
 
 function configuredSymbols() {
   const raw = process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40";
+  const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
   return raw
     .split(",")
     .map((item) => item.trim().toUpperCase())
-    .filter((symbol) => symbol in SYMBOL_CONFIGS);
+    .filter((symbol, index, symbols) => supportedSymbols.has(symbol) && symbols.indexOf(symbol) === index);
+}
+
+function profilesForSymbol(symbol: string) {
+  return SIGNAL_PROFILES.filter((profile) => profile.symbol === symbol);
+}
+
+function profileLabel(profile: SymbolConfig) {
+  return `${profile.symbol}/${profile.profileId}`;
 }
 
 async function scanOnce({ forceTest = false } = {}) {
@@ -657,43 +725,58 @@ async function scanOnce({ forceTest = false } = {}) {
     return;
   }
 
+  const rowsCache = new Map<string, Kline[]>();
+
   for (const symbol of symbols) {
-    const config = SYMBOL_CONFIGS[symbol];
-    try {
-      const rows = await fetchYahoo1h(config);
-      const signal = detectSignal(config, rows);
-      if (!signal) {
-        console.log(`${iso(Date.now())} ${symbol}: no signal`);
-        continue;
-      }
+    const profiles = profilesForSymbol(symbol);
+    if (!profiles.length) {
+      console.log(`${iso(Date.now())} ${symbol}: no configured signal profiles`);
+      continue;
+    }
 
-      const ageMinutes = (Date.now() - signal.entryTime) / 60_000;
-      if (ageMinutes > maxAgeMinutes) {
-        console.log(`${iso(Date.now())} ${symbol}: signal skipped as stale (${ageMinutes.toFixed(1)} min)`);
-        continue;
-      }
+    for (const config of profiles) {
+      const label = profileLabel(config);
+      const cacheKey = [config.yahooSymbol, config.timeframe].join("|");
+      try {
+        let rows = rowsCache.get(cacheKey);
+        if (!rows) {
+          rows = await fetchYahooKlines(config);
+          rowsCache.set(cacheKey, rows);
+        }
+        const signal = detectSignal(config, rows);
+        if (!signal) {
+          console.log(`${iso(Date.now())} ${label}: no signal`);
+          continue;
+        }
 
-      if (state.sentKeys.includes(signal.key)) {
-        console.log(`${iso(Date.now())} ${symbol}: duplicate signal already handled`);
-        continue;
-      }
+        const ageMinutes = (Date.now() - signal.entryTime) / 60_000;
+        if (ageMinutes > maxAgeMinutes) {
+          console.log(`${iso(Date.now())} ${label}: signal skipped as stale (${ageMinutes.toFixed(1)} min)`);
+          continue;
+        }
 
-      const message = signalMessage(signal);
-      if (dryRun) {
-        console.log("[dry-run] Signal detected:");
-        console.log(message.replace(/<[^>]+>/g, ""));
-        appendJournal("dry_run", signal);
-      } else {
-        await sendTelegram(message);
-        appendJournal("sent", signal);
-        console.log(`${iso(Date.now())} ${symbol}: Telegram signal sent`);
-      }
+        if (state.sentKeys.includes(signal.key)) {
+          console.log(`${iso(Date.now())} ${label}: duplicate signal already handled`);
+          continue;
+        }
 
-      state.sentKeys.push(signal.key);
-      saveState(state);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`${iso(Date.now())} ${symbol}: ${message}`);
+        const message = signalMessage(signal);
+        if (dryRun) {
+          console.log("[dry-run] Signal detected:");
+          console.log(message.replace(/<[^>]+>/g, ""));
+          appendJournal("dry_run", signal);
+        } else {
+          await sendTelegram(message);
+          appendJournal("sent", signal);
+          console.log(`${iso(Date.now())} ${label}: Telegram signal sent`);
+        }
+
+        state.sentKeys.push(signal.key);
+        saveState(state);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`${iso(Date.now())} ${label}: ${message}`);
+      }
     }
   }
 }
@@ -714,7 +797,10 @@ async function main() {
   }
 
   const pollMs = Math.max(60_000, Number(process.env.SIGNAL_POLL_MS ?? "300000"));
-  console.log(`Starting live signal monitor. Poll: ${pollMs}ms. Symbols: ${configuredSymbols().join(", ")}`);
+  const profileCount = configuredSymbols().reduce((sum, symbol) => sum + profilesForSymbol(symbol).length, 0);
+  console.log(
+    `Starting live signal monitor. Poll: ${pollMs}ms. Symbols: ${configuredSymbols().join(", ")}. Profiles: ${profileCount}`
+  );
   for (;;) {
     await scanOnce();
     await sleep(pollMs);
