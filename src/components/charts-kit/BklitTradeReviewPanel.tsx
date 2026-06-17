@@ -106,13 +106,14 @@ function finiteLevel(price: number | null | undefined) {
 function researchPipSize(symbol: string) {
   if (symbol.includes("JPY")) return 0.01;
   if (symbol === "GER40") return 1;
+  if (symbol === "XAUUSD" || symbol === "XAGUSD") return 0.1;
 
   return 0.0001;
 }
 
 function formatRiskDistance(symbol: string, trade: NativeBacktestTrade) {
   const distance = Math.abs(trade.entry_price - trade.stop_loss) / researchPipSize(symbol);
-  const unit = symbol === "GER40" ? "пунктів" : "піпсів";
+  const unit = symbol === "GER40" || symbol === "XAUUSD" || symbol === "XAGUSD" ? "пунктів" : "піпсів";
 
   return `${distance.toFixed(symbol === "GER40" ? 1 : 1)} ${unit}`;
 }
@@ -142,6 +143,13 @@ function researchProfileDescription(symbol: string, trade: NativeBacktestTrade) 
   }
   if (trade.setup_variant === "fx_prop_nzdusd_bb_atr_2026") {
     return "FX Prop NZDUSD BB/ATR 2026: prop-safe mean reversion модель для NZDUSD. Таймфрейм 1H, Bollinger 80 з відхиленням 1.75, EMA200 як фільтр режиму. Long дозволений тільки вище EMA200 після закриття нижче нижньої Bollinger band, short дозволений тільки нижче EMA200 після закриття вище верхньої Bollinger band. Entry виконується на відкритті наступної 1H свічки, без look-ahead. Stop Loss = 0.5 * ATR(14) від entry, target - протилежна Bollinger band з моменту сигналу, максимум утримання - 24 години. Ризик на угоду - 1% equity. Модель відібрана не за максимальним прибутком, а за prop-критеріями: drawdown до 8%, коротка серія стопів і здатність дати 20%+ на сильному 60-90 денному відрізку.";
+  }
+
+  if (trade.setup_variant === "prop_usdchf_htf_breakout_2026") {
+    return "USDCHF Prop HTF Breakout 2026: 1H short-only проп-модель. Сетап з'являється тільки тоді, коли закрита 1H свічка закрилась нижче мінімуму попередніх 80 повністю закритих 1H свічок і при цьому close нижче EMA100. Entry виконується на open наступної 1H свічки. Stop Loss = 1 * ATR(14) вище entry, Take Profit = 3R, максимальне утримання - 24 свічки. Ризик на угоду - 1% equity.";
+  }
+  if (trade.setup_variant === "prop_xauusd_htf_breakout_2026") {
+    return "XAUUSD Prop HTF Breakout 2026: 4H breakout-модель для золота. Сетап виникає після закриття 4H свічки за межами 80-свічкового каналу в напрямку EMA100: long вище верхньої межі та EMA100, short нижче нижньої межі та EMA100. Entry на open наступної 4H свічки, Stop Loss = 1 * ATR(14), Take Profit = 3R, максимальне утримання - 12 свічок. Ризик на угоду - 1% equity.";
   }
 
   const profiles: Record<string, string> = {
@@ -538,6 +546,8 @@ function researchSetupKind(trade: NativeBacktestTrade | null) {
   if (trade.setup_variant === "fx_short_pullback_bb_atr_2026") return "FX BB/ATR шорт-пулбек";
   if (trade.setup_variant === "fx_universal_long_bb_atr_2026") return "FX BB/ATR лонг-реверсія";
   if (trade.setup_variant === "fx_prop_nzdusd_bb_atr_2026") return "FX Prop NZDUSD BB/ATR";
+  if (trade.setup_variant === "prop_usdchf_htf_breakout_2026") return "USDCHF Prop HTF Breakout";
+  if (trade.setup_variant === "prop_xauusd_htf_breakout_2026") return "XAUUSD Prop HTF Breakout";
 
   return "Адаптивна BB/ATR модель";
 }
@@ -549,6 +559,8 @@ function researchTimeframe(symbol: string, trade: NativeBacktestTrade | null) {
   if (trade?.setup_variant === "fx_short_pullback_bb_atr_2026") return "1H";
   if (trade?.setup_variant === "fx_universal_long_bb_atr_2026") return "4H";
   if (trade?.setup_variant === "fx_prop_nzdusd_bb_atr_2026") return "1H";
+  if (trade?.setup_variant === "prop_usdchf_htf_breakout_2026") return "1H";
+  if (trade?.setup_variant === "prop_xauusd_htf_breakout_2026") return "4H";
   if (symbol === "AUDUSD") return "4H";
 
   return "1H";
@@ -609,6 +621,32 @@ function researchLogicRows({
       ["Take Profit", "Фіксованого TP немає. Це trend-following угода: прибуток не обмежується наперед, позиція тримається до exit-сигналу або SL."],
       ["Логіка виходу", exitRule],
       ["Результат", result],
+    ];
+  }
+
+  if (
+    trade.setup_variant === "prop_usdchf_htf_breakout_2026" ||
+    trade.setup_variant === "prop_xauusd_htf_breakout_2026"
+  ) {
+    const ema = finiteLevel(trade.ema_value) ? formatPrice(trade.ema_value) : "-";
+    const trigger =
+      trade.direction === "long"
+        ? `закрита ${timeframe} свічка має close ${signalClose}, тобто закрилась вище верхньої межі 80-свічкового каналу ${entryChannelHigh} і вище EMA100 ${ema}`
+        : `закрита ${timeframe} свічка має close ${signalClose}, тобто закрилась нижче нижньої межі 80-свічкового каналу ${entryChannelLow} і нижче EMA100 ${ema}`;
+    const targetRule =
+      trade.direction === "long"
+        ? `TP розміщений на 3R вище entry: ${target}`
+        : `TP розміщений на 3R нижче entry: ${target}`;
+
+    return [
+      ["Модель", researchProfileDescription(symbol, trade)],
+      ["Напрям", `Угода дозволена в напрямку: ${direction}. Сигнал сформувався на закритій ${timeframe} свічці ${signalTime}.`],
+      ["Сигнальна свічка", `Параметри свічки: open ${signalOpen}, high ${signalHigh}, low ${signalLow}, close ${signalClose}. ${trigger}.`],
+      ["Канал і EMA", `Верхня межа каналу: ${entryChannelHigh}. Нижня межа каналу: ${entryChannelLow}. EMA100: ${ema}. Канал рахується тільки по попередніх повністю закритих свічках, без майбутніх даних.`],
+      ["Вхід", `Entry виконаний на open наступної ${timeframe} свічки: ${formatPrice(trade.entry_price)} (${entryTime}). Це прибирає look-ahead bias.`],
+      ["Stop Loss", `SL = 1 * ATR(14) від entry: ${formatPrice(trade.stop_loss)}. ATR(14): ${atr}. Дистанція ризику: ${riskDistance}.`],
+      ["Take Profit", `${targetRule}. Співвідношення ризик/прибуток для цієї моделі - 1:3.`],
+      ["Вихід", `Угода закривається при торканні SL, TP або після максимального часу утримання. Фактичний результат: ${result}`],
     ];
   }
 
@@ -697,7 +735,12 @@ export function ResearchTradeReviewPanel({
         endTime: Math.max(trade.exit_time, trade.entry_time),
         low: trade.entry_channel_low ?? trade.entry_price,
         high: trade.entry_channel_high ?? trade.entry_price,
-        label: trade.setup_variant === "research_2026_donchian_1h_80_10" ? "Канал входу" : "Зона Bollinger",
+        label:
+          trade.setup_variant === "research_2026_donchian_1h_80_10" ||
+          trade.setup_variant === "prop_usdchf_htf_breakout_2026" ||
+          trade.setup_variant === "prop_xauusd_htf_breakout_2026"
+            ? "Канал входу"
+            : "Зона Bollinger",
         color: "var(--chart-4)",
       },
     ];

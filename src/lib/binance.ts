@@ -16,7 +16,7 @@ export interface Kline {
   takerBuyQuoteVolume: number;
 }
 
-export type DataSource = 'spot' | 'futures' | 'okx-swap' | 'yahoo-fx';
+export type DataSource = 'spot' | 'futures' | 'okx-swap' | 'yahoo-fx' | 'yahoo-stock';
 
 export interface FetchKlinesParams {
   symbol: string;
@@ -131,7 +131,7 @@ function getBaseUrl(dataSource: DataSource): string {
     return 'https://www.okx.com/api/v5';
   }
 
-  if (dataSource === 'yahoo-fx') {
+  if (dataSource === 'yahoo-fx' || dataSource === 'yahoo-stock') {
     return typeof window === 'undefined'
       ? 'https://query1.finance.yahoo.com'
       : '/api/yahoo-chart';
@@ -160,7 +160,24 @@ function getOkxBar(interval: string) {
   return interval;
 }
 
-function getYahooSymbol(symbol: string) {
+function getYahooSymbol(symbol: string, dataSource: DataSource = 'yahoo-fx') {
+  if (dataSource === 'yahoo-stock') {
+    const mapped: Record<string, string> = {
+      XAUUSD: 'GC=F',
+      XAGUSD: 'SI=F',
+      US100: 'NQ=F',
+      US30: 'YM=F',
+      SPX500: 'ES=F',
+      UK100: '^FTSE',
+      FRA40: '^FCHI',
+      JP225: '^N225',
+      WTI: 'CL=F',
+      BRENT: 'BZ=F',
+    };
+    const normalized = symbol.replace(/[/_-]/g, '').toUpperCase();
+    return mapped[normalized] ?? symbol.toUpperCase();
+  }
+
   const normalized = symbol.replace(/[/_-]/g, '').toUpperCase();
 
   return normalized.endsWith('=X') ? normalized : `${normalized}=X`;
@@ -222,20 +239,22 @@ async function fetchYahooFxKlines(
   params: FetchKlinesParams,
   signal?: AbortSignal
 ): Promise<Kline[]> {
-  const { symbol, interval, startTime, endTime = Date.now(), limit = 1000 } = params;
+  const { symbol, interval, startTime, endTime = Date.now(), limit = 1000, dataSource = 'yahoo-fx' } = params;
   const intervalMs = getIntervalMs(interval);
   const fallbackStartTime = endTime - Math.ceil(limit * intervalMs * 3);
   const period1 = Math.floor((startTime ?? fallbackStartTime) / 1000);
   const period2 = Math.floor(endTime / 1000);
   const url = new URL(
-    `${getBaseUrl('yahoo-fx')}/v8/finance/chart/${encodeURIComponent(getYahooSymbol(symbol))}`,
+    `${getBaseUrl(dataSource ?? 'yahoo-fx')}/v8/finance/chart/${encodeURIComponent(
+      getYahooSymbol(symbol, dataSource)
+    )}`,
     typeof window === 'undefined' ? undefined : window.location.origin
   );
 
   url.searchParams.set('interval', getYahooInterval(interval));
   url.searchParams.set('period1', period1.toString());
   url.searchParams.set('period2', period2.toString());
-  url.searchParams.set('includePrePost', 'true');
+  url.searchParams.set('includePrePost', dataSource === 'yahoo-stock' ? 'false' : 'true');
 
   let lastError: Error | null = null;
 
@@ -259,7 +278,7 @@ async function fetchYahooFxKlines(
         const chartError = errorPayload?.chart?.error;
         const message = chartError?.description || chartError?.code || response.statusText;
 
-        throw new Error(`Yahoo FX API error: ${response.status} ${message}`);
+        throw new Error(`Yahoo API error: ${response.status} ${message}`);
       }
 
       const payload = (await response.json()) as YahooChartResponse;
@@ -285,7 +304,7 @@ async function fetchYahooFxKlines(
     }
   }
 
-  throw lastError || new Error('Failed to fetch klines from Yahoo FX');
+  throw lastError || new Error('Failed to fetch klines from Yahoo');
 }
 
 function parseOkxCandleResponse(raw: OkxCandleTuple[], interval: string): Kline[] {
@@ -418,7 +437,7 @@ export async function fetchKlines(
     return fetchOkxKlines(params, signal);
   }
 
-  if (dataSource === 'yahoo-fx') {
+  if (dataSource === 'yahoo-fx' || dataSource === 'yahoo-stock') {
     return fetchYahooFxKlines(params, signal);
   }
 
@@ -680,7 +699,7 @@ export async function fetchKlinesMultiBatch(
     return sorted;
   }
 
-  if (dataSource === 'yahoo-fx') {
+  if (dataSource === 'yahoo-fx' || dataSource === 'yahoo-stock') {
     const intervalMs = getIntervalMs(interval);
     const endTime = params.endTime ?? Date.now();
     const startTime = params.startTime ?? endTime - Math.ceil(totalCandles * intervalMs);
@@ -719,7 +738,7 @@ export async function fetchKlinesMultiBatch(
       }
 
       const sorted = allKlines.sort((a, b) => a.openTime - b.openTime).slice(-totalCandles);
-      console.log(`[fetchKlinesMultiBatch] Total fetched from Yahoo FX: ${sorted.length} candles`);
+      console.log(`[fetchKlinesMultiBatch] Total fetched from Yahoo: ${sorted.length} candles`);
       return sorted;
     }
 
@@ -735,7 +754,7 @@ export async function fetchKlinesMultiBatch(
       signal
     );
 
-    console.log(`[fetchKlinesMultiBatch] Total fetched from Yahoo FX: ${klines.length} candles`);
+    console.log(`[fetchKlinesMultiBatch] Total fetched from Yahoo: ${klines.length} candles`);
     return klines;
   }
   

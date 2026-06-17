@@ -39,6 +39,7 @@ import {
   BIOS_ORDERFLOW_EXPERIMENT_VARIANTS,
   ICT_EXPERIMENT_VARIANTS,
   runIctExperimentVariant,
+  runPropHtfBreakoutBacktest,
   type IctExperimentReport,
   type NativeBacktestMetrics,
   type NativeBacktestReport,
@@ -50,7 +51,7 @@ import {
   parseLocalCsvKlines,
 } from "@/lib/data-handlers/local-csv-market-data";
 
-type BacktestMarket = "crypto" | "forex";
+type BacktestMarket = "crypto" | "forex" | "metals";
 type BacktestRangeMode = "lookback" | "custom";
 type ForexDataMode = "remote" | "csv" | "workspace";
 type BacktestStrategy =
@@ -77,6 +78,8 @@ type BacktestStrategy =
   | "fx_short_pullback_bb_atr_2026"
   | "fx_universal_long_bb_atr_2026"
   | "fx_prop_nzdusd_bb_atr_2026"
+  | "prop_usdchf_htf_breakout_2026"
+  | "prop_xauusd_htf_breakout_2026"
   | "crypto_doge_bb_atr_short_reversion_2026"
   | "research_2026_adaptive_pack"
   | "fx_donchian"
@@ -119,6 +122,14 @@ const MARKET_CONFIG = {
       "GBPCAD",
     ],
   },
+  metals: {
+    label: "Metals",
+    requestedExchange: "CFD",
+    marketType: "metal CFD proxy",
+    marketDataProvider: "YAHOO_FINANCE_CHART",
+    dataSource: "yahoo-stock" as const,
+    symbols: ["XAUUSD", "XAGUSD"],
+  },
 } satisfies Record<
   BacktestMarket,
   {
@@ -126,7 +137,7 @@ const MARKET_CONFIG = {
     requestedExchange: string;
     marketType: string;
     marketDataProvider: string;
-    dataSource: "okx-swap" | "yahoo-fx";
+    dataSource: "okx-swap" | "yahoo-fx" | "yahoo-stock";
     symbols: string[];
   }
 >;
@@ -164,6 +175,18 @@ const STRATEGY_SECTIONS = [
         value: "fx_prop_nzdusd_bb_atr_2026",
         categoryLabel: "Пропстратегія",
         description: "NZDUSD 1H модель з обмеженою просадкою, EMA200 trend filter та ризиком 1%.",
+      },
+      {
+        label: "USDCHF Prop HTF Breakout 2026",
+        value: "prop_usdchf_htf_breakout_2026",
+        categoryLabel: "Пропстратегія",
+        description: "USDCHF 1H short-only breakout: close нижче 80-свічкового каналу, EMA100 regime filter, SL = 1 ATR(14), TP = 3R, ризик 1%.",
+      },
+      {
+        label: "XAUUSD Prop HTF Breakout 2026",
+        value: "prop_xauusd_htf_breakout_2026",
+        categoryLabel: "Пропстратегія",
+        description: "XAUUSD 4H breakout: пробій 80-свічкового каналу в напрямку EMA100, SL = 1 ATR(14), TP = 3R, ризик 1%.",
       },
     ],
   },
@@ -238,12 +261,15 @@ function initialSearchParams() {
 }
 
 function allSymbols() {
-  return [...MARKET_CONFIG.crypto.symbols, ...MARKET_CONFIG.forex.symbols];
+  return [...MARKET_CONFIG.crypto.symbols, ...MARKET_CONFIG.forex.symbols, ...MARKET_CONFIG.metals.symbols];
 }
 
 function inferMarketFromSymbol(symbol: string | null): BacktestMarket {
   if (symbol && MARKET_CONFIG.forex.symbols.includes(symbol)) {
     return "forex";
+  }
+  if (symbol && MARKET_CONFIG.metals.symbols.includes(symbol)) {
+    return "metals";
   }
 
   return "crypto";
@@ -251,7 +277,7 @@ function inferMarketFromSymbol(symbol: string | null): BacktestMarket {
 
 function initialMarket(): BacktestMarket {
   const value = initialSearchParams().get("market")?.toLowerCase();
-  if (value === "crypto" || value === "forex") return value;
+  if (value === "crypto" || value === "forex" || value === "metals") return value;
 
   return inferMarketFromSymbol(initialSearchParams().get("symbol")?.toUpperCase() ?? null);
 }
@@ -495,6 +521,17 @@ function formatCryptoPrice(value: number) {
     currency: "USD",
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
+function formatMetalPrice(value: number) {
+  if (!Number.isFinite(value)) return "-";
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -968,6 +1005,8 @@ function tradeHeadersForStrategy(strategy: BacktestStrategy) {
     strategy === "fx_short_pullback_bb_atr_2026" ||
     strategy === "fx_universal_long_bb_atr_2026" ||
     strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+    strategy === "prop_usdchf_htf_breakout_2026" ||
+    strategy === "prop_xauusd_htf_breakout_2026" ||
     strategy === "crypto_doge_bb_atr_short_reversion_2026"
   ) {
     return [
@@ -1037,6 +1076,8 @@ function tradeCellsForStrategy(
     strategy === "fx_short_pullback_bb_atr_2026" ||
     strategy === "fx_universal_long_bb_atr_2026" ||
     strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+    strategy === "prop_usdchf_htf_breakout_2026" ||
+    strategy === "prop_xauusd_htf_breakout_2026" ||
     strategy === "crypto_doge_bb_atr_short_reversion_2026"
   ) {
     return researchTradeCells(trade, formatPrice);
@@ -1108,10 +1149,15 @@ export default function BacktestReports() {
         strategy === "fx_short_pullback_bb_atr_2026" ||
         strategy === "fx_universal_long_bb_atr_2026" ||
         strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+        strategy === "prop_usdchf_htf_breakout_2026" ||
         strategy === "research_2026_adaptive_pack") &&
       market !== "forex"
     ) {
       setMarket("forex");
+    }
+
+    if (strategy === "prop_xauusd_htf_breakout_2026" && market !== "metals") {
+      setMarket("metals");
     }
 
     if (strategy === "crypto_doge_bb_atr_short_reversion_2026" && market !== "crypto") {
@@ -1138,6 +1184,12 @@ export default function BacktestReports() {
     }
     if (strategy === "fx_prop_nzdusd_bb_atr_2026" && symbol !== "NZDUSD") {
       setSymbol("NZDUSD");
+    }
+    if (strategy === "prop_usdchf_htf_breakout_2026" && symbol !== "USDCHF") {
+      setSymbol("USDCHF");
+    }
+    if (strategy === "prop_xauusd_htf_breakout_2026" && symbol !== "XAUUSD") {
+      setSymbol("XAUUSD");
     }
     if (
       strategy === "fx_universal_long_bb_atr_2026" &&
@@ -1279,10 +1331,15 @@ export default function BacktestReports() {
         (strategy === "fx_donchian" ||
           strategy === "fx_london_sweep" ||
           strategy === "ict_improved_v3" ||
+          strategy === "prop_usdchf_htf_breakout_2026" ||
           experimentVariantName != null) &&
         market !== "forex"
       ) {
         throw new Error("This strategy requires Forex market data.");
+      }
+
+      if (strategy === "prop_xauusd_htf_breakout_2026" && market !== "metals") {
+        throw new Error("This strategy requires Metals market data.");
       }
 
       if (experimentVariantName && experimentMetadata) {
@@ -1718,6 +1775,110 @@ export default function BacktestReports() {
         });
 
         setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "prop_usdchf_htf_breakout_2026") {
+        if (symbol !== "USDCHF") {
+          throw new Error("USDCHF Prop HTF Breakout 2026 is currently enabled only for USDCHF.");
+        }
+
+        const dataStartTime = runStartTime - 220 * ONE_DAY_MS;
+        const klines1h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "1h", dataStartTime, runEndTime)
+          : await fetchKlinesMultiBatch(
+              {
+                symbol,
+                interval: "1h",
+                startTime: dataStartTime,
+                endTime: runEndTime,
+                dataSource: selectedMarket.dataSource,
+              },
+              candlesForRange(dataStartTime, runEndTime, "1h"),
+              abortController.signal
+            );
+
+        const nextReport = runPropHtfBreakoutBacktest({
+          klines: klines1h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 3,
+            includePlanB: false,
+            lookback: 80,
+            atrPeriod: 14,
+            emaPeriod: 100,
+            atrMultiplier: 1,
+            rewardR: 3,
+            maxHoldBars: 24,
+            directionMode: "short_only",
+            setupVariant: "prop_usdchf_htf_breakout_2026",
+            strategyName: "USDCHF Prop HTF Breakout 2026",
+            strategyVersion: "research.2026-ytd.usdchf-1h-breakout80-ema100-short-atr1-3r-hold24.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "prop_xauusd_htf_breakout_2026") {
+        if (symbol !== "XAUUSD") {
+          throw new Error("XAUUSD Prop HTF Breakout 2026 is currently enabled only for XAUUSD.");
+        }
+
+        const dataStartTime = runStartTime - 260 * ONE_DAY_MS;
+        const klines4h = await fetchKlinesMultiBatch(
+          {
+            symbol,
+            interval: "4h",
+            startTime: dataStartTime,
+            endTime: runEndTime,
+            dataSource: selectedMarket.dataSource,
+          },
+          candlesForRange(dataStartTime, runEndTime, "4h"),
+          abortController.signal
+        );
+
+        const nextReport = runPropHtfBreakoutBacktest({
+          klines: klines4h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 3,
+            includePlanB: false,
+            lookback: 80,
+            atrPeriod: 14,
+            emaPeriod: 100,
+            atrMultiplier: 1,
+            rewardR: 3,
+            maxHoldBars: 12,
+            directionMode: "all",
+            setupVariant: "prop_xauusd_htf_breakout_2026",
+            strategyName: "XAUUSD Prop HTF Breakout 2026",
+            strategyVersion: "research.2026-ytd.xauusd-4h-breakout80-ema100-all-atr1-3r-hold12.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines4h);
         setKlines5m([]);
         setSelectedTradeIndex(0);
         setReport(nextReport);
@@ -2198,6 +2359,10 @@ export default function BacktestReports() {
             ? "1% / FX 4H BB80 dev1.5 / long-only / ATR14 SL x0.5"
           : strategy === "fx_prop_nzdusd_bb_atr_2026"
             ? "1% / NZDUSD 1H BB80 dev1.75 / EMA200 trend / ATR14 SL x0.5"
+          : strategy === "prop_usdchf_htf_breakout_2026"
+            ? "1% / USDCHF 1H HTF breakout80 / EMA100 / ATR14 SL x1 / TP 3R"
+          : strategy === "prop_xauusd_htf_breakout_2026"
+            ? "1% / XAUUSD 4H HTF breakout80 / EMA100 / ATR14 SL x1 / TP 3R"
           : strategy === "crypto_doge_bb_atr_short_reversion_2026"
             ? "1% / DOGE 1H BB120 dev2.25 / short-only / ATR14 SL x0.5"
           : strategy === "research_2026_adaptive_pack"
@@ -2208,7 +2373,12 @@ export default function BacktestReports() {
           ? "1% / 2.2R / Kyiv KZ"
           : "1% / 2.2R";
   const formatSelectedPrice = useCallback(
-    (value: number) => (market === "forex" ? formatForexPrice(value, symbol) : formatCryptoPrice(value)),
+    (value: number) =>
+      market === "forex"
+        ? formatForexPrice(value, symbol)
+        : market === "metals"
+          ? formatMetalPrice(value)
+          : formatCryptoPrice(value),
     [market, symbol]
   );
 
@@ -2680,6 +2850,8 @@ export default function BacktestReports() {
         strategy === "fx_short_pullback_bb_atr_2026" ||
         strategy === "fx_universal_long_bb_atr_2026" ||
         strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+        strategy === "prop_usdchf_htf_breakout_2026" ||
+        strategy === "prop_xauusd_htf_breakout_2026" ||
         strategy === "crypto_doge_bb_atr_short_reversion_2026") ? (
         <ExpandableResultCard
           title="Огляд угоди Research"

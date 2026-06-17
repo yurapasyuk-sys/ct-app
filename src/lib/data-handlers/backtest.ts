@@ -71,6 +71,8 @@ export type NativeBacktestSetupVariant =
   | "fx_short_pullback_bb_atr_2026"
   | "fx_universal_long_bb_atr_2026"
   | "fx_prop_nzdusd_bb_atr_2026"
+  | "prop_usdchf_htf_breakout_2026"
+  | "prop_xauusd_htf_breakout_2026"
   | "crypto_doge_bb_atr_short_reversion_2026"
   | "research_2026_bb_atr_adaptive"
   | "ict_experiment_v3_adx_regime_filter"
@@ -475,6 +477,7 @@ function yearFromTimestamp(timestamp: number) {
 function pipSizeForSymbol(symbol: string) {
   const normalized = symbol.toUpperCase();
   if (normalized === "GER40") return 1;
+  if (normalized === "XAUUSD" || normalized === "XAGUSD") return 0.1;
 
   return normalized.includes("JPY") ? 0.01 : 0.0001;
 }

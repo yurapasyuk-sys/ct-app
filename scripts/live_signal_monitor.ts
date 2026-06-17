@@ -4,7 +4,7 @@ import { get as httpsGet } from "node:https";
 import type { Kline } from "../src/lib/binance";
 
 type Direction = "long" | "short";
-type StrategyKind = "donchian" | "bb_atr";
+type StrategyKind = "donchian" | "bb_atr" | "htf_breakout";
 type SignalTimeframe = "1h" | "4h";
 type StrategyCategory = "research" | "asset_specific" | "universal" | "prop" | "crypto";
 
@@ -38,15 +38,18 @@ interface SymbolConfig {
   strategyVersion: string;
   entryLookback?: number;
   exitLookback?: number;
+  lookback?: number;
   bbPeriod?: number;
   bandDeviation?: number;
   atrPeriod: number;
   atrMultiplier: number;
+  rewardR?: number;
   maxHoldBars?: number;
   directionMode: "all" | "long_only" | "short_only";
   emaPeriod?: number;
   emaFilter?: "none" | "trend" | "countertrend";
   exitTarget?: "mean" | "opposite_band";
+  includePrePost?: boolean;
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -278,6 +281,42 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     exitTarget: "opposite_band",
   },
   {
+    profileId: "prop_usdchf_htf_breakout_2026",
+    symbol: "USDCHF",
+    yahooSymbol: "USDCHF=X",
+    timeframe: "1h",
+    kind: "htf_breakout",
+    strategyName: "USDCHF Prop HTF Breakout 2026",
+    strategyCategory: "prop",
+    strategyVersion: "research.2026-ytd.usdchf-1h-breakout80-ema100-short-atr1-3r-hold24.1",
+    lookback: 80,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    rewardR: 3,
+    maxHoldBars: 24,
+    directionMode: "short_only",
+    emaPeriod: 100,
+    includePrePost: true,
+  },
+  {
+    profileId: "prop_xauusd_htf_breakout_2026",
+    symbol: "XAUUSD",
+    yahooSymbol: "GC=F",
+    timeframe: "4h",
+    kind: "htf_breakout",
+    strategyName: "XAUUSD Prop HTF Breakout 2026",
+    strategyCategory: "prop",
+    strategyVersion: "research.2026-ytd.xauusd-4h-breakout80-ema100-all-atr1-3r-hold12.1",
+    lookback: 80,
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    rewardR: 3,
+    maxHoldBars: 12,
+    directionMode: "all",
+    emaPeriod: 100,
+    includePrePost: false,
+  },
+  {
     profileId: "crypto_doge_bb_atr_short_reversion_2026",
     symbol: "DOGEUSDT",
     yahooSymbol: "DOGE-USD",
@@ -407,12 +446,14 @@ function yahooInterval(timeframe: SignalTimeframe) {
 function pipSize(symbol: string) {
   if (symbol.includes("JPY")) return 0.01;
   if (symbol === "GER40") return 1;
+  if (symbol === "XAUUSD" || symbol === "XAGUSD") return 0.1;
   return 0.0001;
 }
 
 function formatPrice(symbol: string, value: number | null) {
   if (value == null || !Number.isFinite(value)) return "dynamic";
   if (symbol === "GER40") return value.toFixed(1);
+  if (symbol === "XAUUSD" || symbol === "XAGUSD") return value.toFixed(2);
   return value.toFixed(symbol.includes("JPY") ? 3 : 5);
 }
 
@@ -604,7 +645,13 @@ function getJsonWithIpv4(url: URL, timeoutMs = 20_000) {
 
 async function fetchYahooKlines(config: SymbolConfig) {
   const endTime = Date.now() + 5 * 60 * 1000;
-  const warmupBars = Math.max(config.entryLookback ?? 0, config.bbPeriod ?? 0, config.emaPeriod ?? 0, 120);
+  const warmupBars = Math.max(
+    config.entryLookback ?? 0,
+    config.lookback ?? 0,
+    config.bbPeriod ?? 0,
+    config.emaPeriod ?? 0,
+    120
+  );
   const barsPerDay = config.timeframe === "4h" ? 6 : 24;
   const lookbackDays = Math.max(30, Math.ceil((warmupBars + 48) / barsPerDay));
   const startTime = endTime - lookbackDays * 24 * ONE_HOUR_MS;
@@ -618,7 +665,7 @@ async function fetchYahooKlines(config: SymbolConfig) {
     url.searchParams.set("interval", yahooInterval(config.timeframe));
     url.searchParams.set("period1", Math.floor(startTime / 1000).toString());
     url.searchParams.set("period2", Math.floor(endTime / 1000).toString());
-    url.searchParams.set("includePrePost", "true");
+    url.searchParams.set("includePrePost", config.includePrePost === false ? "false" : "true");
 
     try {
       const rows = parseYahooChart(await getJsonWithIpv4(url), config.timeframe);
@@ -767,10 +814,65 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
   } satisfies Signal;
 }
 
+function detectHtfBreakoutSignal(config: SymbolConfig, rows: Kline[]) {
+  const selected = selectSignalAndEntryBars(rows, config.timeframe);
+  if (!selected) return null;
+  const { signalIndex, entryIndex } = selected;
+  const lookback = config.lookback ?? 80;
+  const rewardR = config.rewardR ?? 3;
+  if (signalIndex - lookback < 0) return null;
+
+  const signal = rows[signalIndex];
+  const entryBar = rows[entryIndex];
+  const channelHigh = highest(rows, signalIndex - lookback, signalIndex);
+  const channelLow = lowest(rows, signalIndex - lookback, signalIndex);
+  const atr = atrAt(rows, signalIndex, config.atrPeriod);
+  const ema = config.emaPeriod ? emaAt(rows, signalIndex, config.emaPeriod) : null;
+  if (atr == null || atr <= 0 || ema == null) return null;
+
+  const direction: Direction | null =
+    signal.close > channelHigh && signal.close > ema
+      ? "long"
+      : signal.close < channelLow && signal.close < ema
+        ? "short"
+        : null;
+  if (!direction || !directionAllowed(config, direction)) return null;
+
+  const entryPrice = entryBar.open;
+  const riskDistance = atr * config.atrMultiplier;
+  if (riskDistance <= 0) return null;
+
+  const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
+  const takeProfit = direction === "long" ? entryPrice + rewardR * riskDistance : entryPrice - rewardR * riskDistance;
+  const key = [config.symbol, config.profileId, config.strategyVersion, direction, entryBar.openTime].join("|");
+
+  return {
+    key,
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
+    strategyVersion: config.strategyVersion,
+    direction,
+    signalTime: signal.openTime,
+    entryTime: entryBar.openTime,
+    entryPrice,
+    stopLoss,
+    takeProfit,
+    exitRule: `Fixed TP ${rewardR}R, time stop ${config.maxHoldBars ?? 24} bars`,
+    riskDistance,
+    riskDistancePips: riskDistance / pipSize(config.symbol),
+    source: `Yahoo ${config.yahooSymbol} ${config.timeframe.toUpperCase()}`,
+    reason:
+      direction === "long"
+        ? `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} broke above ${lookback}-bar high ${formatPrice(config.symbol, channelHigh)} and EMA${config.emaPeriod} ${formatPrice(config.symbol, ema)}`
+        : `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} broke below ${lookback}-bar low ${formatPrice(config.symbol, channelLow)} and EMA${config.emaPeriod} ${formatPrice(config.symbol, ema)}`,
+  } satisfies Signal;
+}
+
 function detectSignal(config: SymbolConfig, rows: Kline[]) {
-  return config.kind === "donchian"
-    ? detectDonchianSignal(config, rows)
-    : detectBbAtrSignal(config, rows);
+  if (config.kind === "donchian") return detectDonchianSignal(config, rows);
+  if (config.kind === "htf_breakout") return detectHtfBreakoutSignal(config, rows);
+  return detectBbAtrSignal(config, rows);
 }
 
 function signalMessage(signal: Signal) {
@@ -820,7 +922,7 @@ async function sendTelegram(message: string) {
 
 function configuredSymbols() {
   const raw =
-    process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,DOGEUSDT";
+    process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,DOGEUSDT";
   const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
   return raw
     .split(",")
