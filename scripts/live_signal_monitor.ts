@@ -27,6 +27,27 @@ interface Signal {
   reason: string;
 }
 
+interface OpenPositionState {
+  key: string;
+  profileId: string;
+  symbol: string;
+  strategyName: string;
+  strategyCategory: StrategyCategory;
+  strategyVersion: string;
+  direction: Direction;
+  timeframe: SignalTimeframe;
+  entryTime: number;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number | null;
+  exitRule: string;
+}
+
+interface MonitorState {
+  sentKeys: string[];
+  openPositions: OpenPositionState[];
+}
+
 interface SymbolConfig {
   profileId: string;
   symbol: string;
@@ -58,8 +79,10 @@ const OUT_DIR = "logs";
 const STATE_PATH = `${OUT_DIR}/signal-monitor-state.json`;
 const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
+const PROCESS_STARTED_AT = Date.now();
+let initialScanCompleted = false;
 const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
-  research: "Research стратегія",
+  research: "Резервна стратегія",
   asset_specific: "Індивідуальна стратегія",
   universal: "Універсальна стратегія",
   prop: "Пропстратегія",
@@ -361,6 +384,18 @@ function iso(timestamp: number) {
   return new Date(timestamp).toISOString();
 }
 
+function kyivTime(timestamp: number) {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(timestamp);
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -420,19 +455,33 @@ function appendJournal(status: string, signal: Signal) {
   );
 }
 
-function loadState() {
-  if (!existsSync(STATE_PATH)) return { sentKeys: [] as string[] };
+function loadState(): MonitorState {
+  if (!existsSync(STATE_PATH)) return { sentKeys: [], openPositions: [] };
   try {
-    const parsed = JSON.parse(readFileSync(STATE_PATH, "utf8")) as { sentKeys?: string[] };
-    return { sentKeys: Array.isArray(parsed.sentKeys) ? parsed.sentKeys : [] };
+    const parsed = JSON.parse(readFileSync(STATE_PATH, "utf8")) as Partial<MonitorState>;
+    return {
+      sentKeys: Array.isArray(parsed.sentKeys) ? parsed.sentKeys : [],
+      openPositions: Array.isArray(parsed.openPositions) ? parsed.openPositions : [],
+    };
   } catch {
-    return { sentKeys: [] as string[] };
+    return { sentKeys: [], openPositions: [] };
   }
 }
 
-function saveState(state: { sentKeys: string[] }) {
+function saveState(state: MonitorState) {
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(STATE_PATH, JSON.stringify({ sentKeys: state.sentKeys.slice(-500) }, null, 2), "utf8");
+  writeFileSync(
+    STATE_PATH,
+    JSON.stringify(
+      {
+        sentKeys: state.sentKeys.slice(-1_000),
+        openPositions: state.openPositions.slice(-100),
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
 }
 
 function timeframeMs(timeframe: SignalTimeframe) {
@@ -706,6 +755,14 @@ function selectSignalAndEntryBars(rows: Kline[], timeframe: SignalTimeframe) {
   return null;
 }
 
+function canonicalEntryTime(signalTime: number, timeframe: SignalTimeframe) {
+  return signalTime + timeframeMs(timeframe);
+}
+
+function signalKey(config: SymbolConfig, direction: Direction, signalTime: number) {
+  return [config.symbol, config.profileId, config.strategyVersion, direction, signalTime].join("|");
+}
+
 function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
   const selected = selectSignalAndEntryBars(rows, config.timeframe);
   if (!selected) return null;
@@ -729,7 +786,7 @@ function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
   const riskDistance = atr * config.atrMultiplier;
   const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
   const riskDistancePips = riskDistance / pipSize(config.symbol);
-  const key = [config.symbol, config.profileId, config.strategyVersion, direction, entryBar.openTime].join("|");
+  const key = signalKey(config, direction, signal.openTime);
 
   return {
     key,
@@ -739,7 +796,7 @@ function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
     strategyVersion: config.strategyVersion,
     direction,
     signalTime: signal.openTime,
-    entryTime: entryBar.openTime,
+    entryTime: canonicalEntryTime(signal.openTime, config.timeframe),
     entryPrice,
     stopLoss,
     takeProfit: null,
@@ -785,7 +842,7 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
     return null;
   }
 
-  const key = [config.symbol, config.profileId, config.strategyVersion, direction, entryBar.openTime].join("|");
+  const key = signalKey(config, direction, signal.openTime);
   const filterText =
     config.emaFilter && config.emaFilter !== "none" && ema != null
       ? `; EMA${config.emaPeriod} ${config.emaFilter} filter passed at ${formatPrice(config.symbol, ema)}`
@@ -799,7 +856,7 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
     strategyVersion: config.strategyVersion,
     direction,
     signalTime: signal.openTime,
-    entryTime: entryBar.openTime,
+    entryTime: canonicalEntryTime(signal.openTime, config.timeframe),
     entryPrice,
     stopLoss,
     takeProfit,
@@ -844,7 +901,7 @@ function detectHtfBreakoutSignal(config: SymbolConfig, rows: Kline[]) {
 
   const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
   const takeProfit = direction === "long" ? entryPrice + rewardR * riskDistance : entryPrice - rewardR * riskDistance;
-  const key = [config.symbol, config.profileId, config.strategyVersion, direction, entryBar.openTime].join("|");
+  const key = signalKey(config, direction, signal.openTime);
 
   return {
     key,
@@ -854,7 +911,7 @@ function detectHtfBreakoutSignal(config: SymbolConfig, rows: Kline[]) {
     strategyVersion: config.strategyVersion,
     direction,
     signalTime: signal.openTime,
-    entryTime: entryBar.openTime,
+    entryTime: canonicalEntryTime(signal.openTime, config.timeframe),
     entryPrice,
     stopLoss,
     takeProfit,
@@ -876,24 +933,120 @@ function detectSignal(config: SymbolConfig, rows: Kline[]) {
 }
 
 function signalMessage(signal: Signal) {
-  const tp = signal.takeProfit == null ? signal.exitRule : formatPrice(signal.symbol, signal.takeProfit);
+  const tp =
+    signal.takeProfit == null
+      ? `${signal.exitRule}; фіксованого TP немає, бот надішле EXIT ALERT при виході або SL`
+      : formatPrice(signal.symbol, signal.takeProfit);
   return [
     "<b>PAPER SIGNAL</b>",
     `<b>${htmlEscape(signal.symbol)}</b> ${signal.direction.toUpperCase()}`,
-    `Strategy: ${htmlEscape(signal.strategyName)}`,
+    `Стратегія: ${htmlEscape(signal.strategyName)}`,
     `Класифікація: ${htmlEscape(strategyCategoryLabel(signal.strategyCategory))}`,
-    `Signal candle: ${iso(signal.signalTime)}`,
-    `Entry time: ${iso(signal.entryTime)}`,
+    `Signal candle: ${kyivTime(signal.signalTime)} Київ / ${iso(signal.signalTime)} UTC`,
+    `Entry time: ${kyivTime(signal.entryTime)} Київ / ${iso(signal.entryTime)} UTC`,
     `Entry: <code>${formatPrice(signal.symbol, signal.entryPrice)}</code>`,
     `SL: <code>${formatPrice(signal.symbol, signal.stopLoss)}</code>`,
     `TP / exit: <code>${htmlEscape(tp)}</code>`,
     `Risk distance: ${signal.riskDistancePips.toFixed(1)} pips/points`,
-    `Reason: ${htmlEscape(signal.reason)}`,
-    `Strategy version: ${htmlEscape(signal.strategyVersion)}`,
-    `Source: ${htmlEscape(signal.source)}`,
+    `Логіка: ${htmlEscape(signal.reason)}`,
+    `Версія: ${htmlEscape(signal.strategyVersion)}`,
+    `Джерело: ${htmlEscape(signal.source)}`,
     "",
     "Mode: paper signal only. No auto-trade.",
   ].join("\n");
+}
+
+function openPositionFromSignal(config: SymbolConfig, signal: Signal): OpenPositionState {
+  return {
+    key: signal.key,
+    profileId: config.profileId,
+    symbol: signal.symbol,
+    strategyName: signal.strategyName,
+    strategyCategory: signal.strategyCategory,
+    strategyVersion: signal.strategyVersion,
+    direction: signal.direction,
+    timeframe: config.timeframe,
+    entryTime: signal.entryTime,
+    entryPrice: signal.entryPrice,
+    stopLoss: signal.stopLoss,
+    takeProfit: signal.takeProfit,
+    exitRule: signal.exitRule,
+  };
+}
+
+function shouldTrackPosition(signal: Signal) {
+  return signal.takeProfit == null;
+}
+
+function exitMessage(position: OpenPositionState, exit: { exitTime: number; exitPrice: number; reason: string }) {
+  return [
+    "<b>PAPER EXIT ALERT</b>",
+    `<b>${htmlEscape(position.symbol)}</b> ${position.direction.toUpperCase()}`,
+    `Стратегія: ${htmlEscape(position.strategyName)}`,
+    `Класифікація: ${htmlEscape(strategyCategoryLabel(position.strategyCategory))}`,
+    `Entry time: ${kyivTime(position.entryTime)} Київ / ${iso(position.entryTime)} UTC`,
+    `Entry: <code>${formatPrice(position.symbol, position.entryPrice)}</code>`,
+    `SL: <code>${formatPrice(position.symbol, position.stopLoss)}</code>`,
+    `Exit time: ${kyivTime(exit.exitTime)} Київ / ${iso(exit.exitTime)} UTC`,
+    `Exit: <code>${formatPrice(position.symbol, exit.exitPrice)}</code>`,
+    `Причина: ${htmlEscape(exit.reason)}`,
+    "",
+    "Mode: paper signal only. No auto-trade.",
+  ].join("\n");
+}
+
+function detectDonchianExit(config: SymbolConfig, position: OpenPositionState, rows: Kline[]) {
+  const exitLookback = config.exitLookback ?? 10;
+  const barMs = timeframeMs(config.timeframe);
+  const now = Date.now();
+  const closedRows = rows.filter((row) => row.openTime + barMs <= now - 30_000);
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row.openTime < position.entryTime) continue;
+
+    const hitStop =
+      position.direction === "long"
+        ? row.low <= position.stopLoss
+        : row.high >= position.stopLoss;
+    if (hitStop) {
+      return {
+        exitTime: Math.max(row.openTime, position.entryTime),
+        exitPrice: position.stopLoss,
+        reason: "ціна торкнулась Stop Loss",
+      };
+    }
+  }
+
+  for (const signal of closedRows) {
+    if (signal.openTime < position.entryTime) continue;
+    const signalIndex = rows.findIndex((row) => row.openTime === signal.openTime);
+    if (signalIndex - exitLookback < 0) continue;
+    const exitHigh = highest(rows, signalIndex - exitLookback, signalIndex);
+    const exitLow = lowest(rows, signalIndex - exitLookback, signalIndex);
+    const shouldExit =
+      position.direction === "long"
+        ? signal.close < exitLow
+        : signal.close > exitHigh;
+    if (!shouldExit) continue;
+
+    const next = rows[signalIndex + 1];
+    return {
+      exitTime: canonicalEntryTime(signal.openTime, config.timeframe),
+      exitPrice: next?.open ?? signal.close,
+      reason:
+        position.direction === "long"
+          ? `${config.timeframe.toUpperCase()} close нижче Donchian(${exitLookback}) exit low`
+          : `${config.timeframe.toUpperCase()} close вище Donchian(${exitLookback}) exit high`,
+    };
+  }
+
+  return null;
+}
+
+function detectPositionExit(config: SymbolConfig, position: OpenPositionState, rows: Kline[]) {
+  if (config.kind === "donchian") return detectDonchianExit(config, position, rows);
+  return null;
 }
 
 async function sendTelegram(message: string) {
@@ -943,6 +1096,9 @@ async function scanOnce({ forceTest = false } = {}) {
   const symbols = configuredSymbols();
   const maxAgeMinutes = Number(process.env.SIGNAL_MAX_SIGNAL_AGE_MINUTES ?? "90");
   const dryRun = process.env.SIGNAL_DRY_RUN === "1" || process.env.SIGNAL_DRY_RUN === "true";
+  const sendExistingOnStart =
+    process.env.SIGNAL_SEND_EXISTING_ON_START === "1" ||
+    process.env.SIGNAL_SEND_EXISTING_ON_START === "true";
 
   if (forceTest) {
     const message = [
@@ -979,6 +1135,31 @@ async function scanOnce({ forceTest = false } = {}) {
           rows = await fetchYahooKlines(config);
           rowsCache.set(cacheKey, rows);
         }
+
+        const profileOpenPositions = state.openPositions.filter(
+          (position) => position.profileId === config.profileId
+        );
+        for (const position of profileOpenPositions) {
+          const exit = detectPositionExit(config, position, rows);
+          if (!exit) continue;
+
+          const exitKey = `exit|${position.key}|${exit.exitTime}`;
+          if (state.sentKeys.includes(exitKey)) continue;
+
+          const message = exitMessage(position, exit);
+          if (dryRun) {
+            console.log("[dry-run] Exit detected:");
+            console.log(message.replace(/<[^>]+>/g, ""));
+          } else {
+            await sendTelegram(message);
+            console.log(`${iso(Date.now())} ${label}: Telegram exit alert sent`);
+          }
+
+          state.sentKeys.push(exitKey);
+          state.openPositions = state.openPositions.filter((item) => item.key !== position.key);
+          saveState(state);
+        }
+
         const signal = detectSignal(config, rows);
         if (!signal) {
           console.log(`${iso(Date.now())} ${label}: no signal`);
@@ -988,6 +1169,16 @@ async function scanOnce({ forceTest = false } = {}) {
         const ageMinutes = (Date.now() - signal.entryTime) / 60_000;
         if (ageMinutes > maxAgeMinutes) {
           console.log(`${iso(Date.now())} ${label}: signal skipped as stale (${ageMinutes.toFixed(1)} min)`);
+          continue;
+        }
+
+        if (!initialScanCompleted && !sendExistingOnStart && signal.entryTime < PROCESS_STARTED_AT - 30_000) {
+          console.log(`${iso(Date.now())} ${label}: pre-start signal skipped (${kyivTime(signal.entryTime)} Kyiv)`);
+          state.sentKeys.push(signal.key);
+          if (shouldTrackPosition(signal) && !state.openPositions.some((position) => position.key === signal.key)) {
+            state.openPositions.push(openPositionFromSignal(config, signal));
+          }
+          saveState(state);
           continue;
         }
 
@@ -1008,6 +1199,10 @@ async function scanOnce({ forceTest = false } = {}) {
         }
 
         state.sentKeys.push(signal.key);
+        if (shouldTrackPosition(signal)) {
+          state.openPositions = state.openPositions.filter((position) => position.key !== signal.key);
+          state.openPositions.push(openPositionFromSignal(config, signal));
+        }
         saveState(state);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1015,6 +1210,8 @@ async function scanOnce({ forceTest = false } = {}) {
       }
     }
   }
+
+  initialScanCompleted = true;
 }
 
 async function main() {
