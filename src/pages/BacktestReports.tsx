@@ -12,7 +12,10 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -73,6 +76,8 @@ type BacktestStrategy =
   | "ger40_bb_atr_short_reversion_2026"
   | "fx_short_pullback_bb_atr_2026"
   | "fx_universal_long_bb_atr_2026"
+  | "fx_prop_nzdusd_bb_atr_2026"
+  | "crypto_doge_bb_atr_short_reversion_2026"
   | "research_2026_adaptive_pack"
   | "fx_donchian"
   | "fx_london_sweep";
@@ -84,7 +89,7 @@ const MARKET_CONFIG = {
     marketType: "crypto perpetual futures",
     marketDataProvider: "OKX_SWAP",
     dataSource: "okx-swap" as const,
-    symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT", "DOGEUSDT"],
   },
   forex: {
     label: "Forex",
@@ -143,14 +148,90 @@ const LOOKBACK_OPTIONS = [
   { label: "30D", value: "30", days: 30 },
   { label: "90D", value: "90", days: 90 },
 ];
-const STRATEGY_OPTIONS = [
-  { label: "Universal Forex BB/ATR Mean Reversion 2026", value: "universal_forex_bb_atr_mean_reversion_2026" },
-  { label: "AUDUSD BB/ATR Long Reversion 2026", value: "audusd_bb_atr_long_reversion_2026" },
-  { label: "GER40 BB/ATR Short Reversion 2026", value: "ger40_bb_atr_short_reversion_2026" },
-  { label: "FX Short Pullback BB/ATR 2026", value: "fx_short_pullback_bb_atr_2026" },
-  { label: "FX Universal Long BB/ATR 2026", value: "fx_universal_long_bb_atr_2026" },
-  { label: "Research 2026 Adaptive Pack", value: "research_2026_adaptive_pack" },
-] satisfies Array<{ label: string; value: BacktestStrategy }>;
+type StrategyOption = {
+  label: string;
+  value: BacktestStrategy;
+  categoryLabel: string;
+  description: string;
+};
+
+const STRATEGY_SECTIONS = [
+  {
+    label: "Пропстратегії",
+    options: [
+      {
+        label: "FX Prop NZDUSD BB/ATR 2026",
+        value: "fx_prop_nzdusd_bb_atr_2026",
+        categoryLabel: "Пропстратегія",
+        description: "NZDUSD 1H модель з обмеженою просадкою, EMA200 trend filter та ризиком 1%.",
+      },
+    ],
+  },
+  {
+    label: "Універсальні Forex",
+    options: [
+      {
+        label: "FX Universal Long BB/ATR 2026",
+        value: "fx_universal_long_bb_atr_2026",
+        categoryLabel: "Універсальна стратегія",
+        description: "4H mean-reversion модель для кількох FX-пар, long-only, ATR SL та вихід по протилежній BB.",
+      },
+      {
+        label: "Universal Forex BB/ATR Mean Reversion 2026",
+        value: "universal_forex_bb_atr_mean_reversion_2026",
+        categoryLabel: "Універсальна стратегія",
+        description: "Forex BB/ATR mean-reversion модель для ручної перевірки на різних валютних парах.",
+      },
+      {
+        label: "FX Short Pullback BB/ATR 2026",
+        value: "fx_short_pullback_bb_atr_2026",
+        categoryLabel: "Універсальна стратегія",
+        description: "1H short-only pullback модель з EMA200 фільтром і ATR stop loss.",
+      },
+    ],
+  },
+  {
+    label: "Індивідуальні активи",
+    options: [
+      {
+        label: "AUDUSD BB/ATR Long Reversion 2026",
+        value: "audusd_bb_atr_long_reversion_2026",
+        categoryLabel: "Індивідуальна стратегія",
+        description: "AUDUSD 1H long-only модель, підібрана окремо під цей актив.",
+      },
+      {
+        label: "GER40 BB/ATR Short Reversion 2026",
+        value: "ger40_bb_atr_short_reversion_2026",
+        categoryLabel: "Індивідуальна стратегія",
+        description: "GER40 1H short-only модель з BB/ATR правилами під індекс.",
+      },
+    ],
+  },
+  {
+    label: "Криптостратегії",
+    options: [
+      {
+        label: "Crypto DOGE BB/ATR Short Reversion 2026",
+        value: "crypto_doge_bb_atr_short_reversion_2026",
+        categoryLabel: "Криптостратегія",
+        description: "DOGE 1H short-only модель для крипторинку з ATR SL та BB exit.",
+      },
+    ],
+  },
+  {
+    label: "Research packs",
+    options: [
+      {
+        label: "Research 2026 Adaptive Pack",
+        value: "research_2026_adaptive_pack",
+        categoryLabel: "Research стратегія",
+        description: "Пакет 2026 adaptive rules, де параметри можуть залежати від конкретного активу.",
+      },
+    ],
+  },
+] satisfies Array<{ label: string; options: StrategyOption[] }>;
+
+const STRATEGY_OPTIONS = STRATEGY_SECTIONS.flatMap((section) => section.options);
 
 function initialSearchParams() {
   return new URLSearchParams(window.location.search);
@@ -399,6 +480,19 @@ function formatForexPrice(value: number, symbol: string) {
   const fractionDigits = symbol.includes("JPY") ? 3 : 5;
 
   return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
+function formatCryptoPrice(value: number) {
+  if (!Number.isFinite(value)) return "-";
+
+  const fractionDigits = Math.abs(value) < 1 ? 6 : 2;
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(value);
@@ -872,7 +966,9 @@ function tradeHeadersForStrategy(strategy: BacktestStrategy) {
     strategy === "audusd_bb_atr_long_reversion_2026" ||
     strategy === "ger40_bb_atr_short_reversion_2026" ||
     strategy === "fx_short_pullback_bb_atr_2026" ||
-    strategy === "fx_universal_long_bb_atr_2026"
+    strategy === "fx_universal_long_bb_atr_2026" ||
+    strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+    strategy === "crypto_doge_bb_atr_short_reversion_2026"
   ) {
     return [
       "direction",
@@ -939,7 +1035,9 @@ function tradeCellsForStrategy(
     strategy === "audusd_bb_atr_long_reversion_2026" ||
     strategy === "ger40_bb_atr_short_reversion_2026" ||
     strategy === "fx_short_pullback_bb_atr_2026" ||
-    strategy === "fx_universal_long_bb_atr_2026"
+    strategy === "fx_universal_long_bb_atr_2026" ||
+    strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+    strategy === "crypto_doge_bb_atr_short_reversion_2026"
   ) {
     return researchTradeCells(trade, formatPrice);
   }
@@ -974,8 +1072,8 @@ export default function BacktestReports() {
   const didApplyFxUniversalLongDefaults = useRef(false);
 
   const selectedMarket = MARKET_CONFIG[market];
-  const selectedStrategyLabel =
-    STRATEGY_OPTIONS.find((option) => option.value === strategy)?.label ?? STRATEGY_OPTIONS[0].label;
+  const selectedStrategy = STRATEGY_OPTIONS.find((option) => option.value === strategy) ?? STRATEGY_OPTIONS[0];
+  const selectedStrategyLabel = selectedStrategy.label;
   const activeMarketDataProvider =
     market === "forex" && forexDataMode !== "remote"
       ? forexDataMode === "workspace"
@@ -1009,14 +1107,22 @@ export default function BacktestReports() {
         strategy === "ger40_bb_atr_short_reversion_2026" ||
         strategy === "fx_short_pullback_bb_atr_2026" ||
         strategy === "fx_universal_long_bb_atr_2026" ||
+        strategy === "fx_prop_nzdusd_bb_atr_2026" ||
         strategy === "research_2026_adaptive_pack") &&
       market !== "forex"
     ) {
       setMarket("forex");
     }
 
+    if (strategy === "crypto_doge_bb_atr_short_reversion_2026" && market !== "crypto") {
+      setMarket("crypto");
+    }
+
     if (!selectedMarket.symbols.includes(symbol)) {
       setSymbol(selectedMarket.symbols[0]);
+    }
+    if (strategy === "crypto_doge_bb_atr_short_reversion_2026" && symbol !== "DOGEUSDT") {
+      setSymbol("DOGEUSDT");
     }
     if (
       strategy === "universal_forex_bb_atr_mean_reversion_2026" &&
@@ -1029,6 +1135,9 @@ export default function BacktestReports() {
     }
     if (strategy === "ger40_bb_atr_short_reversion_2026" && symbol !== "GER40") {
       setSymbol("GER40");
+    }
+    if (strategy === "fx_prop_nzdusd_bb_atr_2026" && symbol !== "NZDUSD") {
+      setSymbol("NZDUSD");
     }
     if (
       strategy === "fx_universal_long_bb_atr_2026" &&
@@ -1560,6 +1669,114 @@ export default function BacktestReports() {
         return;
       }
 
+      if (strategy === "fx_prop_nzdusd_bb_atr_2026") {
+        if (symbol !== "NZDUSD") {
+          throw new Error("FX Prop NZDUSD BB/ATR 2026 is currently enabled only for NZDUSD.");
+        }
+
+        const dataStartTime = runStartTime - 220 * ONE_DAY_MS;
+        const klines1h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "1h", dataStartTime, runEndTime)
+          : await fetchKlinesMultiBatch(
+              {
+                symbol,
+                interval: "1h",
+                startTime: dataStartTime,
+                endTime: runEndTime,
+                dataSource: selectedMarket.dataSource,
+              },
+              candlesForRange(dataStartTime, runEndTime, "1h"),
+              abortController.signal
+            );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h: klines1h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 80,
+            bandDeviation: 1.75,
+            atrPeriod: 14,
+            atrMultiplier: 0.5,
+            maxHoldBars: 24,
+            directionMode: "all",
+            emaPeriod: 200,
+            emaFilter: "trend",
+            exitTarget: "opposite_band",
+            setupVariant: "fx_prop_nzdusd_bb_atr_2026",
+            strategyName: "FX Prop NZDUSD BB/ATR 2026",
+            strategyVersion: "research.2026-ytd.prop-nzdusd-1h-bb80-dev1_75-ema200-trend-atr0_5-hold24-opposite.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "crypto_doge_bb_atr_short_reversion_2026") {
+        if (symbol !== "DOGEUSDT") {
+          throw new Error("Crypto DOGE BB/ATR Short Reversion 2026 is currently enabled only for DOGEUSDT.");
+        }
+
+        const dataStartTime = runStartTime - 220 * ONE_DAY_MS;
+        const klines1h = await fetchKlinesMultiBatch(
+          {
+            symbol,
+            interval: "1h",
+            startTime: dataStartTime,
+            endTime: runEndTime,
+            dataSource: selectedMarket.dataSource,
+          },
+          candlesForRange(dataStartTime, runEndTime, "1h"),
+          abortController.signal
+        );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h: klines1h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 120,
+            bandDeviation: 2.25,
+            atrPeriod: 14,
+            atrMultiplier: 0.5,
+            maxHoldBars: 48,
+            directionMode: "short_only",
+            emaPeriod: 200,
+            emaFilter: "none",
+            exitTarget: "mean",
+            setupVariant: "crypto_doge_bb_atr_short_reversion_2026",
+            strategyName: "Crypto DOGE BB/ATR Short Reversion 2026",
+            strategyVersion: "research.2026-ytd.dogeusdt-1h-bb120-dev2_25-short-atr0_5-mean-hold48.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
       if (strategy === "research_2026_adaptive_pack") {
         if (!["AUDUSD", "EURUSD", "GBPUSD", "USDJPY", "GER40"].includes(symbol)) {
           throw new Error(
@@ -1979,6 +2196,10 @@ export default function BacktestReports() {
             ? "1% / FX 1H BB80 dev1.25 / short-only below EMA200 / ATR14 SL x0.75"
           : strategy === "fx_universal_long_bb_atr_2026"
             ? "1% / FX 4H BB80 dev1.5 / long-only / ATR14 SL x0.5"
+          : strategy === "fx_prop_nzdusd_bb_atr_2026"
+            ? "1% / NZDUSD 1H BB80 dev1.75 / EMA200 trend / ATR14 SL x0.5"
+          : strategy === "crypto_doge_bb_atr_short_reversion_2026"
+            ? "1% / DOGE 1H BB120 dev2.25 / short-only / ATR14 SL x0.5"
           : strategy === "research_2026_adaptive_pack"
             ? "1% / in-sample 2026 adaptive research pack"
           : strategy === "ict_improved_v2"
@@ -1987,7 +2208,7 @@ export default function BacktestReports() {
           ? "1% / 2.2R / Kyiv KZ"
           : "1% / 2.2R";
   const formatSelectedPrice = useCallback(
-    (value: number) => (market === "forex" ? formatForexPrice(value, symbol) : formatCurrency(value)),
+    (value: number) => (market === "forex" ? formatForexPrice(value, symbol) : formatCryptoPrice(value)),
     [market, symbol]
   );
 
@@ -2012,13 +2233,28 @@ export default function BacktestReports() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STRATEGY_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
+                  {STRATEGY_SECTIONS.map((section, sectionIndex) => (
+                    <SelectGroup key={section.label}>
+                      {sectionIndex > 0 ? <SelectSeparator /> : null}
+                      <SelectLabel className="pl-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {section.label}
+                      </SelectLabel>
+                      {section.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
+              <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">{selectedStrategy.categoryLabel}</Badge>
+                  <span className="font-medium text-foreground">{selectedStrategy.label}</span>
+                </div>
+                <div className="mt-1 text-muted-foreground">{selectedStrategy.description}</div>
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -2442,7 +2678,9 @@ export default function BacktestReports() {
         strategy === "audusd_bb_atr_long_reversion_2026" ||
         strategy === "ger40_bb_atr_short_reversion_2026" ||
         strategy === "fx_short_pullback_bb_atr_2026" ||
-        strategy === "fx_universal_long_bb_atr_2026") ? (
+        strategy === "fx_universal_long_bb_atr_2026" ||
+        strategy === "fx_prop_nzdusd_bb_atr_2026" ||
+        strategy === "crypto_doge_bb_atr_short_reversion_2026") ? (
         <ExpandableResultCard
           title="Огляд угоди Research"
           expandedContentClassName="flex flex-col"

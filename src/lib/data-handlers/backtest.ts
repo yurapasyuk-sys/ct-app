@@ -70,6 +70,8 @@ export type NativeBacktestSetupVariant =
   | "ger40_bb_atr_short_reversion_2026"
   | "fx_short_pullback_bb_atr_2026"
   | "fx_universal_long_bb_atr_2026"
+  | "fx_prop_nzdusd_bb_atr_2026"
+  | "crypto_doge_bb_atr_short_reversion_2026"
   | "research_2026_bb_atr_adaptive"
   | "ict_experiment_v3_adx_regime_filter"
   | "order_flow_proxy_1_5r"

@@ -140,6 +140,9 @@ function researchProfileDescription(symbol: string, trade: NativeBacktestTrade) 
   if (trade.setup_variant === "fx_universal_long_bb_atr_2026") {
     return "FX Universal Long BB/ATR 2026: універсальна long-only mean reversion модель для forex-пар. Таймфрейм 4H, Bollinger 80 з відхиленням 1.5. Сетап виникає тоді, коли 4H свічка закрилась нижче нижньої смуги Bollinger, тобто ринок зробив сильний рух вниз і став перепроданим відносно останньої 4H структури. Entry виконується на відкритті наступної 4H свічки. Stop Loss = 0.5 * ATR(14) нижче entry, target - верхня смуга Bollinger з моменту сигналу, максимум утримання - 48 свічок. Ризик на угоду - 1% equity. У 2026 YTD ця модель найкраще проявилась на JPY-кросах, але тестувалась однаковими правилами на широкому FX-кошику.";
   }
+  if (trade.setup_variant === "fx_prop_nzdusd_bb_atr_2026") {
+    return "FX Prop NZDUSD BB/ATR 2026: prop-safe mean reversion модель для NZDUSD. Таймфрейм 1H, Bollinger 80 з відхиленням 1.75, EMA200 як фільтр режиму. Long дозволений тільки вище EMA200 після закриття нижче нижньої Bollinger band, short дозволений тільки нижче EMA200 після закриття вище верхньої Bollinger band. Entry виконується на відкритті наступної 1H свічки, без look-ahead. Stop Loss = 0.5 * ATR(14) від entry, target - протилежна Bollinger band з моменту сигналу, максимум утримання - 24 години. Ризик на угоду - 1% equity. Модель відібрана не за максимальним прибутком, а за prop-критеріями: drawdown до 8%, коротка серія стопів і здатність дати 20%+ на сильному 60-90 денному відрізку.";
+  }
 
   const profiles: Record<string, string> = {
     AUDUSD:
@@ -534,6 +537,7 @@ function researchSetupKind(trade: NativeBacktestTrade | null) {
   if (trade.setup_variant === "ger40_bb_atr_short_reversion_2026") return "GER40 BB/ATR шорт-реверсія";
   if (trade.setup_variant === "fx_short_pullback_bb_atr_2026") return "FX BB/ATR шорт-пулбек";
   if (trade.setup_variant === "fx_universal_long_bb_atr_2026") return "FX BB/ATR лонг-реверсія";
+  if (trade.setup_variant === "fx_prop_nzdusd_bb_atr_2026") return "FX Prop NZDUSD BB/ATR";
 
   return "Адаптивна BB/ATR модель";
 }
@@ -544,6 +548,7 @@ function researchTimeframe(symbol: string, trade: NativeBacktestTrade | null) {
   if (trade?.setup_variant === "audusd_bb_atr_long_reversion_2026") return "1H";
   if (trade?.setup_variant === "fx_short_pullback_bb_atr_2026") return "1H";
   if (trade?.setup_variant === "fx_universal_long_bb_atr_2026") return "4H";
+  if (trade?.setup_variant === "fx_prop_nzdusd_bb_atr_2026") return "1H";
   if (symbol === "AUDUSD") return "4H";
 
   return "1H";

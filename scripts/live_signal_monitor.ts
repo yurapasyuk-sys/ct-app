@@ -6,11 +6,13 @@ import type { Kline } from "../src/lib/binance";
 type Direction = "long" | "short";
 type StrategyKind = "donchian" | "bb_atr";
 type SignalTimeframe = "1h" | "4h";
+type StrategyCategory = "research" | "asset_specific" | "universal" | "prop" | "crypto";
 
 interface Signal {
   key: string;
   symbol: string;
   strategyName: string;
+  strategyCategory: StrategyCategory;
   strategyVersion: string;
   direction: Direction;
   signalTime: number;
@@ -32,6 +34,7 @@ interface SymbolConfig {
   timeframe: SignalTimeframe;
   kind: StrategyKind;
   strategyName: string;
+  strategyCategory: StrategyCategory;
   strategyVersion: string;
   entryLookback?: number;
   exitLookback?: number;
@@ -52,6 +55,13 @@ const OUT_DIR = "logs";
 const STATE_PATH = `${OUT_DIR}/signal-monitor-state.json`;
 const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
+const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
+  research: "Research стратегія",
+  asset_specific: "Індивідуальна стратегія",
+  universal: "Універсальна стратегія",
+  prop: "Пропстратегія",
+  crypto: "Криптостратегія",
+};
 
 const SIGNAL_PROFILES: SymbolConfig[] = [
   {
@@ -61,6 +71,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "4h",
     kind: "bb_atr",
     strategyName: "Research 2026 AUDUSD BB/ATR Adaptive",
+    strategyCategory: "research",
     strategyVersion: "research.2026-ytd.audusd-bb20-dev2-long-opposite-4h.1",
     bbPeriod: 20,
     bandDeviation: 2,
@@ -78,6 +89,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "bb_atr",
     strategyName: "AUDUSD BB/ATR Long Reversion 2026",
+    strategyCategory: "asset_specific",
     strategyVersion: "research.2026-ytd.audusd-bb100-dev1_75-atr0_75-hold24-long-countertrend-opposite-1h.1",
     bbPeriod: 100,
     bandDeviation: 1.75,
@@ -96,6 +108,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "donchian",
     strategyName: "Research 2026 EURUSD Donchian 1H 80/10",
+    strategyCategory: "research",
     strategyVersion: "research.2026-ytd.in-sample.eurusd-donchian-1h-80-10-atr1.1",
     entryLookback: 80,
     exitLookback: 10,
@@ -110,6 +123,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "bb_atr",
     strategyName: "Research 2026 GBPUSD BB/ATR Adaptive",
+    strategyCategory: "research",
     strategyVersion: "research.2026-ytd.in-sample.gbpusd-bb80-dev1_5-short-mean.1",
     bbPeriod: 80,
     bandDeviation: 1.5,
@@ -126,6 +140,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "bb_atr",
     strategyName: "Research 2026 USDJPY BB/ATR Adaptive",
+    strategyCategory: "research",
     strategyVersion: "research.2026-ytd.in-sample.usdjpy-bb40-dev2-long-opposite.1",
     bbPeriod: 40,
     bandDeviation: 2,
@@ -142,6 +157,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "bb_atr",
     strategyName: "Research 2026 GER40 BB/ATR Adaptive",
+    strategyCategory: "research",
     strategyVersion: "research.2026-ytd.in-sample.ger40-bb80-dev2-short-opposite.1",
     bbPeriod: 80,
     bandDeviation: 2,
@@ -159,6 +175,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "bb_atr",
     strategyName: "GER40 BB/ATR Short Reversion 2026",
+    strategyCategory: "asset_specific",
     strategyVersion: "research.2026-ytd.ger40-bb80-dev2_25-atr1_25-hold72-short-opposite-1h.1",
     bbPeriod: 80,
     bandDeviation: 2.25,
@@ -176,6 +193,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "4h",
     kind: "bb_atr",
     strategyName: "FX Universal Long BB/ATR 2026",
+    strategyCategory: "universal",
     strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
     bbPeriod: 80,
     bandDeviation: 1.5,
@@ -193,6 +211,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "4h",
     kind: "bb_atr",
     strategyName: "FX Universal Long BB/ATR 2026",
+    strategyCategory: "universal",
     strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
     bbPeriod: 80,
     bandDeviation: 1.5,
@@ -210,6 +229,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "4h",
     kind: "bb_atr",
     strategyName: "FX Universal Long BB/ATR 2026",
+    strategyCategory: "universal",
     strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
     bbPeriod: 80,
     bandDeviation: 1.5,
@@ -227,6 +247,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "4h",
     kind: "bb_atr",
     strategyName: "FX Universal Long BB/ATR 2026",
+    strategyCategory: "universal",
     strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
     bbPeriod: 80,
     bandDeviation: 1.5,
@@ -236,6 +257,43 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     directionMode: "long_only",
     emaFilter: "none",
     exitTarget: "opposite_band",
+  },
+  {
+    profileId: "fx_prop_nzdusd_bb_atr_2026",
+    symbol: "NZDUSD",
+    yahooSymbol: "NZDUSD=X",
+    timeframe: "1h",
+    kind: "bb_atr",
+    strategyName: "FX Prop NZDUSD BB/ATR 2026",
+    strategyCategory: "prop",
+    strategyVersion: "research.2026-ytd.prop-nzdusd-1h-bb80-dev1_75-ema200-trend-atr0_5-hold24-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 1.75,
+    atrPeriod: 14,
+    atrMultiplier: 0.5,
+    maxHoldBars: 24,
+    directionMode: "all",
+    emaPeriod: 200,
+    emaFilter: "trend",
+    exitTarget: "opposite_band",
+  },
+  {
+    profileId: "crypto_doge_bb_atr_short_reversion_2026",
+    symbol: "DOGEUSDT",
+    yahooSymbol: "DOGE-USD",
+    timeframe: "1h",
+    kind: "bb_atr",
+    strategyName: "Crypto DOGE BB/ATR Short Reversion 2026",
+    strategyCategory: "crypto",
+    strategyVersion: "research.2026-ytd.dogeusdt-1h-bb120-dev2_25-short-atr0_5-mean-hold48.1",
+    bbPeriod: 120,
+    bandDeviation: 2.25,
+    atrPeriod: 14,
+    atrMultiplier: 0.5,
+    maxHoldBars: 48,
+    directionMode: "short_only",
+    emaFilter: "none",
+    exitTarget: "mean",
   },
 ];
 
@@ -356,6 +414,10 @@ function formatPrice(symbol: string, value: number | null) {
   if (value == null || !Number.isFinite(value)) return "dynamic";
   if (symbol === "GER40") return value.toFixed(1);
   return value.toFixed(symbol.includes("JPY") ? 3 : 5);
+}
+
+function strategyCategoryLabel(category: StrategyCategory) {
+  return STRATEGY_CATEGORY_LABELS[category] ?? category;
 }
 
 function htmlEscape(value: string) {
@@ -626,6 +688,7 @@ function detectDonchianSignal(config: SymbolConfig, rows: Kline[]) {
     key,
     symbol: config.symbol,
     strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
     strategyVersion: config.strategyVersion,
     direction,
     signalTime: signal.openTime,
@@ -685,6 +748,7 @@ function detectBbAtrSignal(config: SymbolConfig, rows: Kline[]) {
     key,
     symbol: config.symbol,
     strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
     strategyVersion: config.strategyVersion,
     direction,
     signalTime: signal.openTime,
@@ -715,6 +779,7 @@ function signalMessage(signal: Signal) {
     "<b>PAPER SIGNAL</b>",
     `<b>${htmlEscape(signal.symbol)}</b> ${signal.direction.toUpperCase()}`,
     `Strategy: ${htmlEscape(signal.strategyName)}`,
+    `Класифікація: ${htmlEscape(strategyCategoryLabel(signal.strategyCategory))}`,
     `Signal candle: ${iso(signal.signalTime)}`,
     `Entry time: ${iso(signal.entryTime)}`,
     `Entry: <code>${formatPrice(signal.symbol, signal.entryPrice)}</code>`,
@@ -754,7 +819,8 @@ async function sendTelegram(message: string) {
 }
 
 function configuredSymbols() {
-  const raw = process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY";
+  const raw =
+    process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,DOGEUSDT";
   const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
   return raw
     .split(",")
