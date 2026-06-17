@@ -169,6 +169,74 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     emaFilter: "none",
     exitTarget: "opposite_band",
   },
+  {
+    profileId: "fx_universal_long_bb_atr_2026_eurjpy",
+    symbol: "EURJPY",
+    yahooSymbol: "EURJPY=X",
+    timeframe: "4h",
+    kind: "bb_atr",
+    strategyName: "FX Universal Long BB/ATR 2026",
+    strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 1.5,
+    atrPeriod: 14,
+    atrMultiplier: 0.5,
+    maxHoldBars: 48,
+    directionMode: "long_only",
+    emaFilter: "none",
+    exitTarget: "opposite_band",
+  },
+  {
+    profileId: "fx_universal_long_bb_atr_2026_chfjpy",
+    symbol: "CHFJPY",
+    yahooSymbol: "CHFJPY=X",
+    timeframe: "4h",
+    kind: "bb_atr",
+    strategyName: "FX Universal Long BB/ATR 2026",
+    strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 1.5,
+    atrPeriod: 14,
+    atrMultiplier: 0.5,
+    maxHoldBars: 48,
+    directionMode: "long_only",
+    emaFilter: "none",
+    exitTarget: "opposite_band",
+  },
+  {
+    profileId: "fx_universal_long_bb_atr_2026_usdjpy",
+    symbol: "USDJPY",
+    yahooSymbol: "USDJPY=X",
+    timeframe: "4h",
+    kind: "bb_atr",
+    strategyName: "FX Universal Long BB/ATR 2026",
+    strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 1.5,
+    atrPeriod: 14,
+    atrMultiplier: 0.5,
+    maxHoldBars: 48,
+    directionMode: "long_only",
+    emaFilter: "none",
+    exitTarget: "opposite_band",
+  },
+  {
+    profileId: "fx_universal_long_bb_atr_2026_gbpjpy",
+    symbol: "GBPJPY",
+    yahooSymbol: "GBPJPY=X",
+    timeframe: "4h",
+    kind: "bb_atr",
+    strategyName: "FX Universal Long BB/ATR 2026",
+    strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
+    bbPeriod: 80,
+    bandDeviation: 1.5,
+    atrPeriod: 14,
+    atrMultiplier: 0.5,
+    maxHoldBars: 48,
+    directionMode: "long_only",
+    emaFilter: "none",
+    exitTarget: "opposite_band",
+  },
 ];
 
 function loadEnvFile(path: string) {
@@ -686,7 +754,7 @@ async function sendTelegram(message: string) {
 }
 
 function configuredSymbols() {
-  const raw = process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40";
+  const raw = process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY";
   const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
   return raw
     .split(",")

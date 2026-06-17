@@ -68,8 +68,11 @@ type BacktestStrategy =
   | "order_flow_proxy_1_5r_prev_day_short_mr10"
   | "universal_bb_atr_mean_reversion"
   | "universal_bb_atr_target15"
+  | "universal_forex_bb_atr_mean_reversion_2026"
   | "audusd_bb_atr_long_reversion_2026"
   | "ger40_bb_atr_short_reversion_2026"
+  | "fx_short_pullback_bb_atr_2026"
+  | "fx_universal_long_bb_atr_2026"
   | "research_2026_adaptive_pack"
   | "fx_donchian"
   | "fx_london_sweep";
@@ -89,7 +92,27 @@ const MARKET_CONFIG = {
     marketType: "spot forex",
     marketDataProvider: "YAHOO_FINANCE_CHART",
     dataSource: "yahoo-fx" as const,
-    symbols: ["EURUSD", "GBPUSD", "USDJPY", "GER40", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD", "EURJPY", "GBPJPY"],
+    symbols: [
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "GER40",
+      "USDCHF",
+      "AUDUSD",
+      "USDCAD",
+      "NZDUSD",
+      "EURJPY",
+      "GBPJPY",
+      "EURGBP",
+      "AUDJPY",
+      "CADJPY",
+      "CHFJPY",
+      "EURAUD",
+      "GBPAUD",
+      "AUDNZD",
+      "EURCAD",
+      "GBPCAD",
+    ],
   },
 } satisfies Record<
   BacktestMarket,
@@ -112,6 +135,8 @@ const WORKSPACE_FOREX_CSV: Partial<Record<string, string>> = {
   USDJPY: "/data/forex/USDJPY_1m_2025-01-01_2026-06-13.csv",
   GER40: "/data/forex/GER40_1m_2024-01-01_2026-06-15.csv",
 };
+const FX_UNIVERSAL_LONG_RECOMMENDED_SYMBOLS = ["EURJPY", "CHFJPY", "USDJPY", "GBPJPY"];
+const FX_UNIVERSAL_LONG_RECOMMENDED_TEXT = FX_UNIVERSAL_LONG_RECOMMENDED_SYMBOLS.join(", ");
 const LOOKBACK_OPTIONS = [
   { label: "3D", value: "3", days: 3 },
   { label: "14D", value: "14", days: 14 },
@@ -119,28 +144,12 @@ const LOOKBACK_OPTIONS = [
   { label: "90D", value: "90", days: 90 },
 ];
 const STRATEGY_OPTIONS = [
-  { label: "Centurion ICT Sweep", value: "centurion_ict" },
-  { label: "Centurion ICT Sweep + Kyiv Kill Zones", value: "centurion_ict_kyiv_killzones" },
-  { label: "ICT Sweep EMA200 + ATR FVG", value: "ict_ema_atr_fvg" },
-  { label: "EURUSD ICT Sweep + FVG Improved v2", value: "ict_improved_v2" },
-  { label: "Forex ICT Sweep + FVG Improved v3", value: "ict_improved_v3" },
-  { label: "ICT Experiments v3 ADX Regime Filter", value: "ict_v3_adx_regime_filter" },
-  { label: "Order Flow Proxy 1.5R", value: "order_flow_proxy_1_5r" },
-  { label: "Order Flow Proxy 2R", value: "order_flow_proxy_2r" },
-  { label: "Order Flow Proxy Partial TP", value: "order_flow_proxy_partial_tp" },
-  { label: "Order Flow Proxy 2R PD", value: "order_flow_proxy_2r_prev_day" },
-  { label: "Order Flow Proxy 2R PD Target 15", value: "order_flow_proxy_2r_prev_day_target15" },
-  { label: "Order Flow Proxy 2R PD Short", value: "order_flow_proxy_2r_prev_day_short" },
-  { label: "Order Flow Proxy 2R PD Short Target 15", value: "order_flow_proxy_2r_prev_day_short_target15" },
-  { label: "Order Flow Proxy 2R PD Short MR10", value: "order_flow_proxy_2r_prev_day_short_mr10" },
-  { label: "Order Flow Proxy 1.5R PD Short MR10", value: "order_flow_proxy_1_5r_prev_day_short_mr10" },
-  { label: "Universal BB ATR Mean Reversion", value: "universal_bb_atr_mean_reversion" },
-  { label: "Universal BB ATR Target 15", value: "universal_bb_atr_target15" },
+  { label: "Universal Forex BB/ATR Mean Reversion 2026", value: "universal_forex_bb_atr_mean_reversion_2026" },
   { label: "AUDUSD BB/ATR Long Reversion 2026", value: "audusd_bb_atr_long_reversion_2026" },
   { label: "GER40 BB/ATR Short Reversion 2026", value: "ger40_bb_atr_short_reversion_2026" },
+  { label: "FX Short Pullback BB/ATR 2026", value: "fx_short_pullback_bb_atr_2026" },
+  { label: "FX Universal Long BB/ATR 2026", value: "fx_universal_long_bb_atr_2026" },
   { label: "Research 2026 Adaptive Pack", value: "research_2026_adaptive_pack" },
-  { label: "FX Donchian Trend", value: "fx_donchian" },
-  { label: "London Sweep + FVG", value: "fx_london_sweep" },
 ] satisfies Array<{ label: string; value: BacktestStrategy }>;
 
 function initialSearchParams() {
@@ -220,33 +229,12 @@ function initialForexDataMode(): ForexDataMode {
 
 function initialStrategy(): BacktestStrategy {
   const value = initialSearchParams().get("strategy");
-  if (
-    value === "centurion_ict_kyiv_killzones" ||
-    value === "ict_ema_atr_fvg" ||
-    value === "ict_improved_v2" ||
-    value === "ict_improved_v3" ||
-    value === "ict_v3_adx_regime_filter" ||
-    value === "order_flow_proxy_1_5r" ||
-    value === "order_flow_proxy_2r" ||
-    value === "order_flow_proxy_partial_tp" ||
-    value === "order_flow_proxy_2r_prev_day" ||
-    value === "order_flow_proxy_2r_prev_day_target15" ||
-    value === "order_flow_proxy_2r_prev_day_short" ||
-    value === "order_flow_proxy_2r_prev_day_short_target15" ||
-    value === "order_flow_proxy_2r_prev_day_short_mr10" ||
-    value === "order_flow_proxy_1_5r_prev_day_short_mr10" ||
-    value === "universal_bb_atr_mean_reversion" ||
-    value === "universal_bb_atr_target15" ||
-    value === "audusd_bb_atr_long_reversion_2026" ||
-    value === "ger40_bb_atr_short_reversion_2026" ||
-    value === "research_2026_adaptive_pack" ||
-    value === "fx_donchian" ||
-    value === "fx_london_sweep"
-  ) {
-    return value;
+  const activeStrategy = STRATEGY_OPTIONS.find((option) => option.value === value)?.value;
+  if (activeStrategy) {
+    return activeStrategy;
   }
 
-  return "centurion_ict";
+  return "fx_universal_long_bb_atr_2026";
 }
 
 function isCenturionStrategy(strategy: BacktestStrategy) {
@@ -880,8 +868,11 @@ function tradeHeadersForStrategy(strategy: BacktestStrategy) {
 
   if (
     strategy === "research_2026_adaptive_pack" ||
+    strategy === "universal_forex_bb_atr_mean_reversion_2026" ||
     strategy === "audusd_bb_atr_long_reversion_2026" ||
-    strategy === "ger40_bb_atr_short_reversion_2026"
+    strategy === "ger40_bb_atr_short_reversion_2026" ||
+    strategy === "fx_short_pullback_bb_atr_2026" ||
+    strategy === "fx_universal_long_bb_atr_2026"
   ) {
     return [
       "direction",
@@ -944,8 +935,11 @@ function tradeCellsForStrategy(
   if (strategy === "fx_london_sweep") return londonTradeCells(trade, formatPrice);
   if (
     strategy === "research_2026_adaptive_pack" ||
+    strategy === "universal_forex_bb_atr_mean_reversion_2026" ||
     strategy === "audusd_bb_atr_long_reversion_2026" ||
-    strategy === "ger40_bb_atr_short_reversion_2026"
+    strategy === "ger40_bb_atr_short_reversion_2026" ||
+    strategy === "fx_short_pullback_bb_atr_2026" ||
+    strategy === "fx_universal_long_bb_atr_2026"
   ) {
     return researchTradeCells(trade, formatPrice);
   }
@@ -976,6 +970,8 @@ export default function BacktestReports() {
   const [isLoading, setIsLoading] = useState(false);
   const didAutoRun = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const previousStrategyRef = useRef<BacktestStrategy | null>(null);
+  const didApplyFxUniversalLongDefaults = useRef(false);
 
   const selectedMarket = MARKET_CONFIG[market];
   const selectedStrategyLabel =
@@ -1000,12 +996,19 @@ export default function BacktestReports() {
   );
 
   useEffect(() => {
+    const previousStrategy = previousStrategyRef.current;
+    const enteredFxUniversalLong = previousStrategy !== strategy && strategy === "fx_universal_long_bb_atr_2026";
+    previousStrategyRef.current = strategy;
+
     if (
       (strategy === "fx_donchian" ||
         strategy === "fx_london_sweep" ||
         strategy === "ict_improved_v3" ||
+        strategy === "universal_forex_bb_atr_mean_reversion_2026" ||
         strategy === "audusd_bb_atr_long_reversion_2026" ||
         strategy === "ger40_bb_atr_short_reversion_2026" ||
+        strategy === "fx_short_pullback_bb_atr_2026" ||
+        strategy === "fx_universal_long_bb_atr_2026" ||
         strategy === "research_2026_adaptive_pack") &&
       market !== "forex"
     ) {
@@ -1015,17 +1018,35 @@ export default function BacktestReports() {
     if (!selectedMarket.symbols.includes(symbol)) {
       setSymbol(selectedMarket.symbols[0]);
     }
+    if (
+      strategy === "universal_forex_bb_atr_mean_reversion_2026" &&
+      !["AUDUSD", "EURUSD", "GBPUSD", "USDJPY"].includes(symbol)
+    ) {
+      setSymbol("AUDUSD");
+    }
     if (strategy === "audusd_bb_atr_long_reversion_2026" && symbol !== "AUDUSD") {
       setSymbol("AUDUSD");
     }
     if (strategy === "ger40_bb_atr_short_reversion_2026" && symbol !== "GER40") {
       setSymbol("GER40");
     }
+    if (
+      strategy === "fx_universal_long_bb_atr_2026" &&
+      (enteredFxUniversalLong || !didApplyFxUniversalLongDefaults.current)
+    ) {
+      didApplyFxUniversalLongDefaults.current = true;
+      if (!FX_UNIVERSAL_LONG_RECOMMENDED_SYMBOLS.includes(symbol)) {
+        setSymbol("EURJPY");
+      }
+      if (forexDataMode !== "remote") {
+        setForexDataMode("remote");
+      }
+    }
 
     if (!availableLookbacks.some((option) => option.value === lookbackDays)) {
       setLookbackDays(availableLookbacks[0].value);
     }
-  }, [availableLookbacks, lookbackDays, market, selectedMarket.symbols, strategy, symbol]);
+  }, [availableLookbacks, forexDataMode, lookbackDays, market, selectedMarket.symbols, strategy, symbol]);
 
   const localCsvSummary = useMemo(() => {
     if (!localCsvKlines1m.length) return null;
@@ -1258,6 +1279,64 @@ export default function BacktestReports() {
         return;
       }
 
+      if (strategy === "universal_forex_bb_atr_mean_reversion_2026") {
+        if (!["AUDUSD", "EURUSD", "GBPUSD", "USDJPY"].includes(symbol)) {
+          throw new Error("Universal Forex BB/ATR Mean Reversion 2026 is available only for AUDUSD, EURUSD, GBPUSD, and USDJPY.");
+        }
+
+        const dataStartTime = runStartTime - 120 * ONE_DAY_MS;
+        const klines4h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "4h", dataStartTime, runEndTime)
+          : aggregateKlines(
+              await fetchKlinesMultiBatch(
+                {
+                  symbol,
+                  interval: "1h",
+                  startTime: dataStartTime,
+                  endTime: runEndTime,
+                  dataSource: selectedMarket.dataSource,
+                },
+                candlesForRange(dataStartTime, runEndTime, "1h"),
+                abortController.signal
+              ),
+              "4h"
+            );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 20,
+            bandDeviation: 1.25,
+            atrPeriod: 14,
+            atrMultiplier: 0.75,
+            maxHoldBars: 48,
+            directionMode: "all",
+            emaPeriod: 0,
+            emaFilter: "none",
+            exitTarget: "mean",
+            setupVariant: "universal_forex_bb_atr_mean_reversion_2026",
+            strategyName: "Universal Forex BB/ATR Mean Reversion 2026",
+            strategyVersion: "research.2026-ytd.fx-bb20-dev1_25-atr0_75-hold48-4h-mean-risk1.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines4h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
       if (strategy === "audusd_bb_atr_long_reversion_2026") {
         if (symbol !== "AUDUSD") {
           throw new Error("AUDUSD BB/ATR Long Reversion 2026 is currently enabled only for AUDUSD.");
@@ -1362,6 +1441,119 @@ export default function BacktestReports() {
         });
 
         setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "fx_short_pullback_bb_atr_2026") {
+        if (symbol === "GER40") {
+          throw new Error("FX Short Pullback BB/ATR 2026 is available only for forex currency pairs.");
+        }
+
+        const dataStartTime = runStartTime - 180 * ONE_DAY_MS;
+        const klines1h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "1h", dataStartTime, runEndTime)
+          : await fetchKlinesMultiBatch(
+              {
+                symbol,
+                interval: "1h",
+                startTime: dataStartTime,
+                endTime: runEndTime,
+                dataSource: selectedMarket.dataSource,
+              },
+              candlesForRange(dataStartTime, runEndTime, "1h"),
+              abortController.signal
+            );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h: klines1h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 80,
+            bandDeviation: 1.25,
+            atrPeriod: 14,
+            atrMultiplier: 0.75,
+            maxHoldBars: 24,
+            directionMode: "short_only",
+            emaPeriod: 200,
+            emaFilter: "trend",
+            exitTarget: "opposite_band",
+            setupVariant: "fx_short_pullback_bb_atr_2026",
+            strategyName: "FX Short Pullback BB/ATR 2026",
+            strategyVersion: "research.2026-ytd.fx-1h-bb80-dev1_25-short-ema200-trend-atr0_75-opposite.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines1h);
+        setKlines5m([]);
+        setSelectedTradeIndex(0);
+        setReport(nextReport);
+        return;
+      }
+
+      if (strategy === "fx_universal_long_bb_atr_2026") {
+        if (symbol === "GER40") {
+          throw new Error("FX Universal Long BB/ATR 2026 is available only for forex currency pairs.");
+        }
+
+        const dataStartTime = runStartTime - 220 * ONE_DAY_MS;
+        const klines4h = useLocalCsv
+          ? getLocalCsvKlinesForRange(localCsvKlines1m, "4h", dataStartTime, runEndTime)
+          : aggregateKlines(
+              await fetchKlinesMultiBatch(
+                {
+                  symbol,
+                  interval: "1h",
+                  startTime: dataStartTime,
+                  endTime: runEndTime,
+                  dataSource: selectedMarket.dataSource,
+                },
+                candlesForRange(dataStartTime, runEndTime, "1h"),
+                abortController.signal
+              ),
+              "4h"
+            );
+
+        const nextReport = runUniversalBbAtrBacktest({
+          klines4h,
+          config: {
+            symbol,
+            requestedExchange: selectedMarket.requestedExchange,
+            marketType: selectedMarket.marketType,
+            marketDataProvider: activeMarketDataProvider,
+            initialCapital: 10_000,
+            riskPerTradePercent: 1,
+            rewardRMultiple: 0,
+            includePlanB: false,
+            bbPeriod: 80,
+            bandDeviation: 1.5,
+            atrPeriod: 14,
+            atrMultiplier: 0.5,
+            maxHoldBars: 48,
+            directionMode: "long_only",
+            emaPeriod: 0,
+            emaFilter: "none",
+            exitTarget: "opposite_band",
+            setupVariant: "fx_universal_long_bb_atr_2026",
+            strategyName: "FX Universal Long BB/ATR 2026",
+            strategyVersion: "research.2026-ytd.fx-4h-bb80-dev1_5-long-atr0_5-opposite.1",
+            tradeStartTime: runStartTime,
+            tradeEndTime: runEndTime,
+          },
+        });
+
+        setKlines1h(klines4h);
         setKlines5m([]);
         setSelectedTradeIndex(0);
         setReport(nextReport);
@@ -1726,6 +1918,12 @@ export default function BacktestReports() {
 
   useEffect(() => {
     if (didAutoRun.current) return;
+    if (
+      strategy === "fx_universal_long_bb_atr_2026" &&
+      (forexDataMode !== "remote" || !FX_UNIVERSAL_LONG_RECOMMENDED_SYMBOLS.includes(symbol))
+    ) {
+      return;
+    }
     if (market === "forex" && forexDataMode !== "remote" && !localCsvKlines1m.length) return;
 
     didAutoRun.current = true;
@@ -1734,7 +1932,7 @@ export default function BacktestReports() {
     return () => {
       abortRef.current?.abort();
     };
-  }, [forexDataMode, localCsvKlines1m.length, market, runBacktest]);
+  }, [forexDataMode, localCsvKlines1m.length, market, runBacktest, strategy, symbol]);
 
   const metrics = report?.metrics;
   const selectedTrade = report?.trades[selectedTradeIndex] ?? null;
@@ -1771,10 +1969,16 @@ export default function BacktestReports() {
             ? "1% / 4H BB40 2σ / ATR14 SL x3 / mean exit"
           : strategy === "universal_bb_atr_target15"
             ? "2% / 4H BB80 1.5σ / long-only below EMA200 / ATR14 SL x1"
+          : strategy === "universal_forex_bb_atr_mean_reversion_2026"
+            ? "1% / Forex 4H BB20 dev1.25 / ATR14 SL x0.75 / mean exit"
           : strategy === "audusd_bb_atr_long_reversion_2026"
             ? "1% / AUDUSD 1H BB100 dev1.75 / long-only / ATR14 SL x0.75"
           : strategy === "ger40_bb_atr_short_reversion_2026"
             ? "1% / GER40 1H BB80 dev2.25 / short-only / ATR14 SL x1.25"
+          : strategy === "fx_short_pullback_bb_atr_2026"
+            ? "1% / FX 1H BB80 dev1.25 / short-only below EMA200 / ATR14 SL x0.75"
+          : strategy === "fx_universal_long_bb_atr_2026"
+            ? "1% / FX 4H BB80 dev1.5 / long-only / ATR14 SL x0.5"
           : strategy === "research_2026_adaptive_pack"
             ? "1% / in-sample 2026 adaptive research pack"
           : strategy === "ict_improved_v2"
@@ -1862,6 +2066,16 @@ export default function BacktestReports() {
                     <SelectItem value="csv">Local CSV 1M</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            ) : null}
+
+            {strategy === "fx_universal_long_bb_atr_2026" ? (
+              <div className="rounded-md border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
+                <div className="font-semibold">30%+ у дослідженні було не на EURUSD.</div>
+                <div>
+                  Найкращі пари для цієї моделі за 2026 YTD: {FX_UNIVERSAL_LONG_RECOMMENDED_TEXT}. Для повторення
+                  research-результату використовуй Yahoo Finance, бо локальний EURUSD CSV на скріні дає слабкий результат.
+                </div>
               </div>
             ) : null}
 
@@ -2224,8 +2438,11 @@ export default function BacktestReports() {
 
       {report &&
       (strategy === "research_2026_adaptive_pack" ||
+        strategy === "universal_forex_bb_atr_mean_reversion_2026" ||
         strategy === "audusd_bb_atr_long_reversion_2026" ||
-        strategy === "ger40_bb_atr_short_reversion_2026") ? (
+        strategy === "ger40_bb_atr_short_reversion_2026" ||
+        strategy === "fx_short_pullback_bb_atr_2026" ||
+        strategy === "fx_universal_long_bb_atr_2026") ? (
         <ExpandableResultCard
           title="Огляд угоди Research"
           expandedContentClassName="flex flex-col"

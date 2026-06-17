@@ -125,11 +125,20 @@ function researchProfileDescription(symbol: string, trade: NativeBacktestTrade) 
   if (trade.setup_variant === "research_2026_donchian_1h_80_10") {
     return "Пробійна модель Donchian: вхід після закритої 1H свічки, яка пробила канал останніх 80 закритих 1H свічок. Вихід без фіксованого TP: позиція тримається, доки не з'явиться протилежний сигнал по 10-свічковому каналу або не спрацює стоп-лос.";
   }
+  if (trade.setup_variant === "universal_forex_bb_atr_mean_reversion_2026") {
+    return "Універсальна Forex BB/ATR Mean Reversion 2026: однакові правила для AUDUSD, EURUSD, GBPUSD і USDJPY. Таймфрейм 4H, Bollinger 20 з відхиленням 1.25, вхід у mean reversion після закриття свічки за межами смуги. Якщо close нижче нижньої смуги - long на відкритті наступної 4H свічки; якщо close вище верхньої смуги - short. Stop Loss = 0.75 * ATR(14) від entry. Ціль - середня лінія Bollinger на момент сигналу. Максимальне утримання - 48 свічок. Ризик на сетап - 1% equity.";
+  }
   if (trade.setup_variant === "audusd_bb_atr_long_reversion_2026") {
     return "Модель AUDUSD BB/ATR Long Reversion 2026: 1H, Bollinger 100 з відхиленням 1.75, тільки long. Логіка така: якщо AUDUSD закрив 1H свічку нижче нижньої смуги Bollinger і при цьому знаходиться нижче EMA200, ринок вважається перепроданим у контртрендовій зоні. Вхід у long виконується на відкритті наступної 1H свічки. Stop Loss ставиться на 0.75 * ATR(14) нижче entry, ціль - верхня смуга Bollinger з моменту сигналу, максимум утримання - 24 години. Це mean reversion модель: вона шукає повернення ціни від нижнього екстремуму, а не пробій за трендом.";
   }
   if (trade.setup_variant === "ger40_bb_atr_short_reversion_2026") {
     return "Модель GER40 BB/ATR Short Reversion 2026: 1H, Bollinger 80 з відхиленням 2.25, тільки short. Логіка така: якщо GER40 закрив 1H свічку вище верхньої смуги Bollinger, ринок вважається перегрітим після різкого імпульсу вгору. Вхід у short виконується на відкритті наступної 1H свічки. Stop Loss ставиться на 1.25 * ATR(14) вище entry, ціль - нижня смуга Bollinger з моменту сигналу, максимум утримання - 72 години. Це mean reversion модель, тобто вона заробляє не на продовженні тренду, а на поверненні ціни з екстремуму.";
+  }
+  if (trade.setup_variant === "fx_short_pullback_bb_atr_2026") {
+    return "FX Short Pullback BB/ATR 2026: універсальна short-only модель для forex-пар. Таймфрейм 1H, Bollinger 80 з відхиленням 1.25, EMA200 як фільтр тренду. Сетап виникає тоді, коли 1H свічка закрилась вище верхньої смуги Bollinger, але все ще нижче EMA200. Це означає не купівлю пробою, а пошук шорту після різкого відкату в межах ведмежого режиму. Entry виконується на відкритті наступної 1H свічки. Stop Loss = 0.75 * ATR(14) вище entry, target - нижня смуга Bollinger з моменту сигналу, максимум утримання - 24 години. Ризик на угоду - 1% equity.";
+  }
+  if (trade.setup_variant === "fx_universal_long_bb_atr_2026") {
+    return "FX Universal Long BB/ATR 2026: універсальна long-only mean reversion модель для forex-пар. Таймфрейм 4H, Bollinger 80 з відхиленням 1.5. Сетап виникає тоді, коли 4H свічка закрилась нижче нижньої смуги Bollinger, тобто ринок зробив сильний рух вниз і став перепроданим відносно останньої 4H структури. Entry виконується на відкритті наступної 4H свічки. Stop Loss = 0.5 * ATR(14) нижче entry, target - верхня смуга Bollinger з моменту сигналу, максимум утримання - 48 свічок. Ризик на угоду - 1% equity. У 2026 YTD ця модель найкраще проявилась на JPY-кросах, але тестувалась однаковими правилами на широкому FX-кошику.";
   }
 
   const profiles: Record<string, string> = {
@@ -513,21 +522,28 @@ export function BklitTradeReviewPanel({
 function getResearchReviewWindow(data: MarketOhlcPoint[], trade: NativeBacktestTrade | null, symbol: string) {
   if (!trade) return data.slice(-140);
 
-  const barMs = symbol === "AUDUSD" ? FOUR_HOURS_MS : HOUR_MS;
+  const barMs = researchTimeframe(symbol, trade) === "4H" ? FOUR_HOURS_MS : HOUR_MS;
   return getWindow(data, trade.entry_time - 28 * barMs, trade.exit_time + 10 * barMs, 160);
 }
 
 function researchSetupKind(trade: NativeBacktestTrade | null) {
   if (!trade) return "Research";
   if (trade.setup_variant === "research_2026_donchian_1h_80_10") return "Пробій Donchian";
+  if (trade.setup_variant === "universal_forex_bb_atr_mean_reversion_2026") return "Universal Forex BB/ATR реверсія";
   if (trade.setup_variant === "audusd_bb_atr_long_reversion_2026") return "AUDUSD BB/ATR лонг-реверсія";
   if (trade.setup_variant === "ger40_bb_atr_short_reversion_2026") return "GER40 BB/ATR шорт-реверсія";
+  if (trade.setup_variant === "fx_short_pullback_bb_atr_2026") return "FX BB/ATR шорт-пулбек";
+  if (trade.setup_variant === "fx_universal_long_bb_atr_2026") return "FX BB/ATR лонг-реверсія";
 
   return "Адаптивна BB/ATR модель";
 }
 
 function researchTimeframe(symbol: string, trade: NativeBacktestTrade | null) {
   if (trade?.setup_variant === "research_2026_donchian_1h_80_10") return "1H";
+  if (trade?.setup_variant === "universal_forex_bb_atr_mean_reversion_2026") return "4H";
+  if (trade?.setup_variant === "audusd_bb_atr_long_reversion_2026") return "1H";
+  if (trade?.setup_variant === "fx_short_pullback_bb_atr_2026") return "1H";
+  if (trade?.setup_variant === "fx_universal_long_bb_atr_2026") return "4H";
   if (symbol === "AUDUSD") return "4H";
 
   return "1H";
