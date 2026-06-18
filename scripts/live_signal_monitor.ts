@@ -7,6 +7,8 @@ type Direction = "long" | "short";
 type StrategyKind = "donchian" | "bb_atr" | "htf_breakout";
 type SignalTimeframe = "1h" | "4h";
 type StrategyCategory = "research" | "asset_specific" | "universal" | "prop" | "crypto";
+type PositionExitResult = "take_profit" | "stop_loss" | "strategy_exit";
+type TradeOutcome = "win" | "stop_loss" | "break_even";
 
 interface Signal {
   key: string;
@@ -41,11 +43,62 @@ interface OpenPositionState {
   stopLoss: number;
   takeProfit: number | null;
   exitRule: string;
+  signalMessageId?: number;
+}
+
+interface PositionExit {
+  exitTime: number;
+  exitPrice: number;
+  result: PositionExitResult;
+}
+
+interface ClosedTradeState {
+  key: string;
+  profileId: string;
+  symbol: string;
+  strategyName: string;
+  strategyCategory: StrategyCategory;
+  strategyVersion: string;
+  direction: Direction;
+  entryTime: number;
+  exitTime: number;
+  entryPrice: number;
+  exitPrice: number;
+  exitResult: PositionExitResult;
+  outcome: TradeOutcome;
 }
 
 interface MonitorState {
   sentKeys: string[];
   openPositions: OpenPositionState[];
+  closedTrades: ClosedTradeState[];
+}
+
+interface TelegramMenuState {
+  updateOffset: number;
+}
+
+interface TelegramInlineButton {
+  text: string;
+  callback_data: string;
+}
+
+interface TelegramMessage {
+  message_id: number;
+  text?: string;
+  chat: { id: number };
+}
+
+interface TelegramCallbackQuery {
+  id: string;
+  data?: string;
+  message?: TelegramMessage;
+}
+
+interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 }
 
 interface SymbolConfig {
@@ -75,9 +128,6 @@ interface SymbolConfig {
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const FOUR_HOURS_MS = 4 * ONE_HOUR_MS;
-const OUT_DIR = "logs";
-const STATE_PATH = `${OUT_DIR}/signal-monitor-state.json`;
-const JOURNAL_PATH = `${OUT_DIR}/signal-journal.csv`;
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 const PROCESS_STARTED_AT = Date.now();
 let initialScanCompleted = false;
@@ -396,6 +446,15 @@ function kyivTime(timestamp: number) {
   }).format(timestamp);
 }
 
+function kyivClockTime(timestamp: number) {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "Europe/Kyiv",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(timestamp);
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -405,11 +464,22 @@ function csvEscape(value: unknown) {
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
+function dataPaths() {
+  const outDir = process.env.SIGNAL_DATA_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? "logs";
+  return {
+    outDir,
+    statePath: `${outDir}/signal-monitor-state.json`,
+    journalPath: `${outDir}/signal-journal.csv`,
+    telegramMenuStatePath: `${outDir}/telegram-menu-state.json`,
+  };
+}
+
 function ensureJournal() {
-  mkdirSync(OUT_DIR, { recursive: true });
-  if (!existsSync(JOURNAL_PATH)) {
+  const { outDir, journalPath } = dataPaths();
+  mkdirSync(outDir, { recursive: true });
+  if (!existsSync(journalPath)) {
     appendFileSync(
-      JOURNAL_PATH,
+      journalPath,
       [
         "logged_at",
         "status",
@@ -431,9 +501,10 @@ function ensureJournal() {
 }
 
 function appendJournal(status: string, signal: Signal) {
+  const { journalPath } = dataPaths();
   ensureJournal();
   appendFileSync(
-    JOURNAL_PATH,
+    journalPath,
     [
       iso(Date.now()),
       status,
@@ -456,32 +527,55 @@ function appendJournal(status: string, signal: Signal) {
 }
 
 function loadState(): MonitorState {
-  if (!existsSync(STATE_PATH)) return { sentKeys: [], openPositions: [] };
+  const { statePath } = dataPaths();
+  if (!existsSync(statePath)) return { sentKeys: [], openPositions: [], closedTrades: [] };
   try {
-    const parsed = JSON.parse(readFileSync(STATE_PATH, "utf8")) as Partial<MonitorState>;
+    const parsed = JSON.parse(readFileSync(statePath, "utf8")) as Partial<MonitorState>;
     return {
       sentKeys: Array.isArray(parsed.sentKeys) ? parsed.sentKeys : [],
       openPositions: Array.isArray(parsed.openPositions) ? parsed.openPositions : [],
+      closedTrades: Array.isArray(parsed.closedTrades) ? parsed.closedTrades : [],
     };
   } catch {
-    return { sentKeys: [], openPositions: [] };
+    return { sentKeys: [], openPositions: [], closedTrades: [] };
   }
 }
 
 function saveState(state: MonitorState) {
-  mkdirSync(OUT_DIR, { recursive: true });
+  const { outDir, statePath } = dataPaths();
+  mkdirSync(outDir, { recursive: true });
   writeFileSync(
-    STATE_PATH,
+    statePath,
     JSON.stringify(
       {
         sentKeys: state.sentKeys.slice(-1_000),
         openPositions: state.openPositions.slice(-100),
+        closedTrades: state.closedTrades.slice(-5_000),
       },
       null,
       2
     ),
     "utf8"
   );
+}
+
+function loadTelegramMenuState(): TelegramMenuState {
+  const { telegramMenuStatePath } = dataPaths();
+  if (!existsSync(telegramMenuStatePath)) return { updateOffset: 0 };
+  try {
+    const parsed = JSON.parse(readFileSync(telegramMenuStatePath, "utf8")) as Partial<TelegramMenuState>;
+    return {
+      updateOffset: Number.isFinite(parsed.updateOffset) ? Number(parsed.updateOffset) : 0,
+    };
+  } catch {
+    return { updateOffset: 0 };
+  }
+}
+
+function saveTelegramMenuState(state: TelegramMenuState) {
+  const { outDir, telegramMenuStatePath } = dataPaths();
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(telegramMenuStatePath, JSON.stringify(state, null, 2), "utf8");
 }
 
 function timeframeMs(timeframe: SignalTimeframe) {
@@ -942,8 +1036,7 @@ function signalMessage(signal: Signal) {
     `<b>${htmlEscape(signal.symbol)}</b> ${signal.direction.toUpperCase()}`,
     `Стратегія: ${htmlEscape(signal.strategyName)}`,
     `Класифікація: ${htmlEscape(strategyCategoryLabel(signal.strategyCategory))}`,
-    `Signal candle: ${kyivTime(signal.signalTime)} Київ / ${iso(signal.signalTime)} UTC`,
-    `Entry time: ${kyivTime(signal.entryTime)} Київ / ${iso(signal.entryTime)} UTC`,
+    `Entry time: ${kyivClockTime(signal.entryTime)} Київ`,
     `Entry: <code>${formatPrice(signal.symbol, signal.entryPrice)}</code>`,
     `SL: <code>${formatPrice(signal.symbol, signal.stopLoss)}</code>`,
     `TP / exit: <code>${htmlEscape(tp)}</code>`,
@@ -956,7 +1049,11 @@ function signalMessage(signal: Signal) {
   ].join("\n");
 }
 
-function openPositionFromSignal(config: SymbolConfig, signal: Signal): OpenPositionState {
+function openPositionFromSignal(
+  config: SymbolConfig,
+  signal: Signal,
+  signalMessageId?: number
+): OpenPositionState {
   return {
     key: signal.key,
     profileId: config.profileId,
@@ -971,31 +1068,62 @@ function openPositionFromSignal(config: SymbolConfig, signal: Signal): OpenPosit
     stopLoss: signal.stopLoss,
     takeProfit: signal.takeProfit,
     exitRule: signal.exitRule,
+    signalMessageId,
   };
 }
 
-function shouldTrackPosition(signal: Signal) {
-  return signal.takeProfit == null;
+function tradeOutcome(position: OpenPositionState, exit: PositionExit): TradeOutcome {
+  const breakEvenTolerance = pipSize(position.symbol) * 0.1;
+  const directionalResult =
+    position.direction === "long"
+      ? exit.exitPrice - position.entryPrice
+      : position.entryPrice - exit.exitPrice;
+
+  if (Math.abs(directionalResult) <= breakEvenTolerance) return "break_even";
+  if (exit.result === "take_profit" || directionalResult > 0) return "win";
+  return "stop_loss";
 }
 
-function exitMessage(position: OpenPositionState, exit: { exitTime: number; exitPrice: number; reason: string }) {
+function closedTradeFromExit(position: OpenPositionState, exit: PositionExit): ClosedTradeState {
+  return {
+    key: position.key,
+    profileId: position.profileId,
+    symbol: position.symbol,
+    strategyName: position.strategyName,
+    strategyCategory: position.strategyCategory,
+    strategyVersion: position.strategyVersion,
+    direction: position.direction,
+    entryTime: position.entryTime,
+    exitTime: exit.exitTime,
+    entryPrice: position.entryPrice,
+    exitPrice: exit.exitPrice,
+    exitResult: exit.result,
+    outcome: tradeOutcome(position, exit),
+  };
+}
+
+function exitMessage(position: OpenPositionState, exit: PositionExit, outcome: TradeOutcome) {
+  const result =
+    outcome === "break_even"
+      ? "➖ BREAK-EVEN"
+      : exit.result === "take_profit" || outcome === "win"
+      ? "✅ TAKE PROFIT"
+      : "❌ STOP LOSS";
   return [
-    "<b>PAPER EXIT ALERT</b>",
+    "<b>ПОЗИЦІЮ ЗАКРИТО</b>",
     `<b>${htmlEscape(position.symbol)}</b> ${position.direction.toUpperCase()}`,
     `Стратегія: ${htmlEscape(position.strategyName)}`,
-    `Класифікація: ${htmlEscape(strategyCategoryLabel(position.strategyCategory))}`,
-    `Entry time: ${kyivTime(position.entryTime)} Київ / ${iso(position.entryTime)} UTC`,
-    `Entry: <code>${formatPrice(position.symbol, position.entryPrice)}</code>`,
-    `SL: <code>${formatPrice(position.symbol, position.stopLoss)}</code>`,
-    `Exit time: ${kyivTime(exit.exitTime)} Київ / ${iso(exit.exitTime)} UTC`,
-    `Exit: <code>${formatPrice(position.symbol, exit.exitPrice)}</code>`,
-    `Причина: ${htmlEscape(exit.reason)}`,
-    "",
-    "Mode: paper signal only. No auto-trade.",
+    `Категорія: ${htmlEscape(strategyCategoryLabel(position.strategyCategory))}`,
+    `Entry time: ${kyivClockTime(position.entryTime)} Київ`,
+    `Результат: <b>${result}</b>`,
   ].join("\n");
 }
 
-function detectDonchianExit(config: SymbolConfig, position: OpenPositionState, rows: Kline[]) {
+function detectDonchianExit(
+  config: SymbolConfig,
+  position: OpenPositionState,
+  rows: Kline[]
+): PositionExit | null {
   const exitLookback = config.exitLookback ?? 10;
   const barMs = timeframeMs(config.timeframe);
   const now = Date.now();
@@ -1013,7 +1141,7 @@ function detectDonchianExit(config: SymbolConfig, position: OpenPositionState, r
       return {
         exitTime: Math.max(row.openTime, position.entryTime),
         exitPrice: position.stopLoss,
-        reason: "ціна торкнулась Stop Loss",
+        result: "stop_loss",
       };
     }
   }
@@ -1034,43 +1162,106 @@ function detectDonchianExit(config: SymbolConfig, position: OpenPositionState, r
     return {
       exitTime: canonicalEntryTime(signal.openTime, config.timeframe),
       exitPrice: next?.open ?? signal.close,
-      reason:
-        position.direction === "long"
-          ? `${config.timeframe.toUpperCase()} close нижче Donchian(${exitLookback}) exit low`
-          : `${config.timeframe.toUpperCase()} close вище Donchian(${exitLookback}) exit high`,
+      result: "strategy_exit",
     };
   }
 
   return null;
 }
 
+function detectFixedTargetExit(position: OpenPositionState, rows: Kline[]): PositionExit | null {
+  if (position.takeProfit == null) return null;
+
+  for (const row of rows) {
+    if (row.openTime < position.entryTime) continue;
+
+    const hitStop =
+      position.direction === "long"
+        ? row.low <= position.stopLoss
+        : row.high >= position.stopLoss;
+    const hitTarget =
+      position.direction === "long"
+        ? row.high >= position.takeProfit
+        : row.low <= position.takeProfit;
+
+    // OHLC data does not reveal which level was touched first inside one candle.
+    // Match the backtests and use the conservative outcome when both were hit.
+    if (hitStop) {
+      return {
+        exitTime: Math.max(row.openTime, position.entryTime),
+        exitPrice: position.stopLoss,
+        result: "stop_loss",
+      };
+    }
+    if (hitTarget) {
+      return {
+        exitTime: Math.max(row.openTime, position.entryTime),
+        exitPrice: position.takeProfit,
+        result: "take_profit",
+      };
+    }
+  }
+
+  return null;
+}
+
 function detectPositionExit(config: SymbolConfig, position: OpenPositionState, rows: Kline[]) {
+  const fixedTargetExit = detectFixedTargetExit(position, rows);
+  if (fixedTargetExit) return fixedTargetExit;
   if (config.kind === "donchian") return detectDonchianExit(config, position, rows);
   return null;
 }
 
-async function sendTelegram(message: string) {
+function telegramToken() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) {
-    throw new Error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID.");
-  }
+  if (!token) throw new Error("Missing TELEGRAM_BOT_TOKEN.");
+  return token;
+}
 
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+async function telegramApi<T>(method: string, payload: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`https://api.telegram.org/bot${telegramToken()}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: message,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { description?: string } | null;
-    throw new Error(`Telegram sendMessage failed: ${response.status} ${payload?.description ?? response.statusText}`);
+    throw new Error(`Telegram ${method} failed: ${response.status} ${payload?.description ?? response.statusText}`);
   }
+
+  const body = (await response.json()) as { ok: boolean; result: T; description?: string };
+  if (!body.ok) throw new Error(`Telegram ${method} failed: ${body.description ?? "unknown error"}`);
+  return body.result;
+}
+
+async function sendTelegramTo(
+  chatId: string | number,
+  message: string,
+  inlineKeyboard?: TelegramInlineButton[][],
+  replyToMessageId?: number
+) {
+  return telegramApi<TelegramMessage>("sendMessage", {
+    chat_id: chatId,
+    text: message,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    ...(inlineKeyboard ? { reply_markup: { inline_keyboard: inlineKeyboard } } : {}),
+    ...(replyToMessageId
+      ? {
+          reply_parameters: {
+            message_id: replyToMessageId,
+            allow_sending_without_reply: true,
+          },
+        }
+      : {}),
+  });
+}
+
+async function sendTelegram(message: string, replyToMessageId?: number) {
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!chatId) throw new Error("Missing TELEGRAM_CHAT_ID.");
+  return sendTelegramTo(chatId, message, undefined, replyToMessageId);
 }
 
 function configuredSymbols() {
@@ -1089,6 +1280,217 @@ function profilesForSymbol(symbol: string) {
 
 function profileLabel(profile: SymbolConfig) {
   return `${profile.symbol}/${profile.profileId}`;
+}
+
+function configuredProfiles() {
+  const symbols = new Set(configuredSymbols());
+  return SIGNAL_PROFILES.filter((profile) => symbols.has(profile.symbol));
+}
+
+function mainMenuKeyboard(): TelegramInlineButton[][] {
+  return [[{ text: "📊 Статистика", callback_data: "stats:categories" }]];
+}
+
+function categoryMenuKeyboard(): TelegramInlineButton[][] {
+  const categories = [...new Set(configuredProfiles().map((profile) => profile.strategyCategory))];
+  return [
+    ...categories.map((category) => [
+      {
+        text: strategyCategoryLabel(category),
+        callback_data: `stats:category:${category}`,
+      },
+    ]),
+    [{ text: "⬅️ Головне меню", callback_data: "menu:main" }],
+  ];
+}
+
+function strategyMenuKeyboard(category: StrategyCategory): TelegramInlineButton[][] {
+  return [
+    ...configuredProfiles()
+      .map((profile) => ({ profile, index: SIGNAL_PROFILES.indexOf(profile) }))
+      .filter(({ profile }) => profile.strategyCategory === category)
+      .map(({ profile, index }) => [
+        {
+          text: `${profile.symbol} · ${profile.strategyName}`,
+          callback_data: `stats:profile:${index}`,
+        },
+      ]),
+    [{ text: "⬅️ Категорії", callback_data: "stats:categories" }],
+  ];
+}
+
+function strategyStatistics(profile: SymbolConfig) {
+  const state = loadState();
+  const trades = state.closedTrades.filter((trade) => trade.profileId === profile.profileId);
+  const wins = trades.filter((trade) => trade.outcome === "win").length;
+  const stopLosses = trades.filter((trade) => trade.outcome === "stop_loss").length;
+  const breakEvens = trades.filter((trade) => trade.outcome === "break_even").length;
+  const openPositions = state.openPositions.filter((position) => position.profileId === profile.profileId).length;
+  const decisiveTrades = wins + stopLosses;
+  const winRate = decisiveTrades > 0 ? `${((wins / decisiveTrades) * 100).toFixed(1)}%` : "—";
+
+  return [
+    "<b>СТАТИСТИКА СТРАТЕГІЇ</b>",
+    `Стратегія: ${htmlEscape(profile.strategyName)}`,
+    `Категорія: ${htmlEscape(strategyCategoryLabel(profile.strategyCategory))}`,
+    `Пара: <b>${htmlEscape(profile.symbol)}</b>`,
+    "",
+    `Закрито позицій: <b>${trades.length}</b>`,
+    `✅ Успішні: <b>${wins}</b>`,
+    `❌ Stop Loss: <b>${stopLosses}</b>`,
+    `➖ Break-even: <b>${breakEvens}</b>`,
+    `Успішність без BE: <b>${winRate}</b>`,
+    `Відкриті зараз: <b>${openPositions}</b>`,
+  ].join("\n");
+}
+
+function isAllowedTelegramChat(chatId: number) {
+  const configuredChatId = process.env.TELEGRAM_CHAT_ID;
+  return configuredChatId != null && String(chatId) === String(configuredChatId);
+}
+
+async function editTelegramMenu(
+  chatId: number,
+  messageId: number,
+  text: string,
+  inlineKeyboard: TelegramInlineButton[][]
+) {
+  await telegramApi("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: inlineKeyboard },
+  });
+}
+
+async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+  await telegramApi("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    ...(text ? { text } : {}),
+  });
+}
+
+async function showMainMenu(chatId: number) {
+  await sendTelegramTo(chatId, "<b>Меню бота</b>\nОберіть розділ:", mainMenuKeyboard());
+}
+
+async function handleTelegramCallback(callback: TelegramCallbackQuery) {
+  const message = callback.message;
+  if (!message || !callback.data) {
+    await answerCallbackQuery(callback.id);
+    return;
+  }
+  if (!isAllowedTelegramChat(message.chat.id)) {
+    await answerCallbackQuery(callback.id, "Це меню недоступне в цьому чаті.");
+    return;
+  }
+
+  if (callback.data === "menu:main") {
+    await editTelegramMenu(message.chat.id, message.message_id, "<b>Меню бота</b>\nОберіть розділ:", mainMenuKeyboard());
+  } else if (callback.data === "stats:categories") {
+    await editTelegramMenu(
+      message.chat.id,
+      message.message_id,
+      "<b>Статистика</b>\nОберіть категорію стратегії:",
+      categoryMenuKeyboard()
+    );
+  } else if (callback.data.startsWith("stats:category:")) {
+    const category = callback.data.slice("stats:category:".length) as StrategyCategory;
+    if (!(category in STRATEGY_CATEGORY_LABELS)) {
+      await answerCallbackQuery(callback.id, "Категорію не знайдено.");
+      return;
+    }
+    await editTelegramMenu(
+      message.chat.id,
+      message.message_id,
+      `<b>${htmlEscape(strategyCategoryLabel(category))}</b>\nОберіть стратегію:`,
+      strategyMenuKeyboard(category)
+    );
+  } else if (callback.data.startsWith("stats:profile:")) {
+    const profileIndex = Number(callback.data.slice("stats:profile:".length));
+    const profile = SIGNAL_PROFILES[profileIndex];
+    if (!profile || !configuredProfiles().includes(profile)) {
+      await answerCallbackQuery(callback.id, "Стратегію не знайдено.");
+      return;
+    }
+    await editTelegramMenu(
+      message.chat.id,
+      message.message_id,
+      strategyStatistics(profile),
+      [
+        [{ text: "⬅️ До стратегій", callback_data: `stats:category:${profile.strategyCategory}` }],
+        [{ text: "🏠 Головне меню", callback_data: "menu:main" }],
+      ]
+    );
+  }
+
+  await answerCallbackQuery(callback.id);
+}
+
+async function handleTelegramUpdate(update: TelegramUpdate) {
+  if (update.callback_query) {
+    await handleTelegramCallback(update.callback_query);
+    return;
+  }
+
+  const message = update.message;
+  if (!message?.text || !isAllowedTelegramChat(message.chat.id)) return;
+  const command = message.text.trim().split(/\s+/)[0].split("@")[0].toLowerCase();
+  if (command === "/start" || command === "/menu") {
+    await showMainMenu(message.chat.id);
+  } else if (command === "/stats") {
+    await sendTelegramTo(
+      message.chat.id,
+      "<b>Статистика</b>\nОберіть категорію стратегії:",
+      categoryMenuKeyboard()
+    );
+  }
+}
+
+async function configureTelegramMenu() {
+  await telegramApi("setMyCommands", {
+    commands: [
+      { command: "menu", description: "Відкрити меню бота" },
+      { command: "stats", description: "Статистика стратегій" },
+    ],
+  });
+}
+
+async function telegramMenuLoop() {
+  const menuState = loadTelegramMenuState();
+  try {
+    await configureTelegramMenu();
+    console.log("Telegram menu is ready. Commands: /menu, /stats");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`${iso(Date.now())} Telegram command setup failed: ${message}`);
+  }
+
+  for (;;) {
+    try {
+      const updates = await telegramApi<TelegramUpdate[]>("getUpdates", {
+        offset: menuState.updateOffset,
+        timeout: 20,
+        allowed_updates: ["message", "callback_query"],
+      });
+      for (const update of updates) {
+        menuState.updateOffset = update.update_id + 1;
+        try {
+          await handleTelegramUpdate(update);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`${iso(Date.now())} Telegram menu update failed: ${message}`);
+        }
+        saveTelegramMenuState(menuState);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`${iso(Date.now())} Telegram menu polling failed: ${message}`);
+      await sleep(5_000);
+    }
+  }
 }
 
 async function scanOnce({ forceTest = false } = {}) {
@@ -1146,23 +1548,38 @@ async function scanOnce({ forceTest = false } = {}) {
           const exitKey = `exit|${position.key}|${exit.exitTime}`;
           if (state.sentKeys.includes(exitKey)) continue;
 
-          const message = exitMessage(position, exit);
+          const closedTrade = closedTradeFromExit(position, exit);
+          const message = exitMessage(position, exit, closedTrade.outcome);
           if (dryRun) {
             console.log("[dry-run] Exit detected:");
             console.log(message.replace(/<[^>]+>/g, ""));
           } else {
-            await sendTelegram(message);
+            await sendTelegram(message, position.signalMessageId);
             console.log(`${iso(Date.now())} ${label}: Telegram exit alert sent`);
           }
 
           state.sentKeys.push(exitKey);
           state.openPositions = state.openPositions.filter((item) => item.key !== position.key);
+          state.closedTrades = state.closedTrades.filter((trade) => trade.key !== position.key);
+          state.closedTrades.push(closedTrade);
           saveState(state);
         }
 
         const signal = detectSignal(config, rows);
         if (!signal) {
           console.log(`${iso(Date.now())} ${label}: no signal`);
+          continue;
+        }
+
+        if (state.sentKeys.includes(signal.key)) {
+          const exitKeyPrefix = `exit|${signal.key}|`;
+          const isAlreadyClosed = state.sentKeys.some((key) => key.startsWith(exitKeyPrefix));
+          if (!isAlreadyClosed && !state.openPositions.some((position) => position.key === signal.key)) {
+            state.openPositions.push(openPositionFromSignal(config, signal));
+            saveState(state);
+            console.log(`${iso(Date.now())} ${label}: restored position tracking for existing signal`);
+          }
+          console.log(`${iso(Date.now())} ${label}: duplicate signal already handled`);
           continue;
         }
 
@@ -1175,34 +1592,29 @@ async function scanOnce({ forceTest = false } = {}) {
         if (!initialScanCompleted && !sendExistingOnStart && signal.entryTime < PROCESS_STARTED_AT - 30_000) {
           console.log(`${iso(Date.now())} ${label}: pre-start signal skipped (${kyivTime(signal.entryTime)} Kyiv)`);
           state.sentKeys.push(signal.key);
-          if (shouldTrackPosition(signal) && !state.openPositions.some((position) => position.key === signal.key)) {
+          if (!state.openPositions.some((position) => position.key === signal.key)) {
             state.openPositions.push(openPositionFromSignal(config, signal));
           }
           saveState(state);
           continue;
         }
 
-        if (state.sentKeys.includes(signal.key)) {
-          console.log(`${iso(Date.now())} ${label}: duplicate signal already handled`);
-          continue;
-        }
-
         const message = signalMessage(signal);
+        let signalMessageId: number | undefined;
         if (dryRun) {
           console.log("[dry-run] Signal detected:");
           console.log(message.replace(/<[^>]+>/g, ""));
           appendJournal("dry_run", signal);
         } else {
-          await sendTelegram(message);
+          const sentMessage = await sendTelegram(message);
+          signalMessageId = sentMessage.message_id;
           appendJournal("sent", signal);
           console.log(`${iso(Date.now())} ${label}: Telegram signal sent`);
         }
 
         state.sentKeys.push(signal.key);
-        if (shouldTrackPosition(signal)) {
-          state.openPositions = state.openPositions.filter((position) => position.key !== signal.key);
-          state.openPositions.push(openPositionFromSignal(config, signal));
-        }
+        state.openPositions = state.openPositions.filter((position) => position.key !== signal.key);
+        state.openPositions.push(openPositionFromSignal(config, signal, signalMessageId));
         saveState(state);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1234,10 +1646,15 @@ async function main() {
   console.log(
     `Starting live signal monitor. Poll: ${pollMs}ms. Symbols: ${configuredSymbols().join(", ")}. Profiles: ${profileCount}`
   );
-  for (;;) {
-    await scanOnce();
-    await sleep(pollMs);
-  }
+
+  const signalMonitorLoop = async () => {
+    for (;;) {
+      await scanOnce();
+      await sleep(pollMs);
+    }
+  };
+
+  await Promise.all([signalMonitorLoop(), telegramMenuLoop()]);
 }
 
 main().catch((error) => {
