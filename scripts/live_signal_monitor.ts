@@ -1116,6 +1116,7 @@ function exitMessage(position: OpenPositionState, exit: PositionExit, outcome: T
     `Категорія: ${htmlEscape(strategyCategoryLabel(position.strategyCategory))}`,
     `Entry time: ${kyivClockTime(position.entryTime)} Київ`,
     `Результат: <b>${result}</b>`,
+    `Ціна закриття: <code>${formatPrice(position.symbol, exit.exitPrice)}</code>`,
   ].join("\n");
 }
 

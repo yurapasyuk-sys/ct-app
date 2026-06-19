@@ -12,7 +12,7 @@ It does not place trades. It scans 1H market data and sends Telegram messages wi
 - take profit or dynamic exit rule
 - risk distance
 - signal reason
-- short position-close alerts with the strategy, Kyiv entry time, and `TAKE PROFIT` or `STOP LOSS` result
+- short position-close alerts with the strategy, Kyiv entry time, `TAKE PROFIT` or `STOP LOSS` result, and actual exit price
 - position-close alerts sent as replies to their original signal messages
 - an interactive `/menu` and `/stats` flow for category and strategy statistics
 
