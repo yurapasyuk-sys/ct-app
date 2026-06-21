@@ -27,6 +27,7 @@ TELEGRAM_CHAT_ID=your_destination_chat_id
 SIGNAL_SYMBOLS=EURUSD,GBPUSD,USDJPY,GER40
 SIGNAL_POLL_MS=300000
 SIGNAL_MAX_SIGNAL_AGE_MINUTES=90
+SIGNAL_MAX_EXIT_AGE_MINUTES=360
 SIGNAL_DRY_RUN=0
 SIGNAL_DATA_DIR=logs
 ```
@@ -110,6 +111,12 @@ On PowerShell:
 ```powershell
 $env:SIGNAL_DRY_RUN="1"; npm run signals:once
 ```
+
+Dry-run scans never modify `signal-monitor-state.json`. Historical exits older
+than `SIGNAL_MAX_EXIT_AGE_MINUTES` are recorded in state without sending a late
+Telegram notification. An exit alert is sent only when the original signal's
+Telegram message id is present, so position closes remain replies to their
+opening signals.
 
 ## Logs
 

@@ -4,6 +4,7 @@ import {
   detectLatestQ2PropSignal,
   type Q2PropStrategyConfig,
 } from "../src/lib/data-handlers/q2-prop-signal-strategy";
+import { exitAlertSuppressionReason } from "../src/lib/data-handlers/signal-monitor-policy";
 
 const MINUTE = 60_000;
 
@@ -160,4 +161,32 @@ function testCompressionRelease() {
 testOpeningDrive();
 testSessionStretch();
 testCompressionRelease();
+
+assert.match(
+  exitAlertSuppressionReason({
+    now: Date.UTC(2026, 5, 21, 12, 49),
+    exitTime: Date.UTC(2026, 5, 19, 13, 0),
+    maxExitAgeMinutes: 360,
+    originalMessageId: undefined,
+  }) ?? "",
+  /^stale exit/
+);
+assert.equal(
+  exitAlertSuppressionReason({
+    now: Date.UTC(2026, 5, 21, 12, 49),
+    exitTime: Date.UTC(2026, 5, 21, 12, 30),
+    maxExitAgeMinutes: 360,
+    originalMessageId: undefined,
+  }),
+  "missing original Telegram message id"
+);
+assert.equal(
+  exitAlertSuppressionReason({
+    now: Date.UTC(2026, 5, 21, 12, 49),
+    exitTime: Date.UTC(2026, 5, 21, 12, 30),
+    maxExitAgeMinutes: 360,
+    originalMessageId: 12345,
+  }),
+  null
+);
 console.log("Q2 prop signal strategy tests passed.");

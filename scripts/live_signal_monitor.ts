@@ -7,6 +7,7 @@ import {
   type Q2PropStrategyConfig,
   type Q2PropStrategyKind,
 } from "../src/lib/data-handlers/q2-prop-signal-strategy";
+import { exitAlertSuppressionReason } from "../src/lib/data-handlers/signal-monitor-policy";
 
 type Direction = "long" | "short";
 type StrategyKind = "donchian" | "bb_atr" | "htf_breakout" | Q2PropStrategyKind;
@@ -724,7 +725,12 @@ function loadState(): MonitorState {
   }
 }
 
+function isDryRun() {
+  return process.env.SIGNAL_DRY_RUN === "1" || process.env.SIGNAL_DRY_RUN === "true";
+}
+
 function saveState(state: MonitorState) {
+  if (isDryRun()) return;
   const { outDir, statePath } = dataPaths();
   mkdirSync(outDir, { recursive: true });
   writeFileSync(
@@ -1836,7 +1842,10 @@ async function scanOnce({ forceTest = false } = {}) {
   const state = loadState();
   const symbols = configuredSymbols();
   const maxAgeMinutes = Number(process.env.SIGNAL_MAX_SIGNAL_AGE_MINUTES ?? "90");
-  const dryRun = process.env.SIGNAL_DRY_RUN === "1" || process.env.SIGNAL_DRY_RUN === "true";
+  const maxExitAgeMinutes = Number(
+    process.env.SIGNAL_MAX_EXIT_AGE_MINUTES ?? "360"
+  );
+  const dryRun = isDryRun();
   const sendExistingOnStart =
     process.env.SIGNAL_SEND_EXISTING_ON_START === "1" ||
     process.env.SIGNAL_SEND_EXISTING_ON_START === "true";
@@ -1892,6 +1901,19 @@ async function scanOnce({ forceTest = false } = {}) {
           if (dryRun) {
             console.log("[dry-run] Exit detected:");
             console.log(message.replace(/<[^>]+>/g, ""));
+            continue;
+          }
+
+          const suppressionReason = exitAlertSuppressionReason({
+            now: Date.now(),
+            exitTime: exit.exitTime,
+            maxExitAgeMinutes,
+            originalMessageId: position.signalMessageId,
+          });
+          if (suppressionReason) {
+            console.log(
+              `${iso(Date.now())} ${label}: Telegram exit alert suppressed: ${suppressionReason}`
+            );
           } else {
             await sendTelegram(message, position.signalMessageId);
             console.log(`${iso(Date.now())} ${label}: Telegram exit alert sent`);
@@ -1928,6 +1950,14 @@ async function scanOnce({ forceTest = false } = {}) {
           continue;
         }
 
+        if (dryRun) {
+          const message = signalMessage(signal);
+          console.log("[dry-run] Signal detected:");
+          console.log(message.replace(/<[^>]+>/g, ""));
+          appendJournal("dry_run", signal);
+          continue;
+        }
+
         const portfolioBlock = portfolioEntryBlockReason(config, signal, state);
         if (portfolioBlock) {
           console.log(`${iso(Date.now())} ${label}: signal blocked by portfolio rule (${portfolioBlock})`);
@@ -1948,17 +1978,10 @@ async function scanOnce({ forceTest = false } = {}) {
         }
 
         const message = signalMessage(signal);
-        let signalMessageId: number | undefined;
-        if (dryRun) {
-          console.log("[dry-run] Signal detected:");
-          console.log(message.replace(/<[^>]+>/g, ""));
-          appendJournal("dry_run", signal);
-        } else {
-          const sentMessage = await sendTelegram(message);
-          signalMessageId = sentMessage.message_id;
-          appendJournal("sent", signal);
-          console.log(`${iso(Date.now())} ${label}: Telegram signal sent`);
-        }
+        const sentMessage = await sendTelegram(message);
+        const signalMessageId = sentMessage.message_id;
+        appendJournal("sent", signal);
+        console.log(`${iso(Date.now())} ${label}: Telegram signal sent`);
 
         state.sentKeys.push(signal.key);
         state.openPositions = state.openPositions.filter((position) => position.key !== signal.key);
