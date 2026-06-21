@@ -1,6 +1,7 @@
 # Telegram Signal Monitor
 
-Local paper-signal monitor for `Research 2026 Adaptive Pack`.
+Local paper-signal monitor for the configured strategy profiles, including the
+fixed `Q2 Prop Portfolio 2026`.
 
 It does not place trades. It scans 1H market data and sends Telegram messages with:
 
@@ -29,6 +30,48 @@ SIGNAL_MAX_SIGNAL_AGE_MINUTES=90
 SIGNAL_DRY_RUN=0
 SIGNAL_DATA_DIR=logs
 ```
+
+To run only the five Q2 prop modules:
+
+```env
+SIGNAL_SYMBOLS=GER40,GBPUSD,AUDUSD,USDJPY
+SIGNAL_PROFILE_IDS=q2_prop_ger40_opening_drive_30m,q2_prop_ger40_session_stretch_1h,q2_prop_gbpusd_session_stretch_30m,q2_prop_audusd_compression_release_30m,q2_prop_usdjpy_compression_release_1h
+```
+
+If `SIGNAL_PROFILE_IDS` is omitted, the new profiles are added alongside the
+existing signal strategies.
+
+## Q2 Prop Portfolio 2026
+
+The monitor contains the five fixed modules approved by the Q2 2026 holdout:
+
+- GER40 Opening Drive, 30m, 1 ATR stop, 2.5R target, 16-bar time stop.
+- GER40 Session Stretch Reversion, 1h, 0.75 ATR stop, 2R target,
+  10-bar time stop.
+- GBPUSD Session Stretch Reversion, 30m, 0.75 ATR stop, 2R target,
+  16-bar time stop.
+- AUDUSD Compression Release, 30m, 0.75 ATR stop, 2.5R target,
+  24-bar time stop.
+- USDJPY Compression Release, 1h, 0.75 ATR stop, 2.5R target,
+  16-bar time stop.
+
+Portfolio guards:
+
+- 1% model risk per signal.
+- no more than 2% simultaneous open model risk;
+- no second position from the same module;
+- stop opening new portfolio positions after -3R of realized results in one
+  UTC day;
+- fixed targets, stops, and time exits are monitored automatically.
+
+The monitor remains paper-signal only and does not calculate broker lot size or
+place orders.
+
+GER40 warning: the research dataset used Dukascopy GER40 CFD, while the current
+live monitor uses Yahoo `^GDAXI`, a cash-index proxy with different session
+coverage. GER40 alerts explicitly show this source warning. Before using those
+two modules for a paid challenge, connect the bot to the same GER40 CFD feed
+used by the backtest and run a parity check.
 
 `TELEGRAM_CHAT_ID` is the destination chat, not the bot id. For a Telegram supergroup it usually starts with `-100`.
 

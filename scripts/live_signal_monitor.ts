@@ -2,10 +2,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { lookup } from "node:dns";
 import { get as httpsGet } from "node:https";
 import type { Kline } from "../src/lib/binance";
+import {
+  detectLatestQ2PropSignal,
+  type Q2PropStrategyConfig,
+  type Q2PropStrategyKind,
+} from "../src/lib/data-handlers/q2-prop-signal-strategy";
 
 type Direction = "long" | "short";
-type StrategyKind = "donchian" | "bb_atr" | "htf_breakout";
-type SignalTimeframe = "1h" | "4h";
+type StrategyKind = "donchian" | "bb_atr" | "htf_breakout" | Q2PropStrategyKind;
+type SignalTimeframe = "30m" | "1h" | "4h";
 type StrategyCategory = "research" | "asset_specific" | "universal" | "prop" | "crypto";
 type PositionExitResult = "take_profit" | "stop_loss" | "strategy_exit";
 type TradeOutcome = "win" | "stop_loss" | "break_even";
@@ -27,6 +32,8 @@ interface Signal {
   riskDistancePips: number;
   source: string;
   reason: string;
+  portfolioId?: string;
+  riskPct?: number;
 }
 
 interface OpenPositionState {
@@ -43,6 +50,10 @@ interface OpenPositionState {
   stopLoss: number;
   takeProfit: number | null;
   exitRule: string;
+  riskDistance?: number;
+  maxHoldBars?: number;
+  portfolioId?: string;
+  riskPct?: number;
   signalMessageId?: number;
 }
 
@@ -66,6 +77,9 @@ interface ClosedTradeState {
   exitPrice: number;
   exitResult: PositionExitResult;
   outcome: TradeOutcome;
+  portfolioId?: string;
+  riskPct?: number;
+  realizedR?: number;
 }
 
 interface MonitorState {
@@ -124,12 +138,18 @@ interface SymbolConfig {
   emaFilter?: "none" | "trend" | "countertrend";
   exitTarget?: "mean" | "opposite_band";
   includePrePost?: boolean;
+  portfolioId?: string;
+  riskPct?: number;
+  q2Prop?: Q2PropStrategyConfig;
 }
 
+const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const FOUR_HOURS_MS = 4 * ONE_HOUR_MS;
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 const PROCESS_STARTED_AT = Date.now();
+const PROP_DAILY_STOP_PCT = -3;
+const PROP_MAX_CONCURRENT_RISK_PCT = 2;
 let initialScanCompleted = false;
 const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
   research: "Резервна стратегія",
@@ -140,6 +160,157 @@ const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
 };
 
 const SIGNAL_PROFILES: SymbolConfig[] = [
+  {
+    profileId: "q2_prop_ger40_opening_drive_30m",
+    symbol: "GER40",
+    yahooSymbol: "^GDAXI",
+    timeframe: "30m",
+    kind: "q2_opening_drive",
+    strategyName: "Q2 Prop Portfolio · GER40 Opening Drive",
+    strategyCategory: "prop",
+    strategyVersion: "q2-prop-2026.ger40-opening-drive-30m.1",
+    atrPeriod: 14,
+    atrMultiplier: 1,
+    rewardR: 2.5,
+    maxHoldBars: 16,
+    directionMode: "all",
+    portfolioId: "q2_prop_portfolio_2026",
+    riskPct: 1,
+    q2Prop: {
+      kind: "q2_opening_drive",
+      timeframeMinutes: 30,
+      atrPeriod: 14,
+      sessionStart: 13,
+      driveHours: 2,
+      efficiencyPeriod: 8,
+      minEfficiency: 0.3,
+      minDriveAtr: 0.8,
+      minDirectionalShare: 0.6,
+      stopAtr: 1,
+      rewardR: 2.5,
+      maxHoldBars: 16,
+    },
+  },
+  {
+    profileId: "q2_prop_ger40_session_stretch_1h",
+    symbol: "GER40",
+    yahooSymbol: "^GDAXI",
+    timeframe: "1h",
+    kind: "q2_session_stretch",
+    strategyName: "Q2 Prop Portfolio · GER40 Session Stretch",
+    strategyCategory: "prop",
+    strategyVersion: "q2-prop-2026.ger40-session-stretch-1h.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2,
+    maxHoldBars: 10,
+    directionMode: "all",
+    portfolioId: "q2_prop_portfolio_2026",
+    riskPct: 1,
+    q2Prop: {
+      kind: "q2_session_stretch",
+      timeframeMinutes: 60,
+      atrPeriod: 14,
+      dayOpenHour: 0,
+      signalHour: 13,
+      minStretchAtr: 1.5,
+      stopAtr: 0.75,
+      rewardR: 2,
+      maxHoldBars: 10,
+    },
+  },
+  {
+    profileId: "q2_prop_gbpusd_session_stretch_30m",
+    symbol: "GBPUSD",
+    yahooSymbol: "GBPUSD=X",
+    timeframe: "30m",
+    kind: "q2_session_stretch",
+    strategyName: "Q2 Prop Portfolio · GBPUSD Session Stretch",
+    strategyCategory: "prop",
+    strategyVersion: "q2-prop-2026.gbpusd-session-stretch-30m.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2,
+    maxHoldBars: 16,
+    directionMode: "all",
+    portfolioId: "q2_prop_portfolio_2026",
+    riskPct: 1,
+    q2Prop: {
+      kind: "q2_session_stretch",
+      timeframeMinutes: 30,
+      atrPeriod: 14,
+      dayOpenHour: 0,
+      signalHour: 11,
+      minStretchAtr: 2.5,
+      stopAtr: 0.75,
+      rewardR: 2,
+      maxHoldBars: 16,
+    },
+  },
+  {
+    profileId: "q2_prop_audusd_compression_release_30m",
+    symbol: "AUDUSD",
+    yahooSymbol: "AUDUSD=X",
+    timeframe: "30m",
+    kind: "q2_compression_release",
+    strategyName: "Q2 Prop Portfolio · AUDUSD Compression Release",
+    strategyCategory: "prop",
+    strategyVersion: "q2-prop-2026.audusd-compression-release-30m.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2.5,
+    maxHoldBars: 24,
+    directionMode: "all",
+    portfolioId: "q2_prop_portfolio_2026",
+    riskPct: 1,
+    q2Prop: {
+      kind: "q2_compression_release",
+      timeframeMinutes: 30,
+      atrPeriod: 14,
+      compressionLookback: 40,
+      breakoutLookback: 12,
+      efficiencyPeriod: 10,
+      maxAtrRatio: 0.8,
+      minBodyAtr: 0.8,
+      minEfficiency: 0.4,
+      stopAtr: 0.75,
+      rewardR: 2.5,
+      session: "active",
+      maxHoldBars: 24,
+    },
+  },
+  {
+    profileId: "q2_prop_usdjpy_compression_release_1h",
+    symbol: "USDJPY",
+    yahooSymbol: "USDJPY=X",
+    timeframe: "1h",
+    kind: "q2_compression_release",
+    strategyName: "Q2 Prop Portfolio · USDJPY Compression Release",
+    strategyCategory: "prop",
+    strategyVersion: "q2-prop-2026.usdjpy-compression-release-1h.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2.5,
+    maxHoldBars: 16,
+    directionMode: "all",
+    portfolioId: "q2_prop_portfolio_2026",
+    riskPct: 1,
+    q2Prop: {
+      kind: "q2_compression_release",
+      timeframeMinutes: 60,
+      atrPeriod: 14,
+      compressionLookback: 40,
+      breakoutLookback: 12,
+      efficiencyPeriod: 10,
+      maxAtrRatio: 0.8,
+      minBodyAtr: 0.8,
+      minEfficiency: 0.25,
+      stopAtr: 0.75,
+      rewardR: 2.5,
+      session: "active",
+      maxHoldBars: 16,
+    },
+  },
   {
     profileId: "research_pack_audusd_bb_atr_4h",
     symbol: "AUDUSD",
@@ -434,6 +605,11 @@ function iso(timestamp: number) {
   return new Date(timestamp).toISOString();
 }
 
+function utcDayStart(timestamp: number) {
+  const date = new Date(timestamp);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
 function kyivTime(timestamp: number) {
   return new Intl.DateTimeFormat("uk-UA", {
     timeZone: "Europe/Kyiv",
@@ -579,11 +755,15 @@ function saveTelegramMenuState(state: TelegramMenuState) {
 }
 
 function timeframeMs(timeframe: SignalTimeframe) {
-  return timeframe === "4h" ? FOUR_HOURS_MS : ONE_HOUR_MS;
+  if (timeframe === "4h") return FOUR_HOURS_MS;
+  if (timeframe === "30m") return THIRTY_MINUTES_MS;
+  return ONE_HOUR_MS;
 }
 
 function yahooInterval(timeframe: SignalTimeframe) {
-  return timeframe === "4h" ? "4h" : "60m";
+  if (timeframe === "4h") return "4h";
+  if (timeframe === "30m") return "30m";
+  return "60m";
 }
 
 function pipSize(symbol: string) {
@@ -793,9 +973,10 @@ async function fetchYahooKlines(config: SymbolConfig) {
     config.lookback ?? 0,
     config.bbPeriod ?? 0,
     config.emaPeriod ?? 0,
+    (config.q2Prop?.compressionLookback ?? 0) + config.atrPeriod,
     120
   );
-  const barsPerDay = config.timeframe === "4h" ? 6 : 24;
+  const barsPerDay = config.timeframe === "4h" ? 6 : config.timeframe === "30m" ? 48 : 24;
   const lookbackDays = Math.max(30, Math.ceil((warmupBars + 48) / barsPerDay));
   const startTime = endTime - lookbackDays * 24 * ONE_HOUR_MS;
   let lastError: Error | null = null;
@@ -1020,9 +1201,39 @@ function detectHtfBreakoutSignal(config: SymbolConfig, rows: Kline[]) {
   } satisfies Signal;
 }
 
+function detectQ2PropSignal(config: SymbolConfig, rows: Kline[]) {
+  if (!config.q2Prop) return null;
+  const setup = detectLatestQ2PropSignal(config.q2Prop, rows);
+  if (!setup) return null;
+  return {
+    key: signalKey(config, setup.direction, setup.signalTime),
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
+    strategyVersion: config.strategyVersion,
+    direction: setup.direction,
+    signalTime: setup.signalTime,
+    entryTime: setup.entryTime,
+    entryPrice: setup.entryPrice,
+    stopLoss: setup.stopLoss,
+    takeProfit: setup.takeProfit,
+    exitRule: `Fixed TP ${config.q2Prop.rewardR}R, time stop ${config.q2Prop.maxHoldBars} bars`,
+    riskDistance: setup.riskDistance,
+    riskDistancePips: setup.riskDistance / pipSize(config.symbol),
+    source:
+      config.symbol === "GER40"
+        ? `Yahoo ${config.yahooSymbol} ${config.timeframe.toUpperCase()} cash-index proxy; research used Dukascopy GER40 CFD`
+        : `Yahoo ${config.yahooSymbol} ${config.timeframe.toUpperCase()}`,
+    reason: setup.reason,
+    portfolioId: config.portfolioId,
+    riskPct: config.riskPct,
+  } satisfies Signal;
+}
+
 function detectSignal(config: SymbolConfig, rows: Kline[]) {
   if (config.kind === "donchian") return detectDonchianSignal(config, rows);
   if (config.kind === "htf_breakout") return detectHtfBreakoutSignal(config, rows);
+  if (config.q2Prop) return detectQ2PropSignal(config, rows);
   return detectBbAtrSignal(config, rows);
 }
 
@@ -1041,6 +1252,10 @@ function signalMessage(signal: Signal) {
     `SL: <code>${formatPrice(signal.symbol, signal.stopLoss)}</code>`,
     `TP / exit: <code>${htmlEscape(tp)}</code>`,
     `Risk distance: ${signal.riskDistancePips.toFixed(1)} pips/points`,
+    ...(signal.riskPct ? [`Risk: ${signal.riskPct.toFixed(2)}% of equity`] : []),
+    ...(signal.portfolioId
+      ? ["Portfolio guard: -3% daily stop, maximum 2% simultaneous risk"]
+      : []),
     `Логіка: ${htmlEscape(signal.reason)}`,
     `Версія: ${htmlEscape(signal.strategyVersion)}`,
     `Джерело: ${htmlEscape(signal.source)}`,
@@ -1068,6 +1283,10 @@ function openPositionFromSignal(
     stopLoss: signal.stopLoss,
     takeProfit: signal.takeProfit,
     exitRule: signal.exitRule,
+    riskDistance: signal.riskDistance,
+    maxHoldBars: config.maxHoldBars,
+    portfolioId: signal.portfolioId,
+    riskPct: signal.riskPct,
     signalMessageId,
   };
 }
@@ -1085,6 +1304,10 @@ function tradeOutcome(position: OpenPositionState, exit: PositionExit): TradeOut
 }
 
 function closedTradeFromExit(position: OpenPositionState, exit: PositionExit): ClosedTradeState {
+  const directionalMove =
+    position.direction === "long"
+      ? exit.exitPrice - position.entryPrice
+      : position.entryPrice - exit.exitPrice;
   return {
     key: position.key,
     profileId: position.profileId,
@@ -1099,6 +1322,12 @@ function closedTradeFromExit(position: OpenPositionState, exit: PositionExit): C
     exitPrice: exit.exitPrice,
     exitResult: exit.result,
     outcome: tradeOutcome(position, exit),
+    portfolioId: position.portfolioId,
+    riskPct: position.riskPct,
+    realizedR:
+      position.riskDistance && position.riskDistance > 0
+        ? directionalMove / position.riskDistance
+        : undefined,
   };
 }
 
@@ -1206,7 +1435,56 @@ function detectFixedTargetExit(position: OpenPositionState, rows: Kline[]): Posi
   return null;
 }
 
+function detectQ2PositionExit(
+  position: OpenPositionState,
+  rows: Kline[]
+): PositionExit | null {
+  if (position.takeProfit == null) return null;
+  const barMs = timeframeMs(position.timeframe);
+  const now = Date.now();
+  for (const row of rows) {
+    if (row.openTime < position.entryTime) continue;
+    const hitStop =
+      position.direction === "long"
+        ? row.low <= position.stopLoss
+        : row.high >= position.stopLoss;
+    const hitTarget =
+      position.direction === "long"
+        ? row.high >= position.takeProfit
+        : row.low <= position.takeProfit;
+    if (hitStop) {
+      return {
+        exitTime: Math.max(row.openTime, position.entryTime),
+        exitPrice: position.stopLoss,
+        result: "stop_loss",
+      };
+    }
+    if (hitTarget) {
+      return {
+        exitTime: Math.max(row.openTime, position.entryTime),
+        exitPrice: position.takeProfit,
+        result: "take_profit",
+      };
+    }
+
+    const heldBars = Math.floor((row.openTime - position.entryTime) / barMs);
+    if (
+      position.maxHoldBars &&
+      heldBars >= position.maxHoldBars &&
+      row.openTime + barMs <= now - 30_000
+    ) {
+      return {
+        exitTime: row.closeTime,
+        exitPrice: row.close,
+        result: "strategy_exit",
+      };
+    }
+  }
+  return null;
+}
+
 function detectPositionExit(config: SymbolConfig, position: OpenPositionState, rows: Kline[]) {
+  if (config.q2Prop) return detectQ2PositionExit(position, rows);
   const fixedTargetExit = detectFixedTargetExit(position, rows);
   if (fixedTargetExit) return fixedTargetExit;
   if (config.kind === "donchian") return detectDonchianExit(config, position, rows);
@@ -1276,7 +1554,15 @@ function configuredSymbols() {
 }
 
 function profilesForSymbol(symbol: string) {
-  return SIGNAL_PROFILES.filter((profile) => profile.symbol === symbol);
+  const configuredIds = process.env.SIGNAL_PROFILE_IDS?.split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const allowedIds = configuredIds?.length ? new Set(configuredIds) : null;
+  return SIGNAL_PROFILES.filter(
+    (profile) =>
+      profile.symbol === symbol &&
+      (!allowedIds || allowedIds.has(profile.profileId))
+  );
 }
 
 function profileLabel(profile: SymbolConfig) {
@@ -1285,7 +1571,52 @@ function profileLabel(profile: SymbolConfig) {
 
 function configuredProfiles() {
   const symbols = new Set(configuredSymbols());
-  return SIGNAL_PROFILES.filter((profile) => symbols.has(profile.symbol));
+  return SIGNAL_PROFILES.filter(
+    (profile) =>
+      symbols.has(profile.symbol) &&
+      profilesForSymbol(profile.symbol).some(
+        (configured) => configured.profileId === profile.profileId
+      )
+  );
+}
+
+function portfolioEntryBlockReason(
+  config: SymbolConfig,
+  signal: Signal,
+  state: MonitorState
+) {
+  if (!config.portfolioId || !config.riskPct) return null;
+  if (
+    state.openPositions.some(
+      (position) => position.profileId === config.profileId
+    )
+  ) {
+    return "profile already has an open position";
+  }
+
+  const entryDay = utcDayStart(signal.entryTime);
+  const realizedPct = state.closedTrades
+    .filter(
+      (trade) =>
+        trade.portfolioId === config.portfolioId &&
+        utcDayStart(trade.exitTime) === entryDay
+    )
+    .reduce(
+      (sum, trade) =>
+        sum + (trade.realizedR ?? 0) * (trade.riskPct ?? config.riskPct ?? 0),
+      0
+    );
+  if (realizedPct <= PROP_DAILY_STOP_PCT) {
+    return `daily stop reached (${realizedPct.toFixed(2)}%)`;
+  }
+
+  const openRiskPct = state.openPositions
+    .filter((position) => position.portfolioId === config.portfolioId)
+    .reduce((sum, position) => sum + (position.riskPct ?? 0), 0);
+  if (openRiskPct + config.riskPct > PROP_MAX_CONCURRENT_RISK_PCT + 1e-9) {
+    return `concurrent risk cap reached (${openRiskPct.toFixed(2)}% open)`;
+  }
+  return null;
 }
 
 function mainMenuKeyboard(): TelegramInlineButton[][] {
@@ -1587,6 +1918,15 @@ async function scanOnce({ forceTest = false } = {}) {
         const ageMinutes = (Date.now() - signal.entryTime) / 60_000;
         if (ageMinutes > maxAgeMinutes) {
           console.log(`${iso(Date.now())} ${label}: signal skipped as stale (${ageMinutes.toFixed(1)} min)`);
+          continue;
+        }
+
+        const portfolioBlock = portfolioEntryBlockReason(config, signal, state);
+        if (portfolioBlock) {
+          console.log(`${iso(Date.now())} ${label}: signal blocked by portfolio rule (${portfolioBlock})`);
+          appendJournal(`blocked: ${portfolioBlock}`, signal);
+          state.sentKeys.push(signal.key);
+          saveState(state);
           continue;
         }
 
