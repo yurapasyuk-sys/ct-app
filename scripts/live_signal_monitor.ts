@@ -11,7 +11,13 @@ import {
 type Direction = "long" | "short";
 type StrategyKind = "donchian" | "bb_atr" | "htf_breakout" | Q2PropStrategyKind;
 type SignalTimeframe = "30m" | "1h" | "4h";
-type StrategyCategory = "research" | "asset_specific" | "universal" | "prop" | "crypto";
+type StrategyCategory =
+  | "research"
+  | "asset_specific"
+  | "universal"
+  | "prop"
+  | "proptrade"
+  | "crypto";
 type PositionExitResult = "take_profit" | "stop_loss" | "strategy_exit";
 type TradeOutcome = "win" | "stop_loss" | "break_even";
 
@@ -156,6 +162,7 @@ const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
   asset_specific: "Індивідуальна стратегія",
   universal: "Універсальна стратегія",
   prop: "Пропстратегія",
+  proptrade: "Проптрейд",
   crypto: "Криптостратегія",
 };
 
@@ -167,7 +174,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "30m",
     kind: "q2_opening_drive",
     strategyName: "Q2 Prop Portfolio · GER40 Opening Drive",
-    strategyCategory: "prop",
+    strategyCategory: "proptrade",
     strategyVersion: "q2-prop-2026.ger40-opening-drive-30m.1",
     atrPeriod: 14,
     atrMultiplier: 1,
@@ -198,7 +205,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "q2_session_stretch",
     strategyName: "Q2 Prop Portfolio · GER40 Session Stretch",
-    strategyCategory: "prop",
+    strategyCategory: "proptrade",
     strategyVersion: "q2-prop-2026.ger40-session-stretch-1h.1",
     atrPeriod: 14,
     atrMultiplier: 0.75,
@@ -226,7 +233,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "30m",
     kind: "q2_session_stretch",
     strategyName: "Q2 Prop Portfolio · GBPUSD Session Stretch",
-    strategyCategory: "prop",
+    strategyCategory: "proptrade",
     strategyVersion: "q2-prop-2026.gbpusd-session-stretch-30m.1",
     atrPeriod: 14,
     atrMultiplier: 0.75,
@@ -254,7 +261,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "30m",
     kind: "q2_compression_release",
     strategyName: "Q2 Prop Portfolio · AUDUSD Compression Release",
-    strategyCategory: "prop",
+    strategyCategory: "proptrade",
     strategyVersion: "q2-prop-2026.audusd-compression-release-30m.1",
     atrPeriod: 14,
     atrMultiplier: 0.75,
@@ -286,7 +293,7 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     timeframe: "1h",
     kind: "q2_compression_release",
     strategyName: "Q2 Prop Portfolio · USDJPY Compression Release",
-    strategyCategory: "prop",
+    strategyCategory: "proptrade",
     strategyVersion: "q2-prop-2026.usdjpy-compression-release-1h.1",
     atrPeriod: 14,
     atrMultiplier: 0.75,
