@@ -7,10 +7,24 @@ import {
   type Q2PropStrategyConfig,
   type Q2PropStrategyKind,
 } from "../src/lib/data-handlers/q2-prop-signal-strategy";
-import { exitAlertSuppressionReason } from "../src/lib/data-handlers/signal-monitor-policy";
+import {
+  detectApprovedPropPositionExit,
+  detectLatestApprovedPropSignal,
+  type ApprovedPropStrategyConfig,
+} from "../src/lib/data-handlers/approved-prop-portfolio-strategy";
+import { fetchDukascopyJettaBidAsk } from "../src/lib/data-handlers/dukascopy-jetta";
+import {
+  exitAlertSuppressionReason,
+  propPortfolioEntryBlockReason,
+} from "../src/lib/data-handlers/signal-monitor-policy";
 
 type Direction = "long" | "short";
-type StrategyKind = "donchian" | "bb_atr" | "htf_breakout" | Q2PropStrategyKind;
+type StrategyKind =
+  | "donchian"
+  | "bb_atr"
+  | "htf_breakout"
+  | "approved_prop"
+  | Q2PropStrategyKind;
 type SignalTimeframe = "30m" | "1h" | "4h";
 type StrategyCategory =
   | "research"
@@ -41,6 +55,7 @@ interface Signal {
   reason: string;
   portfolioId?: string;
   riskPct?: number;
+  exitAtTime?: number;
 }
 
 interface OpenPositionState {
@@ -62,6 +77,7 @@ interface OpenPositionState {
   portfolioId?: string;
   riskPct?: number;
   signalMessageId?: number;
+  exitAtTime?: number;
 }
 
 interface PositionExit {
@@ -148,6 +164,14 @@ interface SymbolConfig {
   portfolioId?: string;
   riskPct?: number;
   q2Prop?: Q2PropStrategyConfig;
+  approvedProp?: ApprovedPropStrategyConfig;
+  dataProvider?: "yahoo" | "dukascopy_jetta";
+  dukascopyCode?: string;
+}
+
+interface MarketRows {
+  bid: Kline[];
+  ask: Kline[];
 }
 
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -157,6 +181,13 @@ const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 const PROCESS_STARTED_AT = Date.now();
 const PROP_DAILY_STOP_PCT = -3;
 const PROP_MAX_CONCURRENT_RISK_PCT = 2;
+const APPROVED_PROP_PROFILE_IDS = new Set([
+  "approved_prop_usdchf_breakout_1h",
+  "approved_prop_xauusd_orb_1h",
+  "approved_prop_us30_orb_1h",
+  "approved_prop_spx500_breakout_4h",
+]);
+const APPROVED_PROP_SYMBOLS = ["USDCHF", "XAUUSD", "US30", "SPX500"];
 let initialScanCompleted = false;
 const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
   research: "Резервна стратегія",
@@ -168,6 +199,128 @@ const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
 };
 
 const SIGNAL_PROFILES: SymbolConfig[] = [
+  {
+    profileId: "approved_prop_usdchf_breakout_1h",
+    symbol: "USDCHF",
+    yahooSymbol: "USDCHF=X",
+    dukascopyCode: "USD-CHF",
+    dataProvider: "dukascopy_jetta",
+    timeframe: "1h",
+    kind: "approved_prop",
+    strategyName: "PropTrade Approved Portfolio · USDCHF Breakout",
+    strategyCategory: "proptrade",
+    strategyVersion: "approved.2026.dukascopy.usdchf-1h-breakout80-ema100-short-atr0_75-2_5r.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2.5,
+    maxHoldBars: 24,
+    directionMode: "short_only",
+    portfolioId: "approved_cross_asset_prop_portfolio_2026",
+    riskPct: 0.5,
+    approvedProp: {
+      kind: "htf_breakout",
+      timeframeHours: 1,
+      lookback: 80,
+      atrPeriod: 14,
+      emaPeriod: 100,
+      stopAtr: 0.75,
+      rewardR: 2.5,
+      maxHoldBars: 24,
+      direction: "short",
+    },
+  },
+  {
+    profileId: "approved_prop_xauusd_orb_1h",
+    symbol: "XAUUSD",
+    yahooSymbol: "GC=F",
+    dukascopyCode: "XAU-USD",
+    dataProvider: "dukascopy_jetta",
+    timeframe: "1h",
+    kind: "approved_prop",
+    strategyName: "PropTrade Approved Portfolio · XAUUSD Opening Range",
+    strategyCategory: "proptrade",
+    strategyVersion: "approved.2026.dukascopy.xauusd-orb1-short-atr0_75-2_5r.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2.5,
+    directionMode: "short_only",
+    portfolioId: "approved_cross_asset_prop_portfolio_2026",
+    riskPct: 0.5,
+    approvedProp: {
+      kind: "opening_range_breakout",
+      timeframeHours: 1,
+      openingBars: 1,
+      atrPeriod: 14,
+      emaPeriod: 100,
+      stopAtr: 0.75,
+      rewardR: 2.5,
+      minRangeAtr: 0.15,
+      maxRangeAtr: 2.5,
+      maxRiskAtr: 1.5,
+      direction: "short",
+    },
+  },
+  {
+    profileId: "approved_prop_us30_orb_1h",
+    symbol: "US30",
+    yahooSymbol: "YM=F",
+    dukascopyCode: "USA30.IDX-USD",
+    dataProvider: "dukascopy_jetta",
+    timeframe: "1h",
+    kind: "approved_prop",
+    strategyName: "PropTrade Approved Portfolio · US30 Opening Range",
+    strategyCategory: "proptrade",
+    strategyVersion: "approved.2026.dukascopy.us30-orb1-long-atr0_75-2r.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2,
+    directionMode: "long_only",
+    portfolioId: "approved_cross_asset_prop_portfolio_2026",
+    riskPct: 0.5,
+    approvedProp: {
+      kind: "opening_range_breakout",
+      timeframeHours: 1,
+      openingBars: 1,
+      atrPeriod: 14,
+      emaPeriod: 100,
+      stopAtr: 0.75,
+      rewardR: 2,
+      minRangeAtr: 0.3,
+      maxRangeAtr: 1.5,
+      maxRiskAtr: 1.5,
+      direction: "long",
+    },
+  },
+  {
+    profileId: "approved_prop_spx500_breakout_4h",
+    symbol: "SPX500",
+    yahooSymbol: "ES=F",
+    dukascopyCode: "USA500.IDX-USD",
+    dataProvider: "dukascopy_jetta",
+    timeframe: "4h",
+    kind: "approved_prop",
+    strategyName: "PropTrade Approved Portfolio · SPX500 Breakout",
+    strategyCategory: "proptrade",
+    strategyVersion: "approved.2026.dukascopy.spx500-4h-breakout40-ema100-long-atr0_75-2_5r.1",
+    atrPeriod: 14,
+    atrMultiplier: 0.75,
+    rewardR: 2.5,
+    maxHoldBars: 12,
+    directionMode: "long_only",
+    portfolioId: "approved_cross_asset_prop_portfolio_2026",
+    riskPct: 0.5,
+    approvedProp: {
+      kind: "htf_breakout",
+      timeframeHours: 4,
+      lookback: 40,
+      atrPeriod: 14,
+      emaPeriod: 100,
+      stopAtr: 0.75,
+      rewardR: 2.5,
+      maxHoldBars: 12,
+      direction: "long",
+    },
+  },
   {
     profileId: "q2_prop_ger40_opening_drive_30m",
     symbol: "GER40",
@@ -781,14 +934,14 @@ function yahooInterval(timeframe: SignalTimeframe) {
 
 function pipSize(symbol: string) {
   if (symbol.includes("JPY")) return 0.01;
-  if (symbol === "GER40") return 1;
+  if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500") return 1;
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return 0.1;
   return 0.0001;
 }
 
 function formatPrice(symbol: string, value: number | null) {
   if (value == null || !Number.isFinite(value)) return "dynamic";
-  if (symbol === "GER40") return value.toFixed(1);
+  if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500") return value.toFixed(1);
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return value.toFixed(2);
   return value.toFixed(symbol.includes("JPY") ? 3 : 5);
 }
@@ -1029,6 +1182,21 @@ async function fetchYahooKlines(config: SymbolConfig) {
   throw lastError ?? new Error(`Yahoo chart fetch failed for ${config.symbol}`);
 }
 
+async function fetchMarketRows(config: SymbolConfig): Promise<MarketRows> {
+  if (config.dataProvider === "dukascopy_jetta") {
+    if (!config.dukascopyCode || !config.approvedProp) {
+      throw new Error("Dukascopy profile is missing instrument code or approved strategy config");
+    }
+    return fetchDukascopyJettaBidAsk({
+      code: config.dukascopyCode,
+      timeframeHours: config.approvedProp.timeframeHours,
+      lookbackDays: 45,
+    });
+  }
+  const rows = await fetchYahooKlines(config);
+  return { bid: rows, ask: rows };
+}
+
 function selectSignalAndEntryBars(rows: Kline[], timeframe: SignalTimeframe) {
   const now = Date.now();
   const barMs = timeframeMs(timeframe);
@@ -1243,11 +1411,47 @@ function detectQ2PropSignal(config: SymbolConfig, rows: Kline[]) {
   } satisfies Signal;
 }
 
-function detectSignal(config: SymbolConfig, rows: Kline[]) {
-  if (config.kind === "donchian") return detectDonchianSignal(config, rows);
-  if (config.kind === "htf_breakout") return detectHtfBreakoutSignal(config, rows);
-  if (config.q2Prop) return detectQ2PropSignal(config, rows);
-  return detectBbAtrSignal(config, rows);
+function detectApprovedPropSignal(config: SymbolConfig, rows: MarketRows) {
+  if (!config.approvedProp) return null;
+  const setup = detectLatestApprovedPropSignal(
+    config.approvedProp,
+    rows.bid,
+    rows.ask
+  );
+  if (!setup) return null;
+  return {
+    key: signalKey(config, setup.direction, setup.signalTime),
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
+    strategyVersion: config.strategyVersion,
+    direction: setup.direction,
+    signalTime: setup.signalTime,
+    entryTime: setup.entryTime,
+    entryPrice: setup.entryPrice,
+    stopLoss: setup.stopLoss,
+    takeProfit: setup.takeProfit,
+    exitRule:
+      config.approvedProp.kind === "opening_range_breakout"
+        ? `Fixed TP ${config.approvedProp.rewardR}R, exit at UTC session end`
+        : `Fixed TP ${config.approvedProp.rewardR}R, time stop ${config.approvedProp.maxHoldBars} bars`,
+    riskDistance: setup.riskDistance,
+    riskDistancePips: setup.riskDistance / pipSize(config.symbol),
+    source: `Dukascopy ${config.dukascopyCode} BID/ASK ${config.timeframe.toUpperCase()}`,
+    reason: setup.reason,
+    portfolioId: config.portfolioId,
+    riskPct: config.riskPct,
+    exitAtTime: setup.exitAtTime,
+  } satisfies Signal;
+}
+
+function detectSignal(config: SymbolConfig, rows: MarketRows) {
+  if (config.approvedProp) return detectApprovedPropSignal(config, rows);
+  const bidRows = rows.bid;
+  if (config.kind === "donchian") return detectDonchianSignal(config, bidRows);
+  if (config.kind === "htf_breakout") return detectHtfBreakoutSignal(config, bidRows);
+  if (config.q2Prop) return detectQ2PropSignal(config, bidRows);
+  return detectBbAtrSignal(config, bidRows);
 }
 
 function signalMessage(signal: Signal) {
@@ -1301,6 +1505,7 @@ function openPositionFromSignal(
     portfolioId: signal.portfolioId,
     riskPct: signal.riskPct,
     signalMessageId,
+    exitAtTime: signal.exitAtTime,
   };
 }
 
@@ -1496,7 +1701,30 @@ function detectQ2PositionExit(
   return null;
 }
 
-function detectPositionExit(config: SymbolConfig, position: OpenPositionState, rows: Kline[]) {
+function detectApprovedPositionExit(
+  config: SymbolConfig,
+  position: OpenPositionState,
+  market: MarketRows
+): PositionExit | null {
+  if (!config.approvedProp || position.takeProfit == null) return null;
+  return detectApprovedPropPositionExit(
+    {
+      direction: position.direction,
+      entryTime: position.entryTime,
+      stopLoss: position.stopLoss,
+      takeProfit: position.takeProfit,
+      exitAtTime: position.exitAtTime,
+      maxHoldBars: position.maxHoldBars,
+      timeframeHours: config.approvedProp.timeframeHours,
+    },
+    market.bid,
+    market.ask
+  );
+}
+
+function detectPositionExit(config: SymbolConfig, position: OpenPositionState, market: MarketRows) {
+  if (config.approvedProp) return detectApprovedPositionExit(config, position, market);
+  const rows = market.bid;
   if (config.q2Prop) return detectQ2PositionExit(position, rows);
   const fixedTargetExit = detectFixedTargetExit(position, rows);
   if (fixedTargetExit) return fixedTargetExit;
@@ -1558,12 +1786,24 @@ async function sendTelegram(message: string, replyToMessageId?: number) {
 
 function configuredSymbols() {
   const raw =
-    process.env.SIGNAL_SYMBOLS ?? "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,DOGEUSDT";
+    process.env.SIGNAL_SYMBOLS ??
+    "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,US30,SPX500,DOGEUSDT";
   const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
-  return raw
+  const configured = raw
     .split(",")
     .map((item) => item.trim().toUpperCase())
     .filter((symbol, index, symbols) => supportedSymbols.has(symbol) && symbols.indexOf(symbol) === index);
+  if (approvedPortfolioEnabled()) {
+    for (const symbol of APPROVED_PROP_SYMBOLS) {
+      if (!configured.includes(symbol)) configured.push(symbol);
+    }
+  }
+  return configured;
+}
+
+function approvedPortfolioEnabled() {
+  const value = process.env.SIGNAL_ENABLE_APPROVED_PROP_PORTFOLIO;
+  return value !== "0" && value !== "false";
 }
 
 function profilesForSymbol(symbol: string) {
@@ -1574,7 +1814,9 @@ function profilesForSymbol(symbol: string) {
   return SIGNAL_PROFILES.filter(
     (profile) =>
       profile.symbol === symbol &&
-      (!allowedIds || allowedIds.has(profile.profileId))
+      (!allowedIds ||
+        allowedIds.has(profile.profileId) ||
+        (approvedPortfolioEnabled() && APPROVED_PROP_PROFILE_IDS.has(profile.profileId)))
   );
 }
 
@@ -1599,14 +1841,6 @@ function portfolioEntryBlockReason(
   state: MonitorState
 ) {
   if (!config.portfolioId || !config.riskPct) return null;
-  if (
-    state.openPositions.some(
-      (position) => position.profileId === config.profileId
-    )
-  ) {
-    return "profile already has an open position";
-  }
-
   const entryDay = utcDayStart(signal.entryTime);
   const realizedPct = state.closedTrades
     .filter(
@@ -1619,17 +1853,19 @@ function portfolioEntryBlockReason(
         sum + (trade.realizedR ?? 0) * (trade.riskPct ?? config.riskPct ?? 0),
       0
     );
-  if (realizedPct <= PROP_DAILY_STOP_PCT) {
-    return `daily stop reached (${realizedPct.toFixed(2)}%)`;
-  }
-
   const openRiskPct = state.openPositions
     .filter((position) => position.portfolioId === config.portfolioId)
     .reduce((sum, position) => sum + (position.riskPct ?? 0), 0);
-  if (openRiskPct + config.riskPct > PROP_MAX_CONCURRENT_RISK_PCT + 1e-9) {
-    return `concurrent risk cap reached (${openRiskPct.toFixed(2)}% open)`;
-  }
-  return null;
+  return propPortfolioEntryBlockReason({
+    profileAlreadyOpen: state.openPositions.some(
+      (position) => position.profileId === config.profileId
+    ),
+    realizedPct,
+    openRiskPct,
+    newRiskPct: config.riskPct,
+    dailyStopPct: PROP_DAILY_STOP_PCT,
+    maxConcurrentRiskPct: PROP_MAX_CONCURRENT_RISK_PCT,
+  });
 }
 
 function mainMenuKeyboard(): TelegramInlineButton[][] {
@@ -1867,7 +2103,7 @@ async function scanOnce({ forceTest = false } = {}) {
     return;
   }
 
-  const rowsCache = new Map<string, Kline[]>();
+  const rowsCache = new Map<string, MarketRows>();
 
   for (const symbol of symbols) {
     const profiles = profilesForSymbol(symbol);
@@ -1878,19 +2114,23 @@ async function scanOnce({ forceTest = false } = {}) {
 
     for (const config of profiles) {
       const label = profileLabel(config);
-      const cacheKey = [config.yahooSymbol, config.timeframe].join("|");
+      const cacheKey = [
+        config.dataProvider ?? "yahoo",
+        config.dukascopyCode ?? config.yahooSymbol,
+        config.timeframe,
+      ].join("|");
       try {
-        let rows = rowsCache.get(cacheKey);
-        if (!rows) {
-          rows = await fetchYahooKlines(config);
-          rowsCache.set(cacheKey, rows);
+        let market = rowsCache.get(cacheKey);
+        if (!market) {
+          market = await fetchMarketRows(config);
+          rowsCache.set(cacheKey, market);
         }
 
         const profileOpenPositions = state.openPositions.filter(
           (position) => position.profileId === config.profileId
         );
         for (const position of profileOpenPositions) {
-          const exit = detectPositionExit(config, position, rows);
+          const exit = detectPositionExit(config, position, market);
           if (!exit) continue;
 
           const exitKey = `exit|${position.key}|${exit.exitTime}`;
@@ -1926,7 +2166,7 @@ async function scanOnce({ forceTest = false } = {}) {
           saveState(state);
         }
 
-        const signal = detectSignal(config, rows);
+        const signal = detectSignal(config, market);
         if (!signal) {
           console.log(`${iso(Date.now())} ${label}: no signal`);
           continue;

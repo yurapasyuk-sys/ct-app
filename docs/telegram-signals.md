@@ -42,6 +42,31 @@ SIGNAL_PROFILE_IDS=q2_prop_ger40_opening_drive_30m,q2_prop_ger40_session_stretch
 If `SIGNAL_PROFILE_IDS` is omitted, the new profiles are added alongside the
 existing signal strategies.
 
+## Approved Cross-Asset PropTrade Portfolio
+
+The `Проптрейд` category also contains the broker-confirmed portfolio validated
+on Dukascopy BID/ASK data:
+
+- USDCHF 1H bearish 80-bar breakout, EMA100, 0.75 ATR stop, 2.5R target.
+- XAUUSD 1H bearish opening-range breakout, 0.75 ATR stop, 2.5R target.
+- US30 1H bullish opening-range breakout, 0.75 ATR stop, 2R target.
+- SPX500 4H bullish 40-bar breakout, EMA100, 0.75 ATR stop, 2.5R target.
+
+Each module risks 0.5%, with a shared 2% simultaneous-risk cap and -3% realized
+daily stop. These profiles use Dukascopy Jetta BID/ASK candles in the live
+monitor, matching the control backtest source.
+
+To run only this approved portfolio:
+
+```env
+SIGNAL_SYMBOLS=USDCHF,XAUUSD,US30,SPX500
+SIGNAL_PROFILE_IDS=approved_prop_usdchf_breakout_1h,approved_prop_xauusd_orb_1h,approved_prop_us30_orb_1h,approved_prop_spx500_breakout_4h
+```
+
+This approved portfolio is enabled by default and is added atomically even when
+an older `SIGNAL_SYMBOLS` or `SIGNAL_PROFILE_IDS` list exists on Railway. Set
+`SIGNAL_ENABLE_APPROVED_PROP_PORTFOLIO=false` only when it must be paused.
+
 ## Q2 Prop Portfolio 2026
 
 The monitor contains the five fixed modules approved by the Q2 2026 holdout:
