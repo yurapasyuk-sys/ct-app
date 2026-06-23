@@ -14,6 +14,7 @@ import {
 } from "../src/lib/data-handlers/approved-prop-portfolio-strategy";
 import { fetchDukascopyJettaBidAsk } from "../src/lib/data-handlers/dukascopy-jetta";
 import {
+  aggregateSignalStatistics,
   exitAlertSuppressionReason,
   propPortfolioEntryBlockReason,
 } from "../src/lib/data-handlers/signal-monitor-policy";
@@ -1900,6 +1901,56 @@ function strategyMenuKeyboard(category: StrategyCategory): TelegramInlineButton[
   ];
 }
 
+function formatStatistic(value: number | null, digits = 2) {
+  if (value == null) return "—";
+  if (!Number.isFinite(value)) return "∞";
+  return value.toFixed(digits);
+}
+
+function categoryStatistics(category: StrategyCategory) {
+  const state = loadState();
+  const profiles = configuredProfiles().filter(
+    (profile) => profile.strategyCategory === category
+  );
+  const profileIds = new Set(profiles.map((profile) => profile.profileId));
+  const trades = state.closedTrades.filter((trade) => profileIds.has(trade.profileId));
+  const openPositions = state.openPositions.filter((position) =>
+    profileIds.has(position.profileId)
+  ).length;
+  const statistics = aggregateSignalStatistics(trades);
+  const winRate =
+    statistics.winRatePct == null ? "—" : `${statistics.winRatePct.toFixed(1)}%`;
+  const modelResult =
+    statistics.tradesWithRisk > 0
+      ? `${statistics.totalModelPct >= 0 ? "+" : ""}${statistics.totalModelPct.toFixed(2)}%`
+      : "—";
+  const totalR =
+    statistics.tradesWithResult > 0
+      ? `${statistics.totalR >= 0 ? "+" : ""}${statistics.totalR.toFixed(2)}R`
+      : "—";
+  const averageR =
+    statistics.averageR == null ? "—" : `${statistics.averageR.toFixed(2)}R`;
+
+  return [
+    `<b>СТАТИСТИКА КАТЕГОРІЇ: ${htmlEscape(strategyCategoryLabel(category))}</b>`,
+    `Стратегій у категорії: <b>${profiles.length}</b>`,
+    "",
+    `Закрито позицій: <b>${statistics.trades}</b>`,
+    `✅ Успішні: <b>${statistics.wins}</b>`,
+    `❌ Stop Loss: <b>${statistics.stopLosses}</b>`,
+    `➖ Break-even: <b>${statistics.breakEvens}</b>`,
+    `Успішність без BE: <b>${winRate}</b>`,
+    `Відкриті зараз: <b>${openPositions}</b>`,
+    "",
+    `Сумарний результат: <b>${totalR}</b>`,
+    `Модельний результат за ризиком: <b>${modelResult}</b>`,
+    `Середній результат: <b>${averageR}</b>`,
+    `Profit Factor: <b>${formatStatistic(statistics.profitFactor)}</b>`,
+    "",
+    "Оберіть стратегію для детальної статистики:",
+  ].join("\n");
+}
+
 function strategyStatistics(profile: SymbolConfig) {
   const state = loadState();
   const trades = state.closedTrades.filter((trade) => trade.profileId === profile.profileId);
@@ -1986,7 +2037,7 @@ async function handleTelegramCallback(callback: TelegramCallbackQuery) {
     await editTelegramMenu(
       message.chat.id,
       message.message_id,
-      `<b>${htmlEscape(strategyCategoryLabel(category))}</b>\nОберіть стратегію:`,
+      categoryStatistics(category),
       strategyMenuKeyboard(category)
     );
   } else if (callback.data.startsWith("stats:profile:")) {

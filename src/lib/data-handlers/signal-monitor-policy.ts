@@ -43,3 +43,49 @@ export function propPortfolioEntryBlockReason({
   }
   return null;
 }
+
+export function aggregateSignalStatistics(
+  trades: Array<{
+    outcome: "win" | "stop_loss" | "break_even";
+    realizedR?: number;
+    riskPct?: number;
+  }>
+) {
+  const wins = trades.filter((trade) => trade.outcome === "win").length;
+  const stopLosses = trades.filter((trade) => trade.outcome === "stop_loss").length;
+  const breakEvens = trades.filter((trade) => trade.outcome === "break_even").length;
+  const decisiveTrades = wins + stopLosses;
+  const tradesWithResult = trades.filter(
+    (trade) => trade.realizedR != null && Number.isFinite(trade.realizedR)
+  );
+  const totalR = tradesWithResult.reduce((sum, trade) => sum + (trade.realizedR ?? 0), 0);
+  const grossProfitR = tradesWithResult.reduce(
+    (sum, trade) => sum + Math.max(0, trade.realizedR ?? 0),
+    0
+  );
+  const grossLossR = tradesWithResult.reduce(
+    (sum, trade) => sum + Math.max(0, -(trade.realizedR ?? 0)),
+    0
+  );
+  const totalModelPct = tradesWithResult.reduce(
+    (sum, trade) => sum + (trade.realizedR ?? 0) * (trade.riskPct ?? 0),
+    0
+  );
+  const tradesWithRisk = tradesWithResult.filter(
+    (trade) => trade.riskPct != null && Number.isFinite(trade.riskPct)
+  ).length;
+  return {
+    trades: trades.length,
+    wins,
+    stopLosses,
+    breakEvens,
+    winRatePct: decisiveTrades > 0 ? (wins / decisiveTrades) * 100 : null,
+    totalR,
+    averageR: tradesWithResult.length ? totalR / tradesWithResult.length : null,
+    profitFactor:
+      grossLossR > 0 ? grossProfitR / grossLossR : grossProfitR > 0 ? Infinity : null,
+    totalModelPct,
+    tradesWithResult: tradesWithResult.length,
+    tradesWithRisk,
+  };
+}

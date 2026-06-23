@@ -9,7 +9,10 @@ import {
   aggregateJettaHours,
   decodeJettaCandles,
 } from "../src/lib/data-handlers/dukascopy-jetta";
-import { propPortfolioEntryBlockReason } from "../src/lib/data-handlers/signal-monitor-policy";
+import {
+  aggregateSignalStatistics,
+  propPortfolioEntryBlockReason,
+} from "../src/lib/data-handlers/signal-monitor-policy";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -172,9 +175,28 @@ function testPortfolioRiskRules() {
   );
 }
 
+function testCategoryStatisticsAggregation() {
+  const statistics = aggregateSignalStatistics([
+    { outcome: "win", realizedR: 2, riskPct: 0.5 },
+    { outcome: "stop_loss", realizedR: -1, riskPct: 0.5 },
+    { outcome: "break_even", realizedR: 0, riskPct: 0.5 },
+  ]);
+  assert.equal(statistics.trades, 3);
+  assert.equal(statistics.wins, 1);
+  assert.equal(statistics.stopLosses, 1);
+  assert.equal(statistics.breakEvens, 1);
+  assert.equal(statistics.winRatePct, 50);
+  assert.equal(statistics.totalR, 1);
+  assert.equal(statistics.totalModelPct, 0.5);
+  assert.equal(statistics.averageR, 1 / 3);
+  assert.equal(statistics.profitFactor, 2);
+  assert.equal(statistics.tradesWithRisk, 3);
+}
+
 testShortBreakoutUsesBidEntry();
 testOpeningRangeLongUsesAskAndSessionExit();
 testJettaDecodeAndAggregation();
 testShortExitUsesAskAndStopWinsTie();
 testPortfolioRiskRules();
+testCategoryStatisticsAggregation();
 console.log("Approved PropTrade portfolio signal tests passed.");
