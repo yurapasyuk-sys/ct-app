@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { lookup } from "node:dns";
 import { get as httpsGet } from "node:https";
 import type { Kline } from "../src/lib/binance";
+import { fetchKlinesMultiBatch } from "../src/lib/binance";
 import {
   detectLatestQ2PropSignal,
   type Q2PropStrategyConfig,
@@ -24,6 +25,7 @@ type StrategyKind =
   | "donchian"
   | "bb_atr"
   | "htf_breakout"
+  | "range_expansion_breakout"
   | "approved_prop"
   | Q2PropStrategyKind;
 type SignalTimeframe = "30m" | "1h" | "4h";
@@ -155,10 +157,14 @@ interface SymbolConfig {
   bandDeviation?: number;
   atrPeriod: number;
   atrMultiplier: number;
+  rangeAtrMultiplier?: number;
+  closeLocationMin?: number;
   rewardR?: number;
   maxHoldBars?: number;
   directionMode: "all" | "long_only" | "short_only";
   emaPeriod?: number;
+  emaFastPeriod?: number;
+  emaSlowPeriod?: number;
   emaFilter?: "none" | "trend" | "countertrend";
   exitTarget?: "mean" | "opposite_band";
   includePrePost?: boolean;
@@ -166,7 +172,7 @@ interface SymbolConfig {
   riskPct?: number;
   q2Prop?: Q2PropStrategyConfig;
   approvedProp?: ApprovedPropStrategyConfig;
-  dataProvider?: "yahoo" | "dukascopy_jetta";
+  dataProvider?: "yahoo" | "dukascopy_jetta" | "okx_swap";
   dukascopyCode?: string;
 }
 
@@ -740,6 +746,27 @@ const SIGNAL_PROFILES: SymbolConfig[] = [
     emaFilter: "none",
     exitTarget: "mean",
   },
+  {
+    profileId: "crypto_pepe_range_expansion_breakout_2026",
+    symbol: "PEPEUSDT",
+    yahooSymbol: "PEPEUSDT",
+    dataProvider: "okx_swap",
+    timeframe: "1h",
+    kind: "range_expansion_breakout",
+    strategyName: "Crypto PEPE Range Expansion Breakout 2026",
+    strategyCategory: "crypto",
+    strategyVersion: "research.2026-ytd.pepeusdt-1h-range-expansion-ch20-ema34-144-atr0_7-3r-hold8-long.1",
+    lookback: 20,
+    atrPeriod: 14,
+    atrMultiplier: 0.7,
+    rangeAtrMultiplier: 1.1,
+    closeLocationMin: 0.7,
+    rewardR: 3,
+    maxHoldBars: 8,
+    directionMode: "long_only",
+    emaFastPeriod: 34,
+    emaSlowPeriod: 144,
+  },
 ];
 
 function loadEnvFile(path: string) {
@@ -934,6 +961,7 @@ function yahooInterval(timeframe: SignalTimeframe) {
 }
 
 function pipSize(symbol: string) {
+  if (symbol.endsWith("USDT")) return 0.000001;
   if (symbol.includes("JPY")) return 0.01;
   if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500") return 1;
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return 0.1;
@@ -942,6 +970,11 @@ function pipSize(symbol: string) {
 
 function formatPrice(symbol: string, value: number | null) {
   if (value == null || !Number.isFinite(value)) return "dynamic";
+  if (symbol.endsWith("USDT")) {
+    if (value < 0.01) return value.toFixed(8);
+    if (value < 1) return value.toFixed(6);
+    return value.toFixed(4);
+  }
   if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500") return value.toFixed(1);
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return value.toFixed(2);
   return value.toFixed(symbol.includes("JPY") ? 3 : 5);
@@ -1007,6 +1040,11 @@ function lowest(rows: Kline[], start: number, end: number) {
   let value = Infinity;
   for (let index = start; index < end; index += 1) value = Math.min(value, rows[index].low);
   return value;
+}
+
+function closeLocation(row: Kline) {
+  const range = row.high - row.low;
+  return range > 0 ? (row.close - row.low) / range : 0.5;
 }
 
 function directionAllowed(config: SymbolConfig, direction: Direction) {
@@ -1194,6 +1232,26 @@ async function fetchMarketRows(config: SymbolConfig): Promise<MarketRows> {
       lookbackDays: 45,
     });
   }
+  if (config.dataProvider === "okx_swap") {
+    const warmupBars = Math.max(
+      config.lookback ?? 0,
+      config.emaFastPeriod ?? 0,
+      config.emaSlowPeriod ?? 0,
+      config.atrPeriod,
+      220
+    );
+    const rows = await fetchKlinesMultiBatch(
+      {
+        symbol: config.symbol,
+        interval: config.timeframe === "4h" ? "4h" : "1h",
+        endTime: Date.now() + 5 * 60 * 1000,
+        limit: 300,
+        dataSource: "okx-swap",
+      },
+      warmupBars + 72
+    );
+    return { bid: rows, ask: rows };
+  }
   const rows = await fetchYahooKlines(config);
   return { bid: rows, ask: rows };
 }
@@ -1210,6 +1268,16 @@ function selectSignalAndEntryBars(rows: Kline[], timeframe: SignalTimeframe) {
     return { signalIndex, entryIndex: signalIndex + 1 };
   }
   return null;
+}
+
+function selectLatestClosedSignalBar(rows: Kline[], timeframe: SignalTimeframe) {
+  const now = Date.now();
+  const barMs = timeframeMs(timeframe);
+  const closedRows = rows.filter((row) => row.openTime + barMs <= now - 30_000);
+  const signal = closedRows[closedRows.length - 1];
+  if (!signal) return null;
+  const signalIndex = rows.findIndex((row) => row.openTime === signal.openTime);
+  return signalIndex >= 0 ? { signalIndex } : null;
 }
 
 function canonicalEntryTime(signalTime: number, timeframe: SignalTimeframe) {
@@ -1383,6 +1451,76 @@ function detectHtfBreakoutSignal(config: SymbolConfig, rows: Kline[]) {
   } satisfies Signal;
 }
 
+function detectRangeExpansionBreakoutSignal(config: SymbolConfig, rows: Kline[]) {
+  const selected = selectLatestClosedSignalBar(rows, config.timeframe);
+  if (!selected) return null;
+  const { signalIndex } = selected;
+  const lookback = config.lookback ?? 20;
+  const rewardR = config.rewardR ?? 3;
+  const fastPeriod = config.emaFastPeriod ?? 34;
+  const slowPeriod = config.emaSlowPeriod ?? 144;
+  const minRangeAtr = config.rangeAtrMultiplier ?? 1.1;
+  const minCloseLocation = config.closeLocationMin ?? 0.7;
+  if (signalIndex - lookback < 0) return null;
+
+  const signal = rows[signalIndex];
+  const next = rows[signalIndex + 1];
+  const channelHigh = highest(rows, signalIndex - lookback, signalIndex);
+  const channelLow = lowest(rows, signalIndex - lookback, signalIndex);
+  const atr = atrAt(rows, signalIndex, config.atrPeriod);
+  const emaFast = emaAt(rows, signalIndex, fastPeriod);
+  const emaSlow = emaAt(rows, signalIndex, slowPeriod);
+  if (atr == null || atr <= 0 || emaFast == null || emaSlow == null) return null;
+
+  const location = closeLocation(signal);
+  const candleRange = signal.high - signal.low;
+  const direction: Direction | null =
+    signal.close > channelHigh &&
+    signal.close > signal.open &&
+    location >= minCloseLocation &&
+    candleRange >= atr * minRangeAtr &&
+    emaFast > emaSlow
+      ? "long"
+      : signal.close < channelLow &&
+          signal.close < signal.open &&
+          location <= 1 - minCloseLocation &&
+          candleRange >= atr * minRangeAtr &&
+          emaFast < emaSlow
+        ? "short"
+        : null;
+  if (!direction || !directionAllowed(config, direction)) return null;
+
+  const entryPrice = next?.open ?? signal.close;
+  const riskDistance = atr * config.atrMultiplier;
+  if (riskDistance <= 0) return null;
+
+  const stopLoss = direction === "long" ? entryPrice - riskDistance : entryPrice + riskDistance;
+  const takeProfit = direction === "long" ? entryPrice + rewardR * riskDistance : entryPrice - rewardR * riskDistance;
+  const key = signalKey(config, direction, signal.openTime);
+
+  return {
+    key,
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
+    strategyVersion: config.strategyVersion,
+    direction,
+    signalTime: signal.openTime,
+    entryTime: canonicalEntryTime(signal.openTime, config.timeframe),
+    entryPrice,
+    stopLoss,
+    takeProfit,
+    exitRule: `Fixed TP ${rewardR}R, time stop ${config.maxHoldBars ?? 8} bars`,
+    riskDistance,
+    riskDistancePips: riskDistance / pipSize(config.symbol),
+    source: `OKX ${config.symbol.replace("USDT", "-USDT-SWAP")} ${config.timeframe.toUpperCase()}`,
+    reason:
+      direction === "long"
+        ? `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} broke above ${lookback}-bar high ${formatPrice(config.symbol, channelHigh)}; EMA${fastPeriod} ${formatPrice(config.symbol, emaFast)} > EMA${slowPeriod} ${formatPrice(config.symbol, emaSlow)}; range ${(candleRange / atr).toFixed(2)} ATR; close location ${(location * 100).toFixed(1)}%`
+        : `${config.timeframe.toUpperCase()} close ${formatPrice(config.symbol, signal.close)} broke below ${lookback}-bar low ${formatPrice(config.symbol, channelLow)}; EMA${fastPeriod} ${formatPrice(config.symbol, emaFast)} < EMA${slowPeriod} ${formatPrice(config.symbol, emaSlow)}; range ${(candleRange / atr).toFixed(2)} ATR; close location ${(location * 100).toFixed(1)}%`,
+  } satisfies Signal;
+}
+
 function detectQ2PropSignal(config: SymbolConfig, rows: Kline[]) {
   if (!config.q2Prop) return null;
   const setup = detectLatestQ2PropSignal(config.q2Prop, rows);
@@ -1451,6 +1589,7 @@ function detectSignal(config: SymbolConfig, rows: MarketRows) {
   const bidRows = rows.bid;
   if (config.kind === "donchian") return detectDonchianSignal(config, bidRows);
   if (config.kind === "htf_breakout") return detectHtfBreakoutSignal(config, bidRows);
+  if (config.kind === "range_expansion_breakout") return detectRangeExpansionBreakoutSignal(config, bidRows);
   if (config.q2Prop) return detectQ2PropSignal(config, bidRows);
   return detectBbAtrSignal(config, bidRows);
 }
@@ -1620,6 +1759,8 @@ function detectDonchianExit(
 
 function detectFixedTargetExit(position: OpenPositionState, rows: Kline[]): PositionExit | null {
   if (position.takeProfit == null) return null;
+  const barMs = timeframeMs(position.timeframe);
+  const now = Date.now();
 
   for (const row of rows) {
     if (row.openTime < position.entryTime) continue;
@@ -1647,6 +1788,19 @@ function detectFixedTargetExit(position: OpenPositionState, rows: Kline[]): Posi
         exitTime: Math.max(row.openTime, position.entryTime),
         exitPrice: position.takeProfit,
         result: "take_profit",
+      };
+    }
+
+    const heldBars = Math.floor((row.openTime - position.entryTime) / barMs);
+    if (
+      position.maxHoldBars &&
+      heldBars >= position.maxHoldBars &&
+      row.openTime + barMs <= now - 30_000
+    ) {
+      return {
+        exitTime: row.closeTime,
+        exitPrice: row.close,
+        result: "strategy_exit",
       };
     }
   }
@@ -1788,7 +1942,7 @@ async function sendTelegram(message: string, replyToMessageId?: number) {
 function configuredSymbols() {
   const raw =
     process.env.SIGNAL_SYMBOLS ??
-    "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,US30,SPX500,DOGEUSDT";
+    "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,US30,SPX500,DOGEUSDT,PEPEUSDT";
   const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
   const configured = raw
     .split(",")
