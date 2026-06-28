@@ -14,7 +14,8 @@
     "backtest:matrix": "tsx scripts/run_all_strategy_matrix.ts",
     "signals:once": "tsx scripts/live_signal_monitor.ts --once",
     "signals:monitor": "tsx scripts/live_signal_monitor.ts",
-    "signals:test-telegram": "tsx scripts/live_signal_monitor.ts --test-telegram"
+    "signals:test-telegram": "tsx scripts/live_signal_monitor.ts --test-telegram",
+    "test:prop-2026-session": "tsx scripts/prop_2026_session_momentum_signal_tests.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

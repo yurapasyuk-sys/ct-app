@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { lookup } from "node:dns";
 import { get as httpsGet } from "node:https";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Kline } from "../src/lib/binance";
 import { fetchKlinesMultiBatch } from "../src/lib/binance";
 import {
@@ -15,21 +17,27 @@ import {
 } from "../src/lib/data-handlers/approved-prop-portfolio-strategy";
 import { fetchDukascopyJettaBidAsk } from "../src/lib/data-handlers/dukascopy-jetta";
 import {
+  detectLatestProp2026SessionMomentumSignal,
+  detectProp2026SessionMomentumExit,
+  type Prop2026SessionMomentumConfig,
+} from "../src/lib/data-handlers/prop-2026-session-momentum-strategy";
+import {
   aggregateSignalStatistics,
   exitAlertSuppressionReason,
   propPortfolioEntryBlockReason,
 } from "../src/lib/data-handlers/signal-monitor-policy";
 
 type Direction = "long" | "short";
-type StrategyKind =
+export type StrategyKind =
   | "donchian"
   | "bb_atr"
   | "htf_breakout"
   | "range_expansion_breakout"
+  | "prop_2026_session_momentum"
   | "approved_prop"
   | Q2PropStrategyKind;
-type SignalTimeframe = "30m" | "1h" | "4h";
-type StrategyCategory =
+export type SignalTimeframe = "30m" | "1h" | "4h";
+export type StrategyCategory =
   | "research"
   | "asset_specific"
   | "universal"
@@ -141,7 +149,7 @@ interface TelegramUpdate {
   callback_query?: TelegramCallbackQuery;
 }
 
-interface SymbolConfig {
+export interface SymbolConfig {
   profileId: string;
   symbol: string;
   yahooSymbol: string;
@@ -172,6 +180,7 @@ interface SymbolConfig {
   riskPct?: number;
   q2Prop?: Q2PropStrategyConfig;
   approvedProp?: ApprovedPropStrategyConfig;
+  sessionMomentum2026?: Prop2026SessionMomentumConfig;
   dataProvider?: "yahoo" | "dukascopy_jetta" | "okx_swap";
   dukascopyCode?: string;
 }
@@ -205,7 +214,55 @@ const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
   crypto: "Криптостратегія",
 };
 
-const SIGNAL_PROFILES: SymbolConfig[] = [
+const PROP_2026_SESSION_MOMENTUM_CONFIG: Prop2026SessionMomentumConfig = {
+  signalHourUtc: 13,
+  momentumBars: 12,
+  atrPeriod: 14,
+  fastEmaPeriod: 20,
+  slowEmaPeriod: 100,
+  minMoveAtr: 0.5,
+  stopAtr: 0.75,
+  rewardR: 3,
+  maxHoldBars: 16,
+  maxGapAtr: 0.25,
+  maxSpreadR: 0.15,
+  fridayLastEntryHourUtc: 16,
+  fridayExitHourUtc: 20,
+};
+
+const PROP_2026_SESSION_MOMENTUM_PROFILES: SymbolConfig[] = [
+  ["EURUSD", "EURUSD=X", "EUR-USD"],
+  ["GBPUSD", "GBPUSD=X", "GBP-USD"],
+  ["USDJPY", "USDJPY=X", "USD-JPY"],
+  ["AUDUSD", "AUDUSD=X", "AUD-USD"],
+  ["USDCHF", "USDCHF=X", "USD-CHF"],
+  ["USDCAD", "USDCAD=X", "USD-CAD"],
+  ["US30", "YM=F", "USA30.IDX-USD"],
+  ["SPX500", "ES=F", "USA500.IDX-USD"],
+  ["NAS100", "NQ=F", "USATECH.IDX-USD"],
+].map(([symbol, yahooSymbol, dukascopyCode]) => ({
+  profileId: `prop_2026_session_momentum_${symbol.toLowerCase()}_1h`,
+  symbol,
+  yahooSymbol,
+  dukascopyCode,
+  dataProvider: "dukascopy_jetta",
+  timeframe: "1h",
+  kind: "prop_2026_session_momentum",
+  strategyName: `PropTrade 2026 Session Momentum · ${symbol}`,
+  strategyCategory: "proptrade",
+  strategyVersion: "research.2026-regime.session13-momentum12-ema20-100-min0_5-atr0_75-3r-hold16.1",
+  atrPeriod: 14,
+  atrMultiplier: 0.75,
+  rewardR: 3,
+  maxHoldBars: 16,
+  directionMode: "all",
+  portfolioId: "prop_2026_session_momentum_portfolio",
+  riskPct: 1,
+  sessionMomentum2026: PROP_2026_SESSION_MOMENTUM_CONFIG,
+}));
+
+export const SIGNAL_PROFILES: SymbolConfig[] = [
+  ...PROP_2026_SESSION_MOMENTUM_PROFILES,
   {
     profileId: "approved_prop_usdchf_breakout_1h",
     symbol: "USDCHF",
@@ -963,7 +1020,7 @@ function yahooInterval(timeframe: SignalTimeframe) {
 function pipSize(symbol: string) {
   if (symbol.endsWith("USDT")) return 0.000001;
   if (symbol.includes("JPY")) return 0.01;
-  if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500") return 1;
+  if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500" || symbol === "NAS100") return 1;
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return 0.1;
   return 0.0001;
 }
@@ -975,7 +1032,7 @@ function formatPrice(symbol: string, value: number | null) {
     if (value < 1) return value.toFixed(6);
     return value.toFixed(4);
   }
-  if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500") return value.toFixed(1);
+  if (symbol === "GER40" || symbol === "US30" || symbol === "SPX500" || symbol === "NAS100") return value.toFixed(1);
   if (symbol === "XAUUSD" || symbol === "XAGUSD") return value.toFixed(2);
   return value.toFixed(symbol.includes("JPY") ? 3 : 5);
 }
@@ -1223,12 +1280,13 @@ async function fetchYahooKlines(config: SymbolConfig) {
 
 async function fetchMarketRows(config: SymbolConfig): Promise<MarketRows> {
   if (config.dataProvider === "dukascopy_jetta") {
-    if (!config.dukascopyCode || !config.approvedProp) {
-      throw new Error("Dukascopy profile is missing instrument code or approved strategy config");
-    }
+    if (!config.dukascopyCode) throw new Error("Dukascopy profile is missing instrument code");
+    const timeframeHours = config.approvedProp?.timeframeHours ??
+      (config.sessionMomentum2026 ? 1 : null);
+    if (!timeframeHours) throw new Error("Dukascopy profile is missing a supported strategy config");
     return fetchDukascopyJettaBidAsk({
       code: config.dukascopyCode,
-      timeframeHours: config.approvedProp.timeframeHours,
+      timeframeHours,
       lookbackDays: 45,
     });
   }
@@ -1584,8 +1642,40 @@ function detectApprovedPropSignal(config: SymbolConfig, rows: MarketRows) {
   } satisfies Signal;
 }
 
+function detectProp2026SessionMomentumSignal(config: SymbolConfig, rows: MarketRows) {
+  if (!config.sessionMomentum2026) return null;
+  const setup = detectLatestProp2026SessionMomentumSignal(
+    config.sessionMomentum2026,
+    rows.bid,
+    rows.ask
+  );
+  if (!setup) return null;
+  return {
+    key: signalKey(config, setup.direction, setup.signalTime),
+    symbol: config.symbol,
+    strategyName: config.strategyName,
+    strategyCategory: config.strategyCategory,
+    strategyVersion: config.strategyVersion,
+    direction: setup.direction,
+    signalTime: setup.signalTime,
+    entryTime: setup.entryTime,
+    entryPrice: setup.entryPrice,
+    stopLoss: setup.stopLoss,
+    takeProfit: setup.takeProfit,
+    exitRule: `Fixed TP ${config.sessionMomentum2026.rewardR}R, time stop ${config.sessionMomentum2026.maxHoldBars} hours, Friday 20:00 UTC close`,
+    riskDistance: setup.riskDistance,
+    riskDistancePips: setup.riskDistance / pipSize(config.symbol),
+    source: `Dukascopy ${config.dukascopyCode} BID/ASK 1H`,
+    reason: setup.reason,
+    portfolioId: config.portfolioId,
+    riskPct: config.riskPct,
+    exitAtTime: setup.exitAtTime,
+  } satisfies Signal;
+}
+
 function detectSignal(config: SymbolConfig, rows: MarketRows) {
   if (config.approvedProp) return detectApprovedPropSignal(config, rows);
+  if (config.sessionMomentum2026) return detectProp2026SessionMomentumSignal(config, rows);
   const bidRows = rows.bid;
   if (config.kind === "donchian") return detectDonchianSignal(config, bidRows);
   if (config.kind === "htf_breakout") return detectHtfBreakoutSignal(config, bidRows);
@@ -1877,8 +1967,32 @@ function detectApprovedPositionExit(
   );
 }
 
+function detectProp2026SessionMomentumPositionExit(
+  config: SymbolConfig,
+  position: OpenPositionState,
+  market: MarketRows
+): PositionExit | null {
+  if (!config.sessionMomentum2026 || position.takeProfit == null) return null;
+  return detectProp2026SessionMomentumExit(
+    {
+      direction: position.direction,
+      entryTime: position.entryTime,
+      stopLoss: position.stopLoss,
+      takeProfit: position.takeProfit,
+      exitAtTime: position.exitAtTime,
+      maxHoldBars: config.sessionMomentum2026.maxHoldBars,
+      timeframeHours: 1,
+    },
+    market.bid,
+    market.ask
+  );
+}
+
 function detectPositionExit(config: SymbolConfig, position: OpenPositionState, market: MarketRows) {
   if (config.approvedProp) return detectApprovedPositionExit(config, position, market);
+  if (config.sessionMomentum2026) {
+    return detectProp2026SessionMomentumPositionExit(config, position, market);
+  }
   const rows = market.bid;
   if (config.q2Prop) return detectQ2PositionExit(position, rows);
   const fixedTargetExit = detectFixedTargetExit(position, rows);
@@ -1942,7 +2056,7 @@ async function sendTelegram(message: string, replyToMessageId?: number) {
 function configuredSymbols() {
   const raw =
     process.env.SIGNAL_SYMBOLS ??
-    "AUDUSD,EURUSD,GBPUSD,USDJPY,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,US30,SPX500,DOGEUSDT,PEPEUSDT";
+    "AUDUSD,EURUSD,GBPUSD,USDJPY,USDCAD,GER40,EURJPY,CHFJPY,GBPJPY,NZDUSD,USDCHF,XAUUSD,US30,SPX500,NAS100,DOGEUSDT,PEPEUSDT";
   const supportedSymbols = new Set(SIGNAL_PROFILES.map((profile) => profile.symbol));
   const configured = raw
     .split(",")
@@ -2011,6 +2125,25 @@ function portfolioEntryBlockReason(
   const openRiskPct = state.openPositions
     .filter((position) => position.portfolioId === config.portfolioId)
     .reduce((sum, position) => sum + (position.riskPct ?? 0), 0);
+  if (
+    config.sessionMomentum2026 &&
+    realizedPct - openRiskPct - config.riskPct <= -2
+  ) {
+    return `2026 session portfolio daily risk budget reached (${realizedPct.toFixed(2)}% realized, ${openRiskPct.toFixed(2)}% open)`;
+  }
+  if (config.sessionMomentum2026) {
+    let consecutiveLosses = 0;
+    const portfolioTrades = state.closedTrades
+      .filter((trade) => trade.portfolioId === config.portfolioId)
+      .sort((left, right) => right.exitTime - left.exitTime);
+    for (const trade of portfolioTrades) {
+      if (trade.outcome !== "stop_loss") break;
+      consecutiveLosses += 1;
+    }
+    if (consecutiveLosses >= 7) {
+      return `2026 session portfolio loss-streak guard reached (${consecutiveLosses})`;
+    }
+  }
   return propPortfolioEntryBlockReason({
     profileAlreadyOpen: state.openPositions.some(
       (position) => position.profileId === config.profileId
@@ -2473,7 +2606,13 @@ async function main() {
   await Promise.all([signalMonitorLoop(), telegramMenuLoop()]);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+const isDirectRun = process.argv[1]
+  ? fileURLToPath(import.meta.url) === resolve(process.argv[1])
+  : false;
+
+if (isDirectRun) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

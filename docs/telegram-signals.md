@@ -42,6 +42,28 @@ SIGNAL_PROFILE_IDS=q2_prop_ger40_opening_drive_30m,q2_prop_ger40_session_stretch
 If `SIGNAL_PROFILE_IDS` is omitted, the new profiles are added alongside the
 existing signal strategies.
 
+## PropTrade 2026 Session Momentum
+
+The 2026 regime portfolio uses Dukascopy BID/ASK 1H data for EURUSD, GBPUSD,
+USDJPY, AUDUSD, USDCHF, USDCAD, US30, SPX500, and NAS100. Every profile uses
+1% risk, while the shared portfolio guard caps simultaneous risk at 2%, uses a
+-2% daily entry-risk budget, and blocks the portfolio after seven consecutive
+closed losses pending review.
+
+If Railway defines `SIGNAL_SYMBOLS`, include all portfolio symbols:
+
+```env
+SIGNAL_SYMBOLS=EURUSD,GBPUSD,USDJPY,AUDUSD,USDCHF,USDCAD,US30,SPX500,NAS100
+```
+
+If Railway defines `SIGNAL_PROFILE_IDS`, include these profile IDs:
+
+```env
+SIGNAL_PROFILE_IDS=prop_2026_session_momentum_eurusd_1h,prop_2026_session_momentum_gbpusd_1h,prop_2026_session_momentum_usdjpy_1h,prop_2026_session_momentum_audusd_1h,prop_2026_session_momentum_usdchf_1h,prop_2026_session_momentum_usdcad_1h,prop_2026_session_momentum_us30_1h,prop_2026_session_momentum_spx500_1h,prop_2026_session_momentum_nas100_1h
+```
+
+No Dukascopy API key is required for the public Jetta candle feed.
+
 ## Approved Cross-Asset PropTrade Portfolio
 
 The `Проптрейд` category also contains the broker-confirmed portfolio validated
