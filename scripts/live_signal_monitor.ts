@@ -26,6 +26,11 @@ import {
   exitAlertSuppressionReason,
   propPortfolioEntryBlockReason,
 } from "../src/lib/data-handlers/signal-monitor-policy";
+import {
+  calculateForexPositionSize,
+  forexPairCurrencies,
+  type ForexPositionSizeResult,
+} from "../src/lib/trading/forex-position-size";
 
 type Direction = "long" | "short";
 export type StrategyKind =
@@ -212,6 +217,18 @@ const STRATEGY_CATEGORY_LABELS: Record<StrategyCategory, string> = {
   prop: "Пропстратегія",
   proptrade: "Проптрейд",
   crypto: "Криптостратегія",
+};
+const FX_QUOTE_TO_USD_PAIRS: Record<
+  string,
+  { symbol: string; mode: "direct" | "inverse" }
+> = {
+  AUD: { symbol: "AUDUSD", mode: "direct" },
+  CAD: { symbol: "USDCAD", mode: "inverse" },
+  CHF: { symbol: "USDCHF", mode: "inverse" },
+  EUR: { symbol: "EURUSD", mode: "direct" },
+  GBP: { symbol: "GBPUSD", mode: "direct" },
+  JPY: { symbol: "USDJPY", mode: "inverse" },
+  NZD: { symbol: "NZDUSD", mode: "direct" },
 };
 
 const PROP_2026_SESSION_MOMENTUM_CONFIG: Prop2026SessionMomentumConfig = {
@@ -1037,6 +1054,49 @@ function formatPrice(symbol: string, value: number | null) {
   return value.toFixed(symbol.includes("JPY") ? 3 : 5);
 }
 
+function positiveEnvNumber(name: string, fallback: number) {
+  const value = Number(process.env[name] ?? fallback);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function forexSizingConfig() {
+  return {
+    accountBalanceUsd: positiveEnvNumber("SIGNAL_ACCOUNT_BALANCE_USD", 5_000),
+    riskPercent: positiveEnvNumber("SIGNAL_RISK_PER_TRADE_PCT", 1),
+    contractSize: positiveEnvNumber("SIGNAL_FX_CONTRACT_SIZE", 100_000),
+    lotStep: positiveEnvNumber("SIGNAL_FX_LOT_STEP", 0.01),
+    minLot: positiveEnvNumber("SIGNAL_FX_MIN_LOT", 0.01),
+    maxLot: positiveEnvNumber("SIGNAL_FX_MAX_LOT", 100),
+  };
+}
+
+function lotDecimals(step: number) {
+  const text = step.toString().toLowerCase();
+  if (text.includes("e-")) return Number(text.split("e-")[1]);
+  return text.includes(".") ? text.split(".")[1].length : 0;
+}
+
+function positionSizeLines(signal: Signal, sizing?: ForexPositionSizeResult | null) {
+  if (!forexPairCurrencies(signal.symbol)) return [];
+  if (!sizing) {
+    return ["MT5 lot: <b>not calculated</b> (USD conversion rate unavailable)"];
+  }
+
+  const riskLine = `Manual risk: <b>$${sizing.riskAmountUsd.toFixed(2)}</b> (${sizing.riskPercent.toFixed(2)}% of $${sizing.accountBalanceUsd.toLocaleString("en-US")})`;
+  if (sizing.lotSize == null) {
+    return [
+      riskLine,
+      `MT5 lot: <b>below ${sizing.minLot.toFixed(lotDecimals(sizing.lotStep))}</b>; the broker minimum would exceed the risk target`,
+    ];
+  }
+
+  return [
+    `MT5 lot: <b>${sizing.lotSize.toFixed(lotDecimals(sizing.lotStep))}</b>`,
+    riskLine,
+    `Estimated SL loss: $${sizing.estimatedLossUsd?.toFixed(2)} after rounding down`,
+  ];
+}
+
 function strategyCategoryLabel(category: StrategyCategory) {
   return STRATEGY_CATEGORY_LABELS[category] ?? category;
 }
@@ -1312,6 +1372,51 @@ async function fetchMarketRows(config: SymbolConfig): Promise<MarketRows> {
   }
   const rows = await fetchYahooKlines(config);
   return { bid: rows, ask: rows };
+}
+
+async function quoteToUsdRate(
+  quoteCurrency: string,
+  cache: Map<string, number>
+) {
+  const cached = cache.get(quoteCurrency);
+  if (cached) return cached;
+
+  const conversion = FX_QUOTE_TO_USD_PAIRS[quoteCurrency];
+  if (!conversion) throw new Error(`No ${quoteCurrency}-to-USD conversion pair is configured`);
+
+  const profile = SIGNAL_PROFILES.find((candidate) => candidate.symbol === conversion.symbol);
+  if (!profile) throw new Error(`No market profile is available for ${conversion.symbol}`);
+
+  const rows = await fetchYahooKlines(profile);
+  const marketPrice = rows.at(-1)?.close;
+  if (!marketPrice || !Number.isFinite(marketPrice)) {
+    throw new Error(`${conversion.symbol} returned no conversion price`);
+  }
+
+  const rate = conversion.mode === "direct" ? marketPrice : 1 / marketPrice;
+  cache.set(quoteCurrency, rate);
+  return rate;
+}
+
+async function positionSizeForSignal(
+  signal: Signal,
+  conversionRateCache: Map<string, number>
+) {
+  const currencies = forexPairCurrencies(signal.symbol);
+  if (!currencies) return null;
+
+  const quoteToUsd =
+    currencies.base !== "USD" && currencies.quote !== "USD"
+      ? await quoteToUsdRate(currencies.quote, conversionRateCache)
+      : undefined;
+
+  return calculateForexPositionSize({
+    symbol: signal.symbol,
+    entryPrice: signal.entryPrice,
+    stopLoss: signal.stopLoss,
+    quoteToUsdRate: quoteToUsd,
+    ...forexSizingConfig(),
+  });
 }
 
 function selectSignalAndEntryBars(rows: Kline[], timeframe: SignalTimeframe) {
@@ -1684,7 +1789,7 @@ function detectSignal(config: SymbolConfig, rows: MarketRows) {
   return detectBbAtrSignal(config, bidRows);
 }
 
-function signalMessage(signal: Signal) {
+function signalMessage(signal: Signal, positionSize?: ForexPositionSizeResult | null) {
   const tp =
     signal.takeProfit == null
       ? `${signal.exitRule}; фіксованого TP немає, бот надішле EXIT ALERT при виході або SL`
@@ -1699,7 +1804,8 @@ function signalMessage(signal: Signal) {
     `SL: <code>${formatPrice(signal.symbol, signal.stopLoss)}</code>`,
     `TP / exit: <code>${htmlEscape(tp)}</code>`,
     `Risk distance: ${signal.riskDistancePips.toFixed(1)} pips/points`,
-    ...(signal.riskPct ? [`Risk: ${signal.riskPct.toFixed(2)}% of equity`] : []),
+    ...positionSizeLines(signal, positionSize),
+    ...(signal.riskPct ? [`Model portfolio risk: ${signal.riskPct.toFixed(2)}% of equity`] : []),
     ...(signal.portfolioId
       ? ["Portfolio guard: -3% daily stop, maximum 2% simultaneous risk"]
       : []),
@@ -2425,9 +2531,29 @@ async function scanOnce({ forceTest = false } = {}) {
     process.env.SIGNAL_SEND_EXISTING_ON_START === "true";
 
   if (forceTest) {
+    const testPositionSize = calculateForexPositionSize({
+      symbol: "EURUSD",
+      entryPrice: 1.1,
+      stopLoss: 1.096,
+      ...forexSizingConfig(),
+    });
+    if (!testPositionSize?.lotSize || testPositionSize.estimatedLossUsd == null) {
+      throw new Error("Unable to calculate the Telegram test position size");
+    }
+
     const message = [
-      "<b>PAPER SIGNAL TEST</b>",
-      "Telegram delivery is configured.",
+      "<b>POSITION SIZE TEST</b>",
+      "This is a calculation test, not a trade signal.",
+      "",
+      "<b>EURUSD</b> BUY",
+      "Entry: <code>1.10000</code>",
+      "SL: <code>1.09600</code>",
+      `MT5 lot: <b>${testPositionSize.lotSize.toFixed(lotDecimals(testPositionSize.lotStep))}</b>`,
+      `Risk target: <b>$${testPositionSize.riskAmountUsd.toFixed(2)}</b> (${testPositionSize.riskPercent.toFixed(2)}% of $${testPositionSize.accountBalanceUsd.toLocaleString("en-US")})`,
+      `Estimated SL loss: <b>$${testPositionSize.estimatedLossUsd.toFixed(2)}</b> after rounding down`,
+      "Commission and slippage excluded.",
+      "",
+      "Telegram delivery and MT5 sizing are configured.",
       `Time: ${iso(Date.now())}`,
       "No auto-trade.",
     ].join("\n");
@@ -2442,6 +2568,7 @@ async function scanOnce({ forceTest = false } = {}) {
   }
 
   const rowsCache = new Map<string, MarketRows>();
+  const conversionRateCache = new Map<string, number>();
 
   for (const symbol of symbols) {
     const profiles = profilesForSymbol(symbol);
@@ -2528,8 +2655,16 @@ async function scanOnce({ forceTest = false } = {}) {
           continue;
         }
 
+        let positionSize: ForexPositionSizeResult | null | undefined;
+        try {
+          positionSize = await positionSizeForSignal(signal, conversionRateCache);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`${iso(Date.now())} ${label}: MT5 lot calculation failed: ${message}`);
+        }
+
         if (dryRun) {
-          const message = signalMessage(signal);
+          const message = signalMessage(signal, positionSize);
           console.log("[dry-run] Signal detected:");
           console.log(message.replace(/<[^>]+>/g, ""));
           appendJournal("dry_run", signal);
@@ -2555,7 +2690,7 @@ async function scanOnce({ forceTest = false } = {}) {
           continue;
         }
 
-        const message = signalMessage(signal);
+        const message = signalMessage(signal, positionSize);
         const sentMessage = await sendTelegram(message);
         const signalMessageId = sentMessage.message_id;
         appendJournal("sent", signal);

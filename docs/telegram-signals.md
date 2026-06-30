@@ -112,8 +112,17 @@ Portfolio guards:
   UTC day;
 - fixed targets, stops, and time exits are monitored automatically.
 
-The monitor remains paper-signal only and does not calculate broker lot size or
-place orders.
+For Forex pairs, every opening alert includes a suggested MT5 lot size. By
+default it risks a fixed 1% ($50) of a $5,000 USD account, uses the Entry-to-SL
+distance, converts the quote-currency loss to USD, and rounds down to the
+configured broker lot step. Commission and slippage are intentionally excluded.
+The defaults can be changed with `SIGNAL_ACCOUNT_BALANCE_USD`,
+`SIGNAL_RISK_PER_TRADE_PCT`, `SIGNAL_FX_CONTRACT_SIZE`,
+`SIGNAL_FX_LOT_STEP`, `SIGNAL_FX_MIN_LOT`, and `SIGNAL_FX_MAX_LOT`.
+
+The monitor remains paper-signal only and does not place orders. Index, metal,
+and crypto lot sizes are not shown because their CFD contract specifications
+depend on the MT5 broker.
 
 GER40 warning: the research dataset used Dukascopy GER40 CFD, while the current
 live monitor uses Yahoo `^GDAXI`, a cash-index proxy with different session
