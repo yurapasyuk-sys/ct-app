@@ -246,15 +246,15 @@ function openingRangeAt(
   } satisfies ApprovedPropSignalSetup;
 }
 
-export function detectLatestApprovedPropSignal(
+export function detectAllApprovedPropSignals(
   config: ApprovedPropStrategyConfig,
   bidRows: Kline[],
   askRows: Kline[] = bidRows,
-  now = Date.now()
+  now = Number.POSITIVE_INFINITY
 ) {
   const intervalMs = config.timeframeHours * HOUR_MS;
   const askByTime = new Map(askRows.map((row) => [row.openTime, row]));
-  let latest: ApprovedPropSignalSetup | null = null;
+  const setups: ApprovedPropSignalSetup[] = [];
   for (let signalIndex = 1; signalIndex < bidRows.length - 1; signalIndex += 1) {
     const signal = bidRows[signalIndex];
     if (signal.openTime + intervalMs > now - 30_000) continue;
@@ -262,9 +262,18 @@ export function detectLatestApprovedPropSignal(
       config.kind === "htf_breakout"
         ? breakoutAt(config, bidRows, askByTime, signalIndex)
         : openingRangeAt(config, bidRows, askByTime, signalIndex);
-    if (setup && (!latest || setup.signalTime > latest.signalTime)) latest = setup;
+    if (setup) setups.push(setup);
   }
-  return latest;
+  return setups;
+}
+
+export function detectLatestApprovedPropSignal(
+  config: ApprovedPropStrategyConfig,
+  bidRows: Kline[],
+  askRows: Kline[] = bidRows,
+  now = Date.now()
+) {
+  return detectAllApprovedPropSignals(config, bidRows, askRows, now).at(-1) ?? null;
 }
 
 export function detectApprovedPropPositionExit(

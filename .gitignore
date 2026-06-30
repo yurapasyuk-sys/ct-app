@@ -27,3 +27,9 @@ dist-ssr
 .env
 .env*.local
 roro_bot.py
+.scratch/
+
+# Local backtest inputs and generated research outputs. Existing tracked
+# reference exports remain tracked, but new bulk outputs stay out of commits.
+public/data/forex/
+public/exports/

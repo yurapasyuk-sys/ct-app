@@ -293,6 +293,35 @@ function compressionReleaseAt(
   );
 }
 
+export function detectQ2PropSignalAt(
+  config: Q2PropStrategyConfig,
+  rows: Kline[],
+  signalIndex: number
+) {
+  if (config.kind === "q2_opening_drive") {
+    return openingDriveAt(config, rows, signalIndex);
+  }
+  if (config.kind === "q2_session_stretch") {
+    return sessionStretchAt(config, rows, signalIndex);
+  }
+  return compressionReleaseAt(config, rows, signalIndex);
+}
+
+export function detectAllQ2PropSignals(
+  config: Q2PropStrategyConfig,
+  rows: Kline[],
+  now = Number.POSITIVE_INFINITY
+) {
+  const barMs = config.timeframeMinutes * MINUTE_MS;
+  const setups: Q2PropSignalSetup[] = [];
+  for (let index = 0; index < rows.length - 1; index += 1) {
+    if (rows[index].openTime + barMs > now - 30_000) continue;
+    const setup = detectQ2PropSignalAt(config, rows, index);
+    if (setup) setups.push(setup);
+  }
+  return setups;
+}
+
 export function detectLatestQ2PropSignal(
   config: Q2PropStrategyConfig,
   rows: Kline[],
@@ -302,16 +331,8 @@ export function detectLatestQ2PropSignal(
   for (let index = rows.length - 2; index >= 0; index -= 1) {
     const signal = rows[index];
     if (signal.openTime + barMs > now - 30_000) continue;
-    if (config.kind === "q2_opening_drive") {
-      const setup = openingDriveAt(config, rows, index);
-      if (setup) return setup;
-    } else if (config.kind === "q2_session_stretch") {
-      const setup = sessionStretchAt(config, rows, index);
-      if (setup) return setup;
-    } else {
-      const setup = compressionReleaseAt(config, rows, index);
-      if (setup) return setup;
-    }
+    const setup = detectQ2PropSignalAt(config, rows, index);
+    if (setup) return setup;
   }
   return null;
 }
