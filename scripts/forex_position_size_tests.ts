@@ -3,6 +3,7 @@ import {
   calculateForexPositionSize,
   forexPairCurrencies,
 } from "../src/lib/trading/forex-position-size";
+import { calculateContractPositionSize } from "../src/lib/trading/contract-position-size";
 
 function closeTo(actual: number | null, expected: number, tolerance = 1e-8) {
   assert.notEqual(actual, null);
@@ -92,4 +93,65 @@ assert.throws(
   /JPY-to-USD conversion rate/
 );
 
-console.log("Forex position-size tests passed.");
+const contractCases = [
+  {
+    symbol: "GER40",
+    entryPrice: 25_632.1,
+    stopLoss: 25_567.1,
+    contractSize: 1,
+    profitToUsdRate: 1.17,
+    expectedLot: 0.65,
+    expectedLoss: 49.4325,
+  },
+  {
+    symbol: "US30",
+    entryPrice: 44_000,
+    stopLoss: 43_900,
+    contractSize: 1,
+    profitToUsdRate: 1,
+    expectedLot: 0.5,
+    expectedLoss: 50,
+  },
+  {
+    symbol: "SPX500",
+    entryPrice: 6_200,
+    stopLoss: 6_190,
+    contractSize: 10,
+    profitToUsdRate: 1,
+    expectedLot: 0.5,
+    expectedLoss: 50,
+  },
+  {
+    symbol: "NAS100",
+    entryPrice: 22_500,
+    stopLoss: 22_490,
+    contractSize: 10,
+    profitToUsdRate: 1,
+    expectedLot: 0.5,
+    expectedLoss: 50,
+  },
+  {
+    symbol: "XAUUSD",
+    entryPrice: 3_300,
+    stopLoss: 3_295,
+    contractSize: 100,
+    profitToUsdRate: 1,
+    expectedLot: 0.1,
+    expectedLoss: 50,
+  },
+] as const;
+
+for (const testCase of contractCases) {
+  const sizing = calculateContractPositionSize({
+    ...testCase,
+    accountBalanceUsd: 5_000,
+    riskPercent: 1,
+    minLot: 0.01,
+    maxLot: 50,
+    lotStep: 0.01,
+  });
+  assert.equal(sizing.lotSize, testCase.expectedLot, `${testCase.symbol} lot`);
+  closeTo(sizing.estimatedLossUsd, testCase.expectedLoss);
+}
+
+console.log("Forex and CFD position-size tests passed.");

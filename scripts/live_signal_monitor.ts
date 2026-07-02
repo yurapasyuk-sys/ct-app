@@ -29,8 +29,9 @@ import {
 import {
   calculateForexPositionSize,
   forexPairCurrencies,
-  type ForexPositionSizeResult,
 } from "../src/lib/trading/forex-position-size";
+import { calculateContractPositionSize } from "../src/lib/trading/contract-position-size";
+import type { PositionSizeResult } from "../src/lib/trading/position-size-core";
 
 type Direction = "long" | "short";
 export type StrategyKind =
@@ -229,6 +230,22 @@ const FX_QUOTE_TO_USD_PAIRS: Record<
   GBP: { symbol: "GBPUSD", mode: "direct" },
   JPY: { symbol: "USDJPY", mode: "inverse" },
   NZD: { symbol: "NZDUSD", mode: "direct" },
+};
+const MT5_CONTRACT_SPECS: Record<
+  string,
+  {
+    contractSize: number;
+    profitCurrency: "EUR" | "USD";
+    minLot: number;
+    maxLot: number;
+    lotStep: number;
+  }
+> = {
+  GER40: { contractSize: 1, profitCurrency: "EUR", minLot: 0.01, maxLot: 50, lotStep: 0.01 },
+  US30: { contractSize: 1, profitCurrency: "USD", minLot: 0.01, maxLot: 50, lotStep: 0.01 },
+  SPX500: { contractSize: 10, profitCurrency: "USD", minLot: 0.01, maxLot: 50, lotStep: 0.01 },
+  NAS100: { contractSize: 10, profitCurrency: "USD", minLot: 0.01, maxLot: 50, lotStep: 0.01 },
+  XAUUSD: { contractSize: 100, profitCurrency: "USD", minLot: 0.01, maxLot: 50, lotStep: 0.01 },
 };
 
 const PROP_2026_SESSION_MOMENTUM_CONFIG: Prop2026SessionMomentumConfig = {
@@ -1059,10 +1076,16 @@ function positiveEnvNumber(name: string, fallback: number) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-function forexSizingConfig() {
+function manualRiskConfig() {
   return {
     accountBalanceUsd: positiveEnvNumber("SIGNAL_ACCOUNT_BALANCE_USD", 5_000),
     riskPercent: positiveEnvNumber("SIGNAL_RISK_PER_TRADE_PCT", 1),
+  };
+}
+
+function forexSizingConfig() {
+  return {
+    ...manualRiskConfig(),
     contractSize: positiveEnvNumber("SIGNAL_FX_CONTRACT_SIZE", 100_000),
     lotStep: positiveEnvNumber("SIGNAL_FX_LOT_STEP", 0.01),
     minLot: positiveEnvNumber("SIGNAL_FX_MIN_LOT", 0.01),
@@ -1076,8 +1099,8 @@ function lotDecimals(step: number) {
   return text.includes(".") ? text.split(".")[1].length : 0;
 }
 
-function positionSizeLines(signal: Signal, sizing?: ForexPositionSizeResult | null) {
-  if (!forexPairCurrencies(signal.symbol)) return [];
+function positionSizeLines(signal: Signal, sizing?: PositionSizeResult | null) {
+  if (!forexPairCurrencies(signal.symbol) && !MT5_CONTRACT_SPECS[signal.symbol]) return [];
   if (!sizing) {
     return ["MT5 lot: <b>not calculated</b> (USD conversion rate unavailable)"];
   }
@@ -1402,6 +1425,25 @@ async function positionSizeForSignal(
   signal: Signal,
   conversionRateCache: Map<string, number>
 ) {
+  const contractSpec = MT5_CONTRACT_SPECS[signal.symbol];
+  if (contractSpec) {
+    const profitToUsdRate =
+      contractSpec.profitCurrency === "USD"
+        ? 1
+        : await quoteToUsdRate(contractSpec.profitCurrency, conversionRateCache);
+    return calculateContractPositionSize({
+      symbol: signal.symbol,
+      entryPrice: signal.entryPrice,
+      stopLoss: signal.stopLoss,
+      contractSize: contractSpec.contractSize,
+      profitToUsdRate,
+      minLot: contractSpec.minLot,
+      maxLot: contractSpec.maxLot,
+      lotStep: contractSpec.lotStep,
+      ...manualRiskConfig(),
+    });
+  }
+
   const currencies = forexPairCurrencies(signal.symbol);
   if (!currencies) return null;
 
@@ -1789,7 +1831,7 @@ function detectSignal(config: SymbolConfig, rows: MarketRows) {
   return detectBbAtrSignal(config, bidRows);
 }
 
-function signalMessage(signal: Signal, positionSize?: ForexPositionSizeResult | null) {
+function signalMessage(signal: Signal, positionSize?: PositionSizeResult | null) {
   const tp =
     signal.takeProfit == null
       ? `${signal.exitRule}; фіксованого TP немає, бот надішле EXIT ALERT при виході або SL`
@@ -2655,7 +2697,7 @@ async function scanOnce({ forceTest = false } = {}) {
           continue;
         }
 
-        let positionSize: ForexPositionSizeResult | null | undefined;
+        let positionSize: PositionSizeResult | null | undefined;
         try {
           positionSize = await positionSizeForSignal(signal, conversionRateCache);
         } catch (error) {

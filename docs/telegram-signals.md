@@ -120,9 +120,14 @@ The defaults can be changed with `SIGNAL_ACCOUNT_BALANCE_USD`,
 `SIGNAL_RISK_PER_TRADE_PCT`, `SIGNAL_FX_CONTRACT_SIZE`,
 `SIGNAL_FX_LOT_STEP`, `SIGNAL_FX_MIN_LOT`, and `SIGNAL_FX_MAX_LOT`.
 
-The monitor remains paper-signal only and does not place orders. Index, metal,
-and crypto lot sizes are not shown because their CFD contract specifications
-depend on the MT5 broker.
+The configured MT5 broker contract specifications are also applied to `GER40`
+(contract 1, profit in EUR), `US30` (contract 1), `SPX500` (contract 10),
+`NAS100` (contract 10), and `XAUUSD` (contract 100). Each has minimum volume
+0.01, maximum volume 50, and volume step 0.01. EUR profit on `GER40` is
+converted to the USD account currency using the current `EURUSD` rate.
+
+The monitor remains paper-signal only and does not place orders. Crypto lot
+sizes are not shown because their contract specifications are not configured.
 
 GER40 warning: the research dataset used Dukascopy GER40 CFD, while the current
 live monitor uses Yahoo `^GDAXI`, a cash-index proxy with different session
